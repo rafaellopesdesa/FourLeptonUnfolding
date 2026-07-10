@@ -1,0 +1,22 @@
+# Locally installed generator stack and build downloads
+Generation/software/
+Generation/downloads/
+Generation/build/
+Generation/env.sh
+
+# Generated event samples and run products
+Generation/runs/
+*.lhe
+*.lhe.gz
+*.hepmc
+*.hepmc3
+*.root
+*.run
+*.log
+pwg*.dat
+pwg*.top
+
+# Editor and Python noise
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
