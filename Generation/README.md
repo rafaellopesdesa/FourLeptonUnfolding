@@ -5,7 +5,7 @@ This directory provides a first, reproducible Ubuntu 24.04 workflow for
 - POWHEG-BOX-V2 `gg_H` and `ZZ`;
 - PYTHIA 8.317;
 - Herwig 7.3.0/ThePEG 2.3.0;
-- LHAPDF, FastJet and HepMC3.
+- GSL 2.8, LHAPDF, FastJet and HepMC3.
 
 POWHEG is cloned from its current official GitLab repository. The two process
 repositories are initialized as pinned submodules, and the resolved commits are
@@ -29,7 +29,15 @@ To install elsewhere or limit compilation parallelism:
 ```
 
 The script installs Ubuntu build packages with `apt`. Use `--skip-apt` only if
-the prerequisites are already available.
+the compiler and base build tools are already available. GSL is built inside
+the local installation prefix, so root privileges are not needed for it:
+
+```bash
+./install_generators.sh --skip-apt
+```
+
+This no-`sudo` route still expects `c++`, `gfortran`, `make`, `cmake`, `curl`,
+`git`, `tar`, and the Boost headers to be available on the host system.
 
 ## Run the four combinations
 

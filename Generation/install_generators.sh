@@ -11,6 +11,7 @@ BUILD_DIR="${BUILD_DIR:-${SCRIPT_DIR}/build}"
 JOBS="${JOBS:-$(nproc)}"
 SKIP_APT=0
 
+GSL_VERSION="${GSL_VERSION:-2.8}"
 LHAPDF_VERSION="${LHAPDF_VERSION:-6.5.6}"
 FASTJET_VERSION="${FASTJET_VERSION:-3.4.3}"
 HEPMC3_VERSION="${HEPMC3_VERSION:-3.3.0}"
@@ -95,7 +96,7 @@ install_ubuntu_dependencies() {
   "${apt[@]}" update
   DEBIAN_FRONTEND=noninteractive "${apt[@]}" install -y --no-install-recommends \
     autoconf automake bison build-essential ca-certificates cmake curl flex \
-    gfortran git libboost-all-dev libbz2-dev libgsl-dev liblzma-dev \
+    gfortran git libboost-all-dev libbz2-dev liblzma-dev \
     libreadline-dev libsqlite3-dev libssl-dev libtool libxml2-dev \
     patch pkg-config python3 python3-dev rsync tar uuid-dev xz-utils zlib1g-dev
 }
@@ -126,6 +127,25 @@ configure_optional_prefix() {
   if grep -q -- "$option" <<<"$configure_help"; then
     printf '%s=%s\n' "$option" "$value"
   fi
+}
+
+install_gsl() {
+  local stamp="$PREFIX/.installed-gsl-$GSL_VERSION"
+  [[ -e "$stamp" ]] && return
+  local archive
+  archive="$(download \
+    "https://ftp.gnu.org/gnu/gsl/gsl-${GSL_VERSION}.tar.gz" \
+    "gsl-${GSL_VERSION}.tar.gz")"
+  local src="$BUILD_DIR/gsl-$GSL_VERSION"
+  unpack_clean "$archive" "$src"
+  log "Building GSL $GSL_VERSION"
+  (
+    cd "$src"
+    ./configure --prefix="$PREFIX"
+    make -j"$JOBS"
+    make install
+  )
+  touch "$stamp"
 }
 
 install_lhapdf() {
@@ -225,6 +245,7 @@ install_thepeg() {
     while IFS= read -r option; do
       [[ -n "$option" ]] && options+=("$option")
     done < <(
+      configure_optional_prefix "$help_text" --with-gsl "$PREFIX"
       configure_optional_prefix "$help_text" --with-lhapdf "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc3 "$PREFIX"
@@ -258,6 +279,7 @@ install_herwig() {
     while IFS= read -r option; do
       [[ -n "$option" ]] && options+=("$option")
     done < <(
+      configure_optional_prefix "$help_text" --with-gsl "$PREFIX"
       configure_optional_prefix "$help_text" --with-lhapdf "$PREFIX"
       configure_optional_prefix "$help_text" --with-fastjet "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc "$PREFIX"
@@ -329,6 +351,7 @@ EOF
 write_versions() {
   local powheg_root="$PREFIX/src/POWHEG-BOX-V2"
   {
+    printf 'GSL %s\n' "$GSL_VERSION"
     printf 'LHAPDF %s\n' "$LHAPDF_VERSION"
     printf 'FastJet %s\n' "$FASTJET_VERSION"
     printf 'HepMC3 %s\n' "$HEPMC3_VERSION"
@@ -343,6 +366,7 @@ write_versions() {
 }
 
 install_ubuntu_dependencies
+install_gsl
 install_lhapdf
 install_fastjet
 install_hepmc3
