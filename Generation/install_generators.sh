@@ -96,7 +96,7 @@ install_ubuntu_dependencies() {
   DEBIAN_FRONTEND=noninteractive "${apt[@]}" install -y --no-install-recommends \
     autoconf automake bison build-essential ca-certificates cmake curl flex \
     gfortran git libboost-all-dev libbz2-dev libgsl-dev liblzma-dev \
-    libreadline-dev libsqlite3-dev libssl-dev libtool libxml2-dev ninja-build \
+    libreadline-dev libsqlite3-dev libssl-dev libtool libxml2-dev \
     patch pkg-config python3 python3-dev rsync tar uuid-dev xz-utils zlib1g-dev
 }
 
@@ -176,7 +176,7 @@ install_hepmc3() {
   local src="$BUILD_DIR/HepMC3-$HEPMC3_VERSION"
   unpack_clean "$archive" "$src"
   log "Building HepMC3 $HEPMC3_VERSION"
-  cmake -S "$src" -B "$src/build" -G Ninja \
+  cmake -S "$src" -B "$src/build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DHEPMC3_ENABLE_ROOTIO=OFF \
