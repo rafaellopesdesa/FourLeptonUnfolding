@@ -23,6 +23,7 @@ PYTHIA_REF="${PYTHIA_REF:-83a5c9986f30746cfb390435a9b10ac55a758fca}"
 THEPEG_VERSION="${THEPEG_VERSION:-2.3.0}"
 HERWIG_VERSION="${HERWIG_VERSION:-7.3.0}"
 PDFSET="${PDFSET:-NNPDF31_nlo_as_0118}"
+LHAPDF_SET_BASE_URL="${LHAPDF_SET_BASE_URL:-https://lhapdfsets.web.cern.ch/current}"
 
 POWHEG_URL="${POWHEG_URL:-https://gitlab.com/POWHEG-BOX/V2/POWHEG-BOX-V2.git}"
 POWHEG_REF="${POWHEG_REF:-master}"
@@ -418,12 +419,39 @@ install_herwig() {
 }
 
 install_pdfset() {
-  if "$PREFIX/bin/lhapdf" list --installed 2>/dev/null | grep -qx "$PDFSET"; then
-    return
-  fi
-  log "Installing LHAPDF set $PDFSET"
-  "$PREFIX/bin/lhapdf" update
-  "$PREFIX/bin/lhapdf" install "$PDFSET"
+  local pdfset="$1"
+  [[ "$pdfset" =~ ^[A-Za-z0-9_.+-]+$ ]] || {
+    echo "Invalid LHAPDF set name: $pdfset" >&2
+    exit 1
+  }
+
+  local pdfdir="$PREFIX/share/LHAPDF"
+  [[ -f "$pdfdir/$pdfset/$pdfset.info" ]] && return
+
+  local archive
+  archive="$(download \
+    "$LHAPDF_SET_BASE_URL/${pdfset}.tar.gz" \
+    "${pdfset}.tar.gz")"
+  local stage="$BUILD_DIR/lhapdf-set-$pdfset"
+  rm -rf "$stage"
+  mkdir -p "$stage" "$pdfdir"
+  log "Installing LHAPDF set $pdfset"
+  tar --no-same-owner -xzf "$archive" -C "$stage"
+  [[ -f "$stage/$pdfset/$pdfset.info" ]] || {
+    echo "Downloaded archive for $pdfset does not contain $pdfset/$pdfset.info." >&2
+    exit 1
+  }
+  rm -rf "$pdfdir/$pdfset"
+  mv "$stage/$pdfset" "$pdfdir/"
+}
+
+install_pdfsets() {
+  # Herwig 7.3 builds its default repository during `make install` and needs
+  # both CT14 sets at that point. The analysis set is installed here as well.
+  local pdfset
+  for pdfset in CT14lo CT14nlo "$PDFSET"; do
+    install_pdfset "$pdfset"
+  done
 }
 
 install_powheg() {
@@ -492,6 +520,7 @@ write_versions() {
     printf 'PYTHIA %s\n' "$PYTHIA_VERSION"
     printf 'ThePEG %s\n' "$THEPEG_VERSION"
     printf 'Herwig %s\n' "$HERWIG_VERSION"
+    printf 'Herwig default PDF sets CT14lo CT14nlo\n'
     printf 'PDF set %s\n' "$PDFSET"
     printf 'POWHEG-BOX-V2 %s\n' "$(git -C "$powheg_root" rev-parse HEAD)"
     printf 'POWHEG gg_H %s\n' "$(git -C "$powheg_root/gg_H" rev-parse HEAD)"
@@ -503,12 +532,12 @@ install_ubuntu_dependencies
 install_gsl
 install_boost
 install_lhapdf
+install_pdfsets
 install_fastjet
 install_hepmc3
 install_pythia8
 install_thepeg
 install_herwig
-install_pdfset
 install_powheg
 install_pythia_driver
 write_environment

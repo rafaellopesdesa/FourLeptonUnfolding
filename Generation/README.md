@@ -39,6 +39,9 @@ the local installation prefix, so root privileges are not needed for it:
 This no-`sudo` route still expects `c++`, `gfortran`, `make`, `cmake`, `curl`,
 `git`, and `tar` to be available on the host system. Boost headers and the
 compiled Boost.Test library are built inside the local installation prefix.
+The required `CT14lo`, `CT14nlo`, and `NNPDF31_nlo_as_0118` PDF data sets are
+downloaded directly into that prefix before Herwig is built. This does not
+depend on LHAPDF's optional Python bindings or its `lhapdf install` command.
 
 On systems providing GSL through Environment Modules or Lmod, the local GSL
 build can be skipped:
