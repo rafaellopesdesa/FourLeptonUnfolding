@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 # Install a self-contained POWHEG-BOX-V2 + shower stack on Ubuntu 24.04.
-# Everything except apt build prerequisites is installed below PREFIX.
+# Dependencies are installed below PREFIX unless explicitly supplied by an
+# environment module.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX="${PREFIX:-${SCRIPT_DIR}/software}"
@@ -12,6 +13,7 @@ JOBS="${JOBS:-$(nproc)}"
 SKIP_APT=0
 
 GSL_VERSION="${GSL_VERSION:-2.8}"
+GSL_MODULE="${GSL_MODULE:-}"
 LHAPDF_VERSION="${LHAPDF_VERSION:-6.5.6}"
 FASTJET_VERSION="${FASTJET_VERSION:-3.4.3}"
 HEPMC3_VERSION="${HEPMC3_VERSION:-3.3.0}"
@@ -32,6 +34,7 @@ Options:
   --prefix DIR    Installation prefix (default: Generation/software)
   --jobs N        Parallel build jobs (default: number of CPU cores)
   --skip-apt      Do not install Ubuntu build prerequisites
+  --gsl-module M  Try GSL environment module M; use "auto" for gsl/VERSION
   -h, --help      Show this help
 
 Environment variables can override all version variables near the top of the
@@ -53,6 +56,14 @@ while (($#)); do
       SKIP_APT=1
       shift
       ;;
+    --gsl-module)
+      (($# >= 2)) || {
+        echo "--gsl-module requires a module name (for example gsl/2.8)." >&2
+        exit 2
+      }
+      GSL_MODULE="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -69,6 +80,9 @@ mkdir -p "$PREFIX" "$DOWNLOAD_DIR" "$BUILD_DIR"
 PREFIX="$(realpath "$PREFIX")"
 DOWNLOAD_DIR="$(realpath "$DOWNLOAD_DIR")"
 BUILD_DIR="$(realpath "$BUILD_DIR")"
+GSL_PREFIX="$PREFIX"
+GSL_RESOLVED_VERSION="$GSL_VERSION"
+GSL_MODULE_ACTIVE=0
 
 export PATH="$PREFIX/bin:$PATH"
 export LD_LIBRARY_PATH="$PREFIX/lib:$PREFIX/lib64:${LD_LIBRARY_PATH:-}"
@@ -129,9 +143,79 @@ configure_optional_prefix() {
   fi
 }
 
+initialize_module_command() {
+  type module >/dev/null 2>&1 && return 0
+
+  local -a init_scripts=()
+  if [[ -n "${MODULESHOME:-}" ]]; then
+    init_scripts+=("$MODULESHOME/init/bash")
+  fi
+  init_scripts+=(
+    /etc/profile.d/modules.sh
+    /etc/profile.d/lmod.sh
+    /etc/profile.d/z00_lmod.sh
+    /usr/share/Modules/init/bash
+    /usr/share/lmod/lmod/init/bash
+  )
+
+  local init_script
+  for init_script in "${init_scripts[@]}"; do
+    if [[ -r "$init_script" ]]; then
+      # Environment Modules and Lmod intentionally modify this shell.
+      # shellcheck disable=SC1090
+      source "$init_script"
+      type module >/dev/null 2>&1 && return 0
+    fi
+  done
+  return 1
+}
+
+try_gsl_module() {
+  [[ -n "$GSL_MODULE" ]] || return 1
+  [[ "$GSL_MODULE" != auto ]] || GSL_MODULE="gsl/$GSL_VERSION"
+
+  if ! initialize_module_command; then
+    log "The module command is unavailable; building GSL locally instead"
+    return 1
+  fi
+
+  log "Trying GSL environment module $GSL_MODULE"
+  if ! module load "$GSL_MODULE"; then
+    log "Could not load $GSL_MODULE; building GSL locally instead"
+    return 1
+  fi
+
+  local gsl_config resolved_prefix resolved_version
+  gsl_config="$(command -v gsl-config || true)"
+  resolved_prefix="${gsl_config:+$("$gsl_config" --prefix 2>/dev/null || true)}"
+  resolved_version="${gsl_config:+$("$gsl_config" --version 2>/dev/null || true)}"
+
+  if [[ -z "$gsl_config" || -z "$resolved_prefix" || -z "$resolved_version" || \
+        ! -d "$resolved_prefix/include/gsl" ]]; then
+    log "Module $GSL_MODULE did not expose a usable gsl-config and headers; building GSL locally instead"
+    module unload "$GSL_MODULE" >/dev/null 2>&1 || true
+    return 1
+  fi
+
+  GSL_PREFIX="$(realpath -m "$resolved_prefix")"
+  GSL_RESOLVED_VERSION="$resolved_version"
+  GSL_MODULE_ACTIVE=1
+  log "Using GSL $GSL_RESOLVED_VERSION from $GSL_MODULE ($GSL_PREFIX)"
+}
+
 install_gsl() {
+  try_gsl_module && return
+
+  GSL_PREFIX="$PREFIX"
+  GSL_RESOLVED_VERSION="$GSL_VERSION"
+  GSL_MODULE_ACTIVE=0
   local stamp="$PREFIX/.installed-gsl-$GSL_VERSION"
-  [[ -e "$stamp" ]] && return
+  if [[ -e "$stamp" ]]; then
+    if [[ -x "$PREFIX/bin/gsl-config" ]]; then
+      GSL_RESOLVED_VERSION="$("$PREFIX/bin/gsl-config" --version)"
+    fi
+    return
+  fi
   local archive
   archive="$(download \
     "https://ftp.gnu.org/gnu/gsl/gsl-${GSL_VERSION}.tar.gz" \
@@ -145,6 +229,7 @@ install_gsl() {
     make -j"$JOBS"
     make install
   )
+  GSL_RESOLVED_VERSION="$("$PREFIX/bin/gsl-config" --version)"
   touch "$stamp"
 }
 
@@ -245,7 +330,7 @@ install_thepeg() {
     while IFS= read -r option; do
       [[ -n "$option" ]] && options+=("$option")
     done < <(
-      configure_optional_prefix "$help_text" --with-gsl "$PREFIX"
+      configure_optional_prefix "$help_text" --with-gsl "$GSL_PREFIX"
       configure_optional_prefix "$help_text" --with-lhapdf "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc3 "$PREFIX"
@@ -279,7 +364,7 @@ install_herwig() {
     while IFS= read -r option; do
       [[ -n "$option" ]] && options+=("$option")
     done < <(
-      configure_optional_prefix "$help_text" --with-gsl "$PREFIX"
+      configure_optional_prefix "$help_text" --with-gsl "$GSL_PREFIX"
       configure_optional_prefix "$help_text" --with-lhapdf "$PREFIX"
       configure_optional_prefix "$help_text" --with-fastjet "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc "$PREFIX"
@@ -337,12 +422,14 @@ write_environment() {
   cat >"$SCRIPT_DIR/env.sh" <<EOF
 #!/usr/bin/env bash
 export GENERATION_PREFIX="$PREFIX"
+export GENERATION_GSL_PREFIX="$GSL_PREFIX"
+export GENERATION_GSL_MODULE="$GSL_MODULE"
 export POWHEG_ROOT="$PREFIX/src/POWHEG-BOX-V2"
 export GENERATION_PDFSET="$PDFSET"
-export PATH="$PREFIX/bin:\${PATH}"
-export LD_LIBRARY_PATH="$PREFIX/lib:$PREFIX/lib64:\${LD_LIBRARY_PATH:-}"
-export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:\${PKG_CONFIG_PATH:-}"
-export CMAKE_PREFIX_PATH="$PREFIX:\${CMAKE_PREFIX_PATH:-}"
+export PATH="$GSL_PREFIX/bin:$PREFIX/bin:\${PATH}"
+export LD_LIBRARY_PATH="$GSL_PREFIX/lib:$GSL_PREFIX/lib64:$PREFIX/lib:$PREFIX/lib64:\${LD_LIBRARY_PATH:-}"
+export PKG_CONFIG_PATH="$GSL_PREFIX/lib/pkgconfig:$GSL_PREFIX/lib64/pkgconfig:$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:\${PKG_CONFIG_PATH:-}"
+export CMAKE_PREFIX_PATH="$GSL_PREFIX:$PREFIX:\${CMAKE_PREFIX_PATH:-}"
 export LHAPDF_DATA_PATH="$PREFIX/share/LHAPDF"
 EOF
   chmod +x "$SCRIPT_DIR/env.sh"
@@ -351,7 +438,12 @@ EOF
 write_versions() {
   local powheg_root="$PREFIX/src/POWHEG-BOX-V2"
   {
-    printf 'GSL %s\n' "$GSL_VERSION"
+    printf 'GSL %s\n' "$GSL_RESOLVED_VERSION"
+    if ((GSL_MODULE_ACTIVE)); then
+      printf 'GSL module %s\n' "$GSL_MODULE"
+    else
+      printf 'GSL source local build\n'
+    fi
     printf 'LHAPDF %s\n' "$LHAPDF_VERSION"
     printf 'FastJet %s\n' "$FASTJET_VERSION"
     printf 'HepMC3 %s\n' "$HEPMC3_VERSION"

@@ -39,6 +39,20 @@ the local installation prefix, so root privileges are not needed for it:
 This no-`sudo` route still expects `c++`, `gfortran`, `make`, `cmake`, `curl`,
 `git`, `tar`, and the Boost headers to be available on the host system.
 
+On systems providing GSL through Environment Modules or Lmod, the local GSL
+build can be skipped:
+
+```bash
+./install_generators.sh --skip-apt --gsl-module gsl/2.8
+```
+
+Use `--gsl-module auto` to try `gsl/2.8`, or set the `GSL_MODULE` environment
+variable. The installer validates the loaded module with `gsl-config`; if the
+module command, requested module, or GSL headers are unavailable, it falls back
+to building GSL 2.8 in the local installation prefix. The resolved GSL prefix
+is also written to `env.sh`, so subsequent generation jobs do not need to run
+`module load` themselves.
+
 ## Run the four combinations
 
 ```bash
