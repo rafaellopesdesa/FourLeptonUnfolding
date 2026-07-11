@@ -14,6 +14,7 @@ SKIP_APT=0
 
 GSL_VERSION="${GSL_VERSION:-2.8}"
 GSL_MODULE="${GSL_MODULE:-}"
+BOOST_VERSION="${BOOST_VERSION:-1.83.0}"
 LHAPDF_VERSION="${LHAPDF_VERSION:-6.5.6}"
 FASTJET_VERSION="${FASTJET_VERSION:-3.4.3}"
 HEPMC3_VERSION="${HEPMC3_VERSION:-3.3.0}"
@@ -89,6 +90,7 @@ export LD_LIBRARY_PATH="$PREFIX/lib:$PREFIX/lib64:${LD_LIBRARY_PATH:-}"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:${PKG_CONFIG_PATH:-}"
 export CMAKE_PREFIX_PATH="$PREFIX:${CMAKE_PREFIX_PATH:-}"
 export LHAPDF_DATA_PATH="$PREFIX/share/LHAPDF"
+export BOOST_ROOT="$PREFIX"
 
 log() {
   printf '[install] %s\n' "$*" >&2
@@ -110,7 +112,7 @@ install_ubuntu_dependencies() {
   "${apt[@]}" update
   DEBIAN_FRONTEND=noninteractive "${apt[@]}" install -y --no-install-recommends \
     autoconf automake bison build-essential ca-certificates cmake curl flex \
-    gfortran git libboost-all-dev libbz2-dev liblzma-dev \
+    gfortran git libbz2-dev liblzma-dev \
     libreadline-dev libsqlite3-dev libssl-dev libtool libxml2-dev \
     patch pkg-config python3 python3-dev rsync tar uuid-dev xz-utils zlib1g-dev
 }
@@ -233,6 +235,41 @@ install_gsl() {
   touch "$stamp"
 }
 
+install_boost() {
+  local stamp="$PREFIX/.installed-boost-$BOOST_VERSION"
+  [[ -e "$stamp" ]] && return
+
+  local boost_version_underscore="${BOOST_VERSION//./_}"
+  local archive
+  archive="$(download \
+    "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_version_underscore}.tar.bz2" \
+    "boost_${boost_version_underscore}.tar.bz2")"
+  local src="$BUILD_DIR/boost_$boost_version_underscore"
+  unpack_clean "$archive" "$src"
+  log "Building Boost $BOOST_VERSION headers and Boost.Test"
+  (
+    cd "$src"
+    ./bootstrap.sh --prefix="$PREFIX" --with-libraries=test
+    ./b2 -j"$JOBS" \
+      --prefix="$PREFIX" \
+      --layout=system \
+      variant=release \
+      threading=multi \
+      link=shared,static \
+      install
+  )
+  [[ -f "$PREFIX/include/boost/test/unit_test.hpp" ]] || {
+    echo "Boost.Test headers were not installed below $PREFIX." >&2
+    exit 1
+  }
+  [[ -e "$PREFIX/lib/libboost_unit_test_framework.so" || \
+     -f "$PREFIX/lib/libboost_unit_test_framework.a" ]] || {
+    echo "Boost unit_test_framework was not installed below $PREFIX/lib." >&2
+    exit 1
+  }
+  touch "$stamp"
+}
+
 install_lhapdf() {
   local stamp="$PREFIX/.installed-lhapdf-$LHAPDF_VERSION"
   [[ -e "$stamp" ]] && return
@@ -331,6 +368,7 @@ install_thepeg() {
       [[ -n "$option" ]] && options+=("$option")
     done < <(
       configure_optional_prefix "$help_text" --with-gsl "$GSL_PREFIX"
+      configure_optional_prefix "$help_text" --with-boost "$PREFIX"
       configure_optional_prefix "$help_text" --with-lhapdf "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc3 "$PREFIX"
@@ -365,6 +403,7 @@ install_herwig() {
       [[ -n "$option" ]] && options+=("$option")
     done < <(
       configure_optional_prefix "$help_text" --with-gsl "$GSL_PREFIX"
+      configure_optional_prefix "$help_text" --with-boost "$PREFIX"
       configure_optional_prefix "$help_text" --with-lhapdf "$PREFIX"
       configure_optional_prefix "$help_text" --with-fastjet "$PREFIX"
       configure_optional_prefix "$help_text" --with-hepmc "$PREFIX"
@@ -424,6 +463,8 @@ write_environment() {
 export GENERATION_PREFIX="$PREFIX"
 export GENERATION_GSL_PREFIX="$GSL_PREFIX"
 export GENERATION_GSL_MODULE="$GSL_MODULE"
+export GENERATION_BOOST_PREFIX="$PREFIX"
+export BOOST_ROOT="$PREFIX"
 export POWHEG_ROOT="$PREFIX/src/POWHEG-BOX-V2"
 export GENERATION_PDFSET="$PDFSET"
 export PATH="$GSL_PREFIX/bin:$PREFIX/bin:\${PATH}"
@@ -444,6 +485,7 @@ write_versions() {
     else
       printf 'GSL source local build\n'
     fi
+    printf 'Boost %s (headers and Boost.Test)\n' "$BOOST_VERSION"
     printf 'LHAPDF %s\n' "$LHAPDF_VERSION"
     printf 'FastJet %s\n' "$FASTJET_VERSION"
     printf 'HepMC3 %s\n' "$HEPMC3_VERSION"
@@ -459,6 +501,7 @@ write_versions() {
 
 install_ubuntu_dependencies
 install_gsl
+install_boost
 install_lhapdf
 install_fastjet
 install_hepmc3
