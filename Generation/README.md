@@ -64,7 +64,7 @@ mkdir Generation; cd Generation
 mkdir install
 git clone https://github.com/rafaellopesdesa/FourLeptonUnfolding
 cd FourLeptonUnfolding/Generation
-./install_generators.sh --prefix ../../install --jobs 8 --skip-apt --gsl-module 2.8
+./install_generators.sh --prefix ../../install --jobs 8 --skip-apt --gsl-module gsl/2.8
 source env.sh
 ```
 
