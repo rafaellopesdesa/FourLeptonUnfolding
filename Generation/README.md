@@ -53,6 +53,20 @@ to building GSL 2.8 in the local installation prefix. The resolved GSL prefix
 is also written to `env.sh`, so subsequent generation jobs do not need to run
 `module load` themselves.
 
+## Unity specific recommendations
+
+In Unity, use the /work/ space for compilation
+
+```bash
+cd /work/rclsa_umass_edu/puser]
+mkdir Generation; cd Generation
+mkdir install
+git clone https://github.com/rafaellopesdesa/FourLeptonUnfolding
+cd FourLeptonUnfolding/Generation
+./install_generators.sh --prefix ../../install --jobs 8 --skip-apt --gsl-module auto
+source env.sh
+```
+
 ## Run the four combinations
 
 ```bash
