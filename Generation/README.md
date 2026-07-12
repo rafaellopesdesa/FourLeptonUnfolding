@@ -64,17 +64,25 @@ is also written to `env.sh`, so subsequent generation jobs do not need to run
 
 ## Unity specific recommendations
 
-In Unity, use the /work/ space for compilation
+On Unity, clone the repository and compile the complete generator stack below
+`/work/pi_rclsa_umass_edu/`, not in `/home`. `/work` is mounted on the worker
+nodes and is intended for job I/O; compiling in `/home` can leave batch jobs
+without access to the expected code, executables, or libraries.
 
 ```bash
-cd /work/rclsa_umass_edu/puser]
-mkdir Generation; cd Generation
-mkdir install
+mkdir -p /work/pi_rclsa_umass_edu/$USER/FourLeptonStudy
+cd /work/pi_rclsa_umass_edu/$USER/FourLeptonStudy
 git clone https://github.com/rafaellopesdesa/FourLeptonUnfolding
 cd FourLeptonUnfolding/Generation
-./install_generators.sh --prefix ../../install --jobs 8 --skip-apt --gsl-module gsl/2.8
+./install_generators.sh \
+  --prefix /work/pi_rclsa_umass_edu/$USER/FourLeptonStudy/install \
+  --jobs 8 --skip-apt --gsl-module gsl/2.8
 source env.sh
 ```
+
+After installation, use `submit_generation.sh` to create Unity Slurm campaigns
+with 1000--10000 events per job. The full workflow and output layout are in
+[`../BatchSubmit/README.md`](../BatchSubmit/README.md).
 
 ## Run the four combinations
 
@@ -106,10 +114,9 @@ reuse it. For example:
   --events 0 --seed 301
 ```
 
-Without `--run-card`, the runner uses the process's upstream `testrun-lhc`
-card, changing only the event count, seed, PDF ID and grid-reuse switches. This
-is intended as an installation smoke test. Production cards for the 10-million
-event samples should be committed separately and validated before submission.
+Without `--run-card`, the runner uses the committed Run-3 card in
+`../PowhegCards`, changing only the event count, seed, PDF ID and grid-reuse
+switches in the private run copy.
 
 ## Outputs
 
