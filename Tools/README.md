@@ -1,0 +1,43 @@
+# Four-lepton Python tools
+
+These importable tools implement the conventions and formulas in
+[arXiv:1208.4018](https://arxiv.org/abs/1208.4018).
+
+Install the small Python dependency set from the repository root:
+
+```bash
+python3 -m pip install -r Tools/requirements.txt
+```
+
+The four inputs always have the charge-ordered form `(e-, e+, mu-, mu+)` and
+should normally be scalar [Scikit-HEP vector](https://vector.readthedocs.io/)
+objects:
+
+```python
+import vector
+
+from Tools.four_lepton_kinematics import four_lepton_observables
+from Tools.higgs_decay_width import differential_decay_width
+
+electron = vector.obj(E=30.0, px=10.0, py=5.0, pz=27.8388218)
+# Define positron, muon and antimuon in the same way.
+
+observables = four_lepton_observables(electron, positron, muon, antimuon)
+density = differential_decay_width(electron, positron, muon, antimuon)
+```
+
+`Z1` is always the heavier dilepton pair. The default incoming-parton
+convention is the laboratory `+z` beam; this resolves the unavoidable beam-sign
+ambiguity at a proton-proton collider reproducibly.
+
+The paper names the two decay polar variables `cos(theta1)` and `cos(theta2)`.
+The similarly written `cos(phi1)` and `cos(phi2)` are not observables in its
+convention, so the Python output uses `cos_theta1` and `cos_theta2`.
+
+The scalar-Higgs result is a differential decay-density kernel. Equation (5)
+of the paper defines the mass-and-angle distribution only up to an overall
+constant, so the result is appropriate for relative weights and shapes, not as
+an absolute partial width in GeV. The defaults are `mH = 125.10 GeV`,
+`mZ = 91.1876 GeV`, `GammaZ = 2.4952 GeV`, `v = 246.22 GeV`, and the tree-level
+SM `0+` coupling choice `g1^(0)=1` (equivalently `a1=mZ^2/mH^2`, with
+`a2=a3=0`).
