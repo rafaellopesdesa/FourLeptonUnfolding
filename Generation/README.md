@@ -9,7 +9,9 @@ This directory provides a first, reproducible Ubuntu 24.04 workflow for
 
 POWHEG is cloned from its current official GitLab repository. The two process
 repositories are initialized as pinned submodules, and the resolved commits are
-recorded in `software/versions.txt`.
+recorded in `software/versions.txt`. The installer also creates the process
+object/module directories expected by the upstream make-only build system;
+POWHEG does not use a separate `configure` step.
 
 ## Install
 

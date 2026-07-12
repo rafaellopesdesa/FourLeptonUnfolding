@@ -465,8 +465,16 @@ install_powheg() {
   git -C "$root" submodule update --init gg_H ZZ
 
   for process in gg_H ZZ; do
+    local process_dir="$root/$process"
+    # The upstream process Makefiles write object and Fortran module files to
+    # pre-existing directories, but do not create those directories themselves.
+    # gg_H uses obj/ and mod/; ZZ with gfortran uses obj-gfortran/.
+    mkdir -p \
+      "$process_dir/obj" \
+      "$process_dir/obj-gfortran" \
+      "$process_dir/mod"
     log "Building POWHEG-BOX-V2/$process"
-    make -C "$root/$process" -j1 pwhg_main
+    make -C "$process_dir" -j1 pwhg_main
   done
 }
 
