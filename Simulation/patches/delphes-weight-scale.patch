@@ -1,0 +1,220 @@
+diff --git a/classes/DelphesHepMC2Reader.cc b/classes/DelphesHepMC2Reader.cc
+index 4dfc782..d1611e6 100644
+--- a/classes/DelphesHepMC2Reader.cc
++++ b/classes/DelphesHepMC2Reader.cc
+@@ -56,7 +56,7 @@ static const int kBufferSize = 16384;
+ DelphesHepMC2Reader::DelphesHepMC2Reader() :
+   fInputFile(0), fBuffer(0), fPDG(0),
+   fVertexCounter(-1), fInCounter(-1), fOutCounter(-1),
+-  fParticleCounter(0)
++  fWeightScale(1.0), fParticleCounter(0)
+ {
+   fBuffer = new char[kBufferSize];
+ 
+@@ -79,6 +79,13 @@ void DelphesHepMC2Reader::SetInputFile(FILE *inputFile)
+ 
+ //---------------------------------------------------------------------------
+ 
++void DelphesHepMC2Reader::SetWeightScale(double weightScale)
++{
++  fWeightScale = weightScale;
++}
++
++//---------------------------------------------------------------------------
++
+ void DelphesHepMC2Reader::Clear()
+ {
+   fStateSize = 0;
+@@ -331,9 +338,9 @@ void DelphesHepMC2Reader::AnalyzeEvent(ExRootTreeBranch *branch, long long /*eve
+ 
+   element->ProcessID = fProcessID;
+   element->MPI = fMPI;
+-  element->Weight = fWeight.size() > 0 ? fWeight[0] : 1.0;
+-  element->CrossSection = fCrossSection;
+-  element->CrossSectionError = fCrossSectionError;
++  element->Weight = (fWeight.size() > 0 ? fWeight[0] : 1.0) * fWeightScale;
++  element->CrossSection = fCrossSection * fWeightScale;
++  element->CrossSectionError = fCrossSectionError * fWeightScale;
+   element->Scale = fScale;
+   element->AlphaQED = fAlphaQED;
+   element->AlphaQCD = fAlphaQCD;
+@@ -361,7 +368,7 @@ void DelphesHepMC2Reader::AnalyzeWeight(ExRootTreeBranch *branch)
+   {
+     element = static_cast<Weight *>(branch->NewEntry());
+ 
+-    element->Weight = *itWeight;
++    element->Weight = *itWeight * fWeightScale;
+   }
+ }
+ 
+diff --git a/classes/DelphesHepMC2Reader.h b/classes/DelphesHepMC2Reader.h
+index f7c8066..bbf56df 100644
+--- a/classes/DelphesHepMC2Reader.h
++++ b/classes/DelphesHepMC2Reader.h
+@@ -45,6 +45,7 @@ public:
+   ~DelphesHepMC2Reader();
+ 
+   void SetInputFile(FILE *inputFile);
++  void SetWeightScale(double weightScale);
+ 
+   void Clear();
+   bool EventReady();
+@@ -78,6 +79,8 @@ private:
+ 
+   double fMomentumCoefficient, fPositionCoefficient;
+ 
++  double fWeightScale;
++
+   int fStateSize;
+   std::vector<int> fState;
+ 
+diff --git a/classes/DelphesHepMC3Reader.cc b/classes/DelphesHepMC3Reader.cc
+index a0a80cd..a20f475 100644
+--- a/classes/DelphesHepMC3Reader.cc
++++ b/classes/DelphesHepMC3Reader.cc
+@@ -55,7 +55,7 @@ static const int kBufferSize = 16384;
+ 
+ DelphesHepMC3Reader::DelphesHepMC3Reader() :
+   fInputFile(0), fBuffer(0), fPDG(0),
+-  fVertexCounter(-2), fParticleCounter(-1)
++  fVertexCounter(-2), fParticleCounter(-1), fWeightScale(1.0)
+ {
+   fBuffer = new char[kBufferSize];
+ 
+@@ -78,6 +78,13 @@ void DelphesHepMC3Reader::SetInputFile(FILE *inputFile)
+ 
+ //---------------------------------------------------------------------------
+ 
++void DelphesHepMC3Reader::SetWeightScale(double weightScale)
++{
++  fWeightScale = weightScale;
++}
++
++//---------------------------------------------------------------------------
++
+ void DelphesHepMC3Reader::Clear()
+ {
+   fWeights.clear();
+@@ -348,9 +355,9 @@ void DelphesHepMC3Reader::AnalyzeEvent(ExRootTreeBranch *branch, long long /*eve
+ 
+   element->ProcessID = fProcessID;
+   element->MPI = fMPI;
+-  element->Weight = fWeights.size() > 0 ? fWeights[0] : 1.0;
+-  element->CrossSection = fCrossSection;
+-  element->CrossSectionError = fCrossSectionError;
++  element->Weight = (fWeights.size() > 0 ? fWeights[0] : 1.0) * fWeightScale;
++  element->CrossSection = fCrossSection * fWeightScale;
++  element->CrossSectionError = fCrossSectionError * fWeightScale;
+   element->Scale = fScale;
+   element->AlphaQED = fAlphaQED;
+   element->AlphaQCD = fAlphaQCD;
+@@ -378,7 +385,7 @@ void DelphesHepMC3Reader::AnalyzeWeight(ExRootTreeBranch *branch)
+   {
+     element = static_cast<Weight *>(branch->NewEntry());
+ 
+-    element->Weight = *itWeights;
++    element->Weight = *itWeights * fWeightScale;
+   }
+ }
+ 
+diff --git a/classes/DelphesHepMC3Reader.h b/classes/DelphesHepMC3Reader.h
+index 663af62..b1fec7a 100644
+--- a/classes/DelphesHepMC3Reader.h
++++ b/classes/DelphesHepMC3Reader.h
+@@ -47,6 +47,7 @@ public:
+   ~DelphesHepMC3Reader();
+ 
+   void SetInputFile(FILE *inputFile);
++  void SetWeightScale(double weightScale);
+ 
+   void Clear();
+   bool EventReady();
+@@ -81,6 +82,8 @@ private:
+ 
+   double fMomentumCoefficient, fPositionCoefficient;
+ 
++  double fWeightScale;
++
+   std::vector<double> fWeights;
+ 
+   double fCrossSection, fCrossSectionError;
+diff --git a/readers/DelphesHepMC2.cpp b/readers/DelphesHepMC2.cpp
+index 5d64d4f..4617dde 100644
+--- a/readers/DelphesHepMC2.cpp
++++ b/readers/DelphesHepMC2.cpp
+@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
+   TObjArray *stableParticleOutputArray = 0, *allParticleOutputArray = 0, *partonOutputArray = 0;
+   DelphesHepMC2Reader *reader = 0;
+   Int_t i, maxEvents, skipEvents;
++  Double_t weightScale;
+   Long64_t length, eventCounter;
+ 
+   if(argc < 3)
+@@ -111,6 +112,7 @@ int main(int argc, char *argv[])
+ 
+     maxEvents = confReader->GetInt("::MaxEvents", 0);
+     skipEvents = confReader->GetInt("::SkipEvents", 0);
++    weightScale = confReader->GetDouble("::WeightScale", 1.0);
+ 
+     if(maxEvents < 0)
+     {
+@@ -122,6 +124,11 @@ int main(int argc, char *argv[])
+       throw runtime_error("SkipEvents must be zero or positive");
+     }
+ 
++    if(weightScale <= 0.0)
++    {
++      throw runtime_error("WeightScale must be positive");
++    }
++
+     modularDelphes = new Delphes("Delphes");
+     modularDelphes->SetConfReader(confReader);
+     modularDelphes->SetTreeWriter(treeWriter);
+@@ -132,6 +139,7 @@ int main(int argc, char *argv[])
+     partonOutputArray = modularDelphes->ExportArray("partons");
+ 
+     reader = new DelphesHepMC2Reader;
++    reader->SetWeightScale(weightScale);
+ 
+     modularDelphes->InitTask();
+ 
+diff --git a/readers/DelphesHepMC3.cpp b/readers/DelphesHepMC3.cpp
+index cd86ca5..2ef0e07 100644
+--- a/readers/DelphesHepMC3.cpp
++++ b/readers/DelphesHepMC3.cpp
+@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
+   TObjArray *stableParticleOutputArray = 0, *allParticleOutputArray = 0, *partonOutputArray = 0;
+   DelphesHepMC3Reader *reader = 0;
+   Int_t i, maxEvents, skipEvents;
++  Double_t weightScale;
+   Long64_t length, eventCounter;
+ 
+   if(argc < 3)
+@@ -111,6 +112,7 @@ int main(int argc, char *argv[])
+ 
+     maxEvents = confReader->GetInt("::MaxEvents", 0);
+     skipEvents = confReader->GetInt("::SkipEvents", 0);
++    weightScale = confReader->GetDouble("::WeightScale", 1.0);
+ 
+     if(maxEvents < 0)
+     {
+@@ -122,6 +124,11 @@ int main(int argc, char *argv[])
+       throw runtime_error("SkipEvents must be zero or positive");
+     }
+ 
++    if(weightScale <= 0.0)
++    {
++      throw runtime_error("WeightScale must be positive");
++    }
++
+     modularDelphes = new Delphes("Delphes");
+     modularDelphes->SetConfReader(confReader);
+     modularDelphes->SetTreeWriter(treeWriter);
+@@ -132,6 +139,7 @@ int main(int argc, char *argv[])
+     partonOutputArray = modularDelphes->ExportArray("partons");
+ 
+     reader = new DelphesHepMC3Reader;
++    reader->SetWeightScale(weightScale);
+ 
+     modularDelphes->InitTask();
+

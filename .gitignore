@@ -4,8 +4,14 @@ Generation/downloads/
 Generation/build/
 Generation/env.sh
 
+# Locally installed Delphes/ROOT stack
+Simulation/software/
+Simulation/downloads/
+Simulation/env.sh
+
 # Generated event samples and run products
 Generation/runs/
+Simulation/runs/
 *.lhe
 *.lhe.gz
 *.hepmc

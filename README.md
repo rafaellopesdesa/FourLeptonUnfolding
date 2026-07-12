@@ -9,3 +9,5 @@ generation and alternative parton-shower models.
 The first reproducible generator workflow lives in [`Generation/`](Generation/).
 Unity Slurm campaign submission and its output layout are documented in
 [`BatchSubmit/`](BatchSubmit/).
+Fast ATLAS-like detector simulation with Delphes lives in
+[`Simulation/`](Simulation/).
