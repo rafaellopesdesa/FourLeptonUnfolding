@@ -83,6 +83,15 @@ For a campaign, only `jobs/job_*` directories carrying the generation
 Slurm layer, the same runner can be called on one `jobs/job_*` directory per
 array task. It reads the HepMC version header and selects `DelphesHepMC2` or
 `DelphesHepMC3` accordingly, using the filename extension only as a fallback.
+More precisely, it uses the serialization marker: Herwig's default output is
+written by HepMC3's `WriterAsciiHepMC2`, so its header reports a HepMC3 library
+version while its event records use HepMC2 `IO_GenEvent` syntax. Such files
+must be processed with `DelphesHepMC2`.
+
+After Delphes exits, the runner opens the ROOT file and requires the `Delphes`
+tree to contain at least one entry. A non-empty ROOT container with an empty
+tree is treated as a failed simulation rather than receiving a `SUCCESS`
+marker.
 
 By default each result is written next to its HepMC input:
 

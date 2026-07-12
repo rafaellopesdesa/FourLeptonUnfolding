@@ -168,7 +168,15 @@ detect_hepmc_format() {
   local file="$1"
   local header
   header="$(head -n 20 "$file")"
-  if grep -q 'HepMC::Version 3' <<<"$header"; then
+  # The serialization marker, not the library version, determines the reader.
+  # In particular, Herwig linked against HepMC3 writes its default GenEvent
+  # output with HepMC3::WriterAsciiHepMC2: the Version line starts with 3, but
+  # the event record itself uses HepMC2 IO_GenEvent syntax.
+  if grep -q 'HepMC::Asciiv3-START_EVENT_LISTING' <<<"$header"; then
+    echo 3
+  elif grep -q 'HepMC::IO_GenEvent-START_EVENT_LISTING' <<<"$header"; then
+    echo 2
+  elif grep -q 'HepMC::Version 3' <<<"$header"; then
     echo 3
   elif grep -q 'HepMC::Version 2' <<<"$header"; then
     echo 2
@@ -180,6 +188,13 @@ detect_hepmc_format() {
     echo "Cannot identify HepMC2 or HepMC3 format for $file" >&2
     return 1
   fi
+}
+
+validate_delphes_output() {
+  local output_file="$1"
+  local log_file="$2"
+  DELPHES_OUTPUT_FILE="$output_file" \
+    root -l -b -q "$SCRIPT_DIR/check_delphes_output.C" >>"$log_file" 2>&1
 }
 
 failures=0
@@ -222,7 +237,13 @@ for input_file in "${INPUT_FILES[@]}"; do
   status_file="$output_dir/simulation-metadata.txt"
 
   if [[ -f "$output_dir/SUCCESS" && -s "$output_file" && $OVERWRITE -eq 0 ]]; then
-    printf '[simulation] Already complete: %s\n' "$output_file"
+    if validate_delphes_output "$output_file" "$log_file"; then
+      printf '[simulation] Already complete: %s\n' "$output_file"
+    else
+      echo "Existing SUCCESS output has an empty or invalid Delphes tree: $output_file" >&2
+      echo "Rerun with --overwrite after pulling the HepMC-format fix." >&2
+      failures=$((failures + 1))
+    fi
     continue
   fi
   mkdir -p "$output_dir"
@@ -245,7 +266,8 @@ for input_file in "${INPUT_FILES[@]}"; do
   printf '[simulation] %s -> %s (HepMC%s, process=%s, weight scale=%s)\n' \
     "$input_file" "$output_file" "$format" "$resolved_process" "$weight_scale"
 
-  if "$reader" "$resolved_card" "$output_file" "$input_file" >"$log_file" 2>&1 && [[ -s "$output_file" ]]; then
+  if "$reader" "$resolved_card" "$output_file" "$input_file" >"$log_file" 2>&1 && \
+      [[ -s "$output_file" ]] && validate_delphes_output "$output_file" "$log_file"; then
     {
       printf 'input_file=%s\n' "$input_file"
       printf 'output_file=%s\n' "$output_file"
