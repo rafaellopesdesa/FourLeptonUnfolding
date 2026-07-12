@@ -40,12 +40,13 @@ must remain downstream so every generated event can participate in response,
 efficiency, and out-of-fiducial migrations.
 
 The bundled card normally sets both electron and muon object efficiencies to
-zero below 10 GeV. This would remove part of the fourth-lepton phase space in
-an H-to-four-lepton measurement. In the per-job resolved copy only, the runner
-lowers that technical threshold to 0.1 GeV, matching the lower boundary of the
-card's tracking parameterization. The detector eta acceptance and efficiency
-parameterizations remain active. Analysis-level pT cuts should be applied
-later to both the truth and reconstructed definitions.
+zero below 10 GeV and its tracking parameterization stops at `|eta|=2.5`.
+In the per-job resolved copy only, the runner changes the reconstructed-lepton
+threshold to `pT > 5 GeV` and extends the final endcap tracking-efficiency and
+momentum-resolution bins to `|eta| < 2.7` for both flavors. This extrapolation
+is intentionally analysis-specific and is not a standard ATLAS electron
+acceptance. The original endcap efficiencies/resolutions are held constant
+from 2.5 to 2.7. Analysis-level ordered-pT and event cuts remain downstream.
 
 The fiducial-truth branches apply photon dressing to stable electrons and
 muons. A photon is eligible only when it is status 1, has no hadron anywhere

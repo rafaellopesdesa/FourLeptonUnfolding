@@ -28,7 +28,7 @@ def _module_block(text: str, declaration: str) -> tuple[int, int, str]:
 
 
 def _lower_lepton_threshold(
-    text: str, module_name: str, old_threshold: str = "10.0", new_threshold: str = "0.1"
+    text: str, module_name: str, old_threshold: str = "10.0", new_threshold: str = "5.0"
 ) -> str:
     declaration = f"module Efficiency {module_name} {{"
     start, end, block = _module_block(text, declaration)
@@ -40,6 +40,22 @@ def _lower_lepton_threshold(
         )
     block = block.replace(low_expression, f"pt <= {new_threshold}")
     block = block.replace(high_expression, f"pt > {new_threshold}")
+    return text[:start] + block + text[end:]
+
+
+def _extend_eta_acceptance(text: str, module_name: str) -> str:
+    declaration_by_name = {
+        "ElectronTrackingEfficiency": "module Efficiency ElectronTrackingEfficiency {",
+        "MuonTrackingEfficiency": "module Efficiency MuonTrackingEfficiency {",
+        "ElectronMomentumSmearing": "module MomentumSmearing ElectronMomentumSmearing {",
+        "MuonMomentumSmearing": "module MomentumSmearing MuonMomentumSmearing {",
+        "ElectronEfficiency": "module Efficiency ElectronEfficiency {",
+    }
+    declaration = declaration_by_name[module_name]
+    start, end, block = _module_block(text, declaration)
+    if "2.5" not in block:
+        raise ValueError(f"{module_name} does not have the expected eta=2.5 boundary")
+    block = block.replace("2.5", "2.7")
     return text[:start] + block + text[end:]
 
 
@@ -129,6 +145,14 @@ def prepare_card(text: str) -> str:
 
     text = _lower_lepton_threshold(text, "ElectronEfficiency")
     text = _lower_lepton_threshold(text, "MuonEfficiency")
+    for module_name in (
+        "ElectronTrackingEfficiency",
+        "MuonTrackingEfficiency",
+        "ElectronMomentumSmearing",
+        "MuonMomentumSmearing",
+        "ElectronEfficiency",
+    ):
+        text = _extend_eta_acceptance(text, module_name)
     text = _add_truth_dressing_modules(text)
 
     text = _insert_after(

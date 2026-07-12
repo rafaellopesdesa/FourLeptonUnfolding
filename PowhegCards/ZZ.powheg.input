@@ -4,11 +4,10 @@
 
 ! The process contains off-shell Z/gamma* diagrams with massless leptons.
 ! A positive dilepton-mass cutoff is required to regulate gamma* -> l+l-.
-! The upstream reference card uses 20 GeV. This is safely below the intended
-! 50 GeV analysis threshold while avoiding the extreme low-mass region that
-! makes integration and upper-bound construction inefficient. For 4e/4mu,
-! POWHEG also applies this cut to crossed opposite-sign pairings.
-mllmin 20d0
+! The fiducial selection requires mll > 5 GeV for every SFOS pairing and
+! m34 > 12 GeV for the selected sub-leading pair. Since POWHEG also applies
+! mllmin to crossed pairings in 4e/4mu, keep a 1 GeV migration buffer.
+mllmin 4d0
 
 ! Version-pinned FourLeptonUnfolding extension to POWHEG-BOX-V2/ZZ.
 ! Keep a 10 GeV buffer below the intended m4l >= 105 GeV analysis region.

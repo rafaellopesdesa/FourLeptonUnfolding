@@ -14,10 +14,22 @@ set ExecutionPath {
 # Propagate particles in cylinder
 #################################
 module Efficiency ElectronEfficiency {
-  set EfficiencyFormula { (pt <= 10.0) * (0.0) + (pt > 10.0) * (0.9) }
+  set EfficiencyFormula { (pt <= 10.0) * (0.0) + (abs(eta) <= 2.5) * (pt > 10.0) * (0.9) }
 }
 module Efficiency MuonEfficiency {
   set EfficiencyFormula { (pt <= 10.0) * (0.0) + (pt > 10.0) * (0.9) }
+}
+module Efficiency ElectronTrackingEfficiency {
+  set EfficiencyFormula { (abs(eta) <= 2.5) * (0.9) }
+}
+module Efficiency MuonTrackingEfficiency {
+  set EfficiencyFormula { (abs(eta) <= 2.5) * (0.9) }
+}
+module MomentumSmearing ElectronMomentumSmearing {
+  set ResolutionFormula { (abs(eta) <= 2.5) * (0.1) }
+}
+module MomentumSmearing MuonMomentumSmearing {
+  set ResolutionFormula { (abs(eta) <= 2.5) * (0.1) }
 }
 module TreeWriter TreeWriter {
   add Branch Delphes/allParticles Particle GenParticle
@@ -43,6 +55,10 @@ class PrepareFiducialCardTest(unittest.TestCase):
         self.assertLess(result.index("TruthLeptonDressing\n"), result.index("ParticlePropagator\n"))
         self.assertNotIn("pt <= 10.0", result)
         self.assertNotIn("pt > 10.0", result)
+        self.assertIn("pt <= 5.0", result)
+        self.assertIn("pt > 5.0", result)
+        self.assertNotIn("abs(eta) <= 2.5", result)
+        self.assertIn("abs(eta) <= 2.7", result)
         self.assertEqual(result.count("StableParticle GenParticle"), 1)
 
 

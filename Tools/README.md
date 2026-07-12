@@ -26,6 +26,11 @@ observables = four_lepton_observables(electron, positron, muon, antimuon)
 density = differential_decay_width(electron, positron, muon, antimuon)
 ```
 
+For a selected `4e`, `4mu`, or mixed-flavor candidate, use
+`compute_paired_kinematics(z1_minus, z1_plus, z2_minus, z2_plus,
+z1_flavor=...)`. This preserves the analysis pairing order instead of applying
+the original mass-ordering convention.
+
 `Z1` is always the heavier dilepton pair. The default incoming-parton
 convention is the laboratory `+z` beam; this resolves the unavoidable beam-sign
 ambiguity at a proton-proton collider reproducibly.

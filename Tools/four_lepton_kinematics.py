@@ -1,6 +1,7 @@
 """Four-lepton observables in the conventions of arXiv:1208.4018.
 
-The public functions take the four-vectors in charge-ordered form::
+The original public functions take the four-vectors in flavor- and
+charge-ordered form::
 
     electron, positron, muon, antimuon
 
@@ -11,6 +12,10 @@ natural input.  Mappings with ``E, px, py, pz`` keys and sequences ordered as
 The paper calls the decay polar angles theta_1 and theta_2.  Consequently the
 returned observables are ``cos_theta1`` and ``cos_theta2``; names such as
 ``cos_phi1`` would mix polar and azimuthal angle notation.
+
+For analyses that have already paired the leptons, including same-flavor
+``4e`` and ``4mu`` events, :func:`compute_paired_kinematics` accepts the two
+negative-positive pairs explicitly and preserves their Z1/Z2 order.
 """
 
 from __future__ import annotations
@@ -35,8 +40,9 @@ class FourLeptonKinematics:
     """The complete set of four-lepton observables used in this study.
 
     Angles are in radians and masses/momenta use the units of the inputs.
-    ``z1_flavor`` records which opposite-sign pair became Z1 after applying
-    the paper's convention ``m_Z1 >= m_Z2``.
+    ``z1_flavor`` records the flavor of the pair designated Z1. The original
+    flavor-ordered API applies ``m_Z1 >= m_Z2``; the explicit-pair API keeps
+    the analysis-supplied Z1/Z2 order.
     """
 
     cos_theta_star: float
@@ -254,3 +260,101 @@ def four_lepton_observables(
     return compute_kinematics(
         electron, positron, muon, antimuon, beam_axis=beam_axis
     ).as_dict()
+
+
+def compute_paired_kinematics(
+    z1_negative: Any,
+    z1_positive: Any,
+    z2_negative: Any,
+    z2_positive: Any,
+    *,
+    z1_flavor: str,
+    beam_axis: Sequence[float] = (0.0, 0.0, 1.0),
+) -> FourLeptonKinematics:
+    """Calculate observables for two explicitly ordered SFOS lepton pairs.
+
+    Unlike :func:`compute_kinematics`, this function does not reorder the two
+    pairs by mass.  Z1 is the analysis-selected leading pair (normally the
+    pair closest to the Z pole) and Z2 is the selected remaining pair.  Each
+    pair must be passed as negative lepton followed by positive lepton.
+    """
+
+    if z1_flavor not in {"electron", "muon"}:
+        raise ValueError("z1_flavor must be 'electron' or 'muon'")
+
+    q11 = _coerce_p4(z1_negative)
+    q12 = _coerce_p4(z1_positive)
+    q21 = _coerce_p4(z2_negative)
+    q22 = _coerce_p4(z2_positive)
+    z1 = q11 + q12
+    z2 = q21 + q22
+    zz = z1 + z2
+    m_zz = _mass(zz)
+    if m_zz <= _EPSILON:
+        raise KinematicError("the four-lepton system must have positive invariant mass")
+
+    try:
+        axis = _unit(np.asarray(beam_axis, dtype=float), "beam direction")
+    except (TypeError, ValueError) as error:
+        raise TypeError("beam_axis must contain three numeric components") from error
+    if axis.shape != (3,):
+        raise TypeError("beam_axis must contain exactly three components")
+
+    z1_x = z1.boostCM_of(zz)
+    q11_x = q11.boostCM_of(zz)
+    q12_x = q12.boostCM_of(zz)
+    q21_x = q21.boostCM_of(zz)
+    q22_x = q22.boostCM_of(zz)
+    beam = vector.obj(E=1.0, px=axis[0], py=axis[1], pz=axis[2])
+    beam_x = beam.boostCM_of(zz)
+
+    q1_hat = _unit(_spatial(z1_x), "Z1 direction in the ZZ rest frame")
+    beam_hat = _unit(_spatial(beam_x), "beam direction in the ZZ rest frame")
+    n1 = _unit(np.cross(_spatial(q11_x), _spatial(q12_x)), "Z1 decay plane")
+    n2 = _unit(np.cross(_spatial(q21_x), _spatial(q22_x)), "Z2 decay plane")
+    n_sc = _unit(np.cross(beam_hat, q1_hat), "production plane")
+
+    cos_theta_star = _clip_cosine(float(np.dot(q1_hat, beam_hat)))
+    phi = atan2(float(np.dot(q1_hat, np.cross(n1, n2))), -float(np.dot(n1, n2)))
+    phi1 = atan2(float(np.dot(q1_hat, np.cross(n1, n_sc))), float(np.dot(n1, n_sc)))
+    psi = _wrap_angle(phi1 + 0.5 * phi)
+
+    q2_z1 = z2.boostCM_of(z1)
+    q11_z1 = q11.boostCM_of(z1)
+    q1_z2 = z1.boostCM_of(z2)
+    q21_z2 = q21.boostCM_of(z2)
+    cos_theta1 = _clip_cosine(
+        -float(
+            np.dot(
+                _unit(_spatial(q2_z1), "Z2 direction in the Z1 rest frame"),
+                _unit(_spatial(q11_z1), "negative lepton direction in the Z1 rest frame"),
+            )
+        )
+    )
+    cos_theta2 = _clip_cosine(
+        -float(
+            np.dot(
+                _unit(_spatial(q1_z2), "Z1 direction in the Z2 rest frame"),
+                _unit(_spatial(q21_z2), "negative lepton direction in the Z2 rest frame"),
+            )
+        )
+    )
+
+    energy, pz = float(zz.E), float(zz.pz)
+    if energy <= abs(pz):
+        raise KinematicError("the four-lepton rapidity is undefined")
+
+    return FourLeptonKinematics(
+        cos_theta_star=cos_theta_star,
+        cos_theta1=cos_theta1,
+        cos_theta2=cos_theta2,
+        Phi=_wrap_angle(phi),
+        Phi1=_wrap_angle(phi1),
+        Psi=psi,
+        m_Z1=_mass(z1),
+        m_Z2=_mass(z2),
+        m_ZZ=m_zz,
+        y_ZZ=0.5 * log((energy + pz) / (energy - pz)),
+        pT_ZZ=hypot(float(zz.px), float(zz.py)),
+        z1_flavor=z1_flavor,
+    )

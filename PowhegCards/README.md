@@ -15,24 +15,26 @@ No Born-level generation cut is needed for inclusive `gg_H`, whose Born final
 state is a massive Higgs boson. For continuum four-lepton production, however,
 a literally cut-free cross section is not finite: the matrix element includes
 off-shell photons and has a low-mass `gamma* -> l+l-` singularity when leptons
-are treated as massless. The original `m(l+l-) > 4 GeV` setup proved
-impractically inefficient: POWHEG spent excessive time sampling the
-virtual-photon region and repeatedly violated the inclusive upper bound. The
-`ZZ` card now uses `m(l+l-) > 20 GeV`, matching the value in the upstream
-reference card, and `m(4l) > 95 GeV`. The latter is provided by the small
+are treated as massless. The original setup with only `m(l+l-) > 4 GeV`
+proved impractically inefficient: POWHEG spent excessive time sampling low
+four-lepton masses and repeatedly violated the inclusive upper bound. The
+final `ZZ` card retains `m(l+l-) > 4 GeV` but adds `m(4l) > 95 GeV`. The low dilepton
+threshold is necessary because the fiducial selection only requires every
+SFOS pairing to exceed 5 GeV (and the selected sub-leading pair to exceed
+12 GeV). The four-lepton threshold is provided by the small
 version-pinned source patch installed from
 `Generation/patches/powheg-zz-m4lmin.patch` because the upstream process has no
 native four-lepton-mass input keyword.
 
-These cuts retain margins below the intended `m(l+l-) >= 50 GeV` and
-`m(4l) >= 105 GeV` analysis region. The dilepton margin is intentionally wider
-because POWHEG applies `mllmin` to crossed opposite-sign pairings in
-same-flavor `4e` and `4mu` events. No generator-level lepton-pT or eta cut is
-imposed; all such requirements remain analysis-level choices. The generation
-cuts are part of the generated background phase-space definition and must be
-included when computing acceptance.
+POWHEG applies `mllmin` to crossed opposite-sign pairings in same-flavor `4e`
+and `4mu` events, so the earlier 20 GeV value could remove events that satisfy
+the intended fiducial definition. The 4 GeV cut leaves a 1 GeV buffer below
+the all-SFOS-pair veto, while `m(4l)>95 GeV` leaves 10 GeV below the analysis
+region. No generator-level lepton-pT or eta cut is imposed. The generation
+cuts remain part of the generated background phase-space definition.
 
-Integration grids made with the earlier 4 GeV card are incompatible with this
+All grids made before the `m4l > 95 GeV` requirement—including both the
+original 4 GeV card and the temporary 20 GeV card—are incompatible with this
 phase-space definition. Generate a fresh grid/new campaign; do not pass an old
 grid through `--keep-grids` or `--reuse-grid`.
 

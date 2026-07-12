@@ -7,7 +7,7 @@ import unittest
 
 import vector
 
-from Tools.four_lepton_kinematics import compute_kinematics
+from Tools.four_lepton_kinematics import compute_kinematics, compute_paired_kinematics
 from Tools.higgs_decay_width import sm_higgs_decay_density
 
 
@@ -99,6 +99,19 @@ class FourLeptonToolTest(unittest.TestCase):
             "pT_ZZ",
         ):
             self.assertAlmostEqual(getattr(first, field), getattr(second, field), places=10)
+
+    def test_explicit_pairing_preserves_analysis_order(self):
+        e_minus, e_plus, mu_minus, mu_plus = _event()
+        kin = compute_paired_kinematics(
+            mu_minus,
+            mu_plus,
+            e_minus,
+            e_plus,
+            z1_flavor="muon",
+        )
+        self.assertAlmostEqual(kin.m_Z1, 25.0, places=9)
+        self.assertAlmostEqual(kin.m_Z2, 91.0, places=9)
+        self.assertEqual(kin.z1_flavor, "muon")
 
 
 if __name__ == "__main__":
