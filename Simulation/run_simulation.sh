@@ -102,6 +102,10 @@ awk -v value="$HIGGS_BR" 'BEGIN { exit !(value > 0) }' || {
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/env.sh"
 
+command -v python3 >/dev/null || {
+  echo "python3 is required to prepare the fiducial-study Delphes card" >&2
+  exit 1
+}
 [[ -x "$DELPHES_ROOT/DelphesHepMC2" && -x "$DELPHES_ROOT/DelphesHepMC3" ]] || {
   echo "Delphes HepMC readers are unavailable below $DELPHES_ROOT" >&2
   exit 1
@@ -193,8 +197,15 @@ detect_hepmc_format() {
 validate_delphes_output() {
   local output_file="$1"
   local log_file="$2"
+  local expected_events="$3"
   DELPHES_OUTPUT_FILE="$output_file" \
+    DELPHES_EXPECTED_EVENTS="$expected_events" \
     root -l -b -q "$SCRIPT_DIR/check_delphes_output.C" >>"$log_file" 2>&1
+}
+
+count_hepmc_events() {
+  local input_file="$1"
+  awk '$1 == "E" {count++} END {print count + 0}' "$input_file"
 }
 
 failures=0
@@ -236,12 +247,23 @@ for input_file in "${INPUT_FILES[@]}"; do
   log_file="$output_dir/delphes.log"
   status_file="$output_dir/simulation-metadata.txt"
 
+  input_events="$(count_hepmc_events "$input_file")"
+  if ((input_events <= 0)); then
+    echo "No HepMC event records were found in $input_file" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+  expected_events="$input_events"
+  if ((MAX_EVENTS > 0 && MAX_EVENTS < expected_events)); then
+    expected_events="$MAX_EVENTS"
+  fi
+
   if [[ -f "$output_dir/SUCCESS" && -s "$output_file" && $OVERWRITE -eq 0 ]]; then
-    if validate_delphes_output "$output_file" "$log_file"; then
+    if validate_delphes_output "$output_file" "$log_file" "$expected_events"; then
       printf '[simulation] Already complete: %s\n' "$output_file"
     else
       echo "Existing SUCCESS output has an empty or invalid Delphes tree: $output_file" >&2
-      echo "Rerun with --overwrite after pulling the HepMC-format fix." >&2
+      echo "Rerun with --overwrite to produce the fiducial-study branches." >&2
       failures=$((failures + 1))
     fi
     continue
@@ -256,7 +278,7 @@ for input_file in "${INPUT_FILES[@]}"; do
     continue
   fi
 
-  cp "$CARD" "$resolved_card"
+  python3 "$SCRIPT_DIR/prepare_fiducial_card.py" "$CARD" "$resolved_card"
   {
     printf '\n# Added by FourLeptonUnfolding/Simulation/run_simulation.sh\n'
     printf 'set WeightScale %.17g\n' "$weight_scale"
@@ -267,7 +289,8 @@ for input_file in "${INPUT_FILES[@]}"; do
     "$input_file" "$output_file" "$format" "$resolved_process" "$weight_scale"
 
   if "$reader" "$resolved_card" "$output_file" "$input_file" >"$log_file" 2>&1 && \
-      [[ -s "$output_file" ]] && validate_delphes_output "$output_file" "$log_file"; then
+      [[ -s "$output_file" ]] && \
+      validate_delphes_output "$output_file" "$log_file" "$expected_events"; then
     {
       printf 'input_file=%s\n' "$input_file"
       printf 'output_file=%s\n' "$output_file"
@@ -277,6 +300,12 @@ for input_file in "${INPUT_FILES[@]}"; do
       printf 'higgs_br_h_to_zz_to_4l_including_taus=%s\n' "$HIGGS_BR"
       printf 'weight_branches_scaled=Event.Weight,Weight.Weight\n'
       printf 'cross_section_fields_scaled=Event.CrossSection,Event.CrossSectionError\n'
+      printf 'input_events=%s\n' "$input_events"
+      printf 'output_events=%s\n' "$expected_events"
+      printf 'event_retention_validated=true\n'
+      printf 'truth_particles=StableParticle(status_1,bare,no_photon_dressing)\n'
+      printf 'loose_reco_leptons=RecoElectron,RecoMuon(pre_isolation)\n'
+      printf 'reconstruction_marker=HasFourRecoLeptons\n'
       printf 'delphes_version=%s\n' "${DELPHES_VERSION:-unknown}"
       printf 'delphes_commit=%s\n' "$(git -C "$DELPHES_ROOT" rev-parse HEAD)"
       printf 'card=%s\n' "$CARD"

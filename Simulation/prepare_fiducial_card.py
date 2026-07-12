@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Make a loose H->4l fiducial-study card from the bundled ATLAS card.
+
+The installed Delphes card remains untouched.  This script modifies only the
+per-job resolved copy used by ``run_simulation.sh``.
+"""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+
+def _module_block(text: str, declaration: str) -> tuple[int, int, str]:
+    start = text.find(declaration)
+    if start < 0:
+        raise ValueError(f"card does not contain expected module: {declaration}")
+
+    lines = text[start:].splitlines(keepends=True)
+    depth = 0
+    length = 0
+    for line in lines:
+        depth += line.count("{") - line.count("}")
+        length += len(line)
+        if depth == 0:
+            return start, start + length, text[start : start + length]
+    raise ValueError(f"unterminated module: {declaration}")
+
+
+def _lower_lepton_threshold(
+    text: str, module_name: str, old_threshold: str = "10.0", new_threshold: str = "0.1"
+) -> str:
+    declaration = f"module Efficiency {module_name} {{"
+    start, end, block = _module_block(text, declaration)
+    low_expression = f"pt <= {old_threshold}"
+    high_expression = f"pt > {old_threshold}"
+    if low_expression not in block or high_expression not in block:
+        raise ValueError(
+            f"{module_name} does not have the expected {old_threshold} GeV threshold"
+        )
+    block = block.replace(low_expression, f"pt <= {new_threshold}")
+    block = block.replace(high_expression, f"pt > {new_threshold}")
+    return text[:start] + block + text[end:]
+
+
+def _insert_after(text: str, anchor: str, addition: str) -> str:
+    if addition.strip() in text:
+        return text
+    if text.count(anchor) != 1:
+        raise ValueError(f"expected exactly one card line matching: {anchor.strip()}")
+    return text.replace(anchor, anchor + addition, 1)
+
+
+def prepare_card(text: str) -> str:
+    """Return the fiducial-study variant of a Delphes ATLAS card."""
+
+    text = _lower_lepton_threshold(text, "ElectronEfficiency")
+    text = _lower_lepton_threshold(text, "MuonEfficiency")
+
+    text = _insert_after(
+        text,
+        "  add Branch Delphes/allParticles Particle GenParticle\n",
+        "\n"
+        "  # Explicit post-shower status-1 truth particles (no photon dressing).\n"
+        "  add Branch Delphes/stableParticles StableParticle GenParticle\n",
+    )
+    text = _insert_after(
+        text,
+        "  add Branch UniqueObjectFinder/electrons Electron Electron\n",
+        "  # Loose, pre-isolation reconstructed objects for response studies.\n"
+        "  add Branch ElectronEfficiency/electrons RecoElectron Electron\n",
+    )
+    text = _insert_after(
+        text,
+        "  add Branch UniqueObjectFinder/muons Muon Muon\n",
+        "  add Branch MuonEfficiency/muons RecoMuon Muon\n",
+    )
+
+    return (
+        "# FourLeptonUnfolding fiducial-study card.\n"
+        "# Derived at run time from Delphes's bundled ATLAS card.\n"
+        "# Analysis-level lepton pT, isolation, pairing, and mass cuts belong downstream.\n\n"
+        + text
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input_card", type=Path)
+    parser.add_argument("output_card", type=Path)
+    args = parser.parse_args()
+
+    source = args.input_card.read_text(encoding="utf-8")
+    args.output_card.write_text(prepare_card(source), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

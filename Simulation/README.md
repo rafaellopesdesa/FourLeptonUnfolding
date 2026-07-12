@@ -1,8 +1,9 @@
 # Delphes detector simulation
 
-This directory turns the showered HepMC events from `Generation/` into the
-standard Delphes ROOT tree using Delphes's bundled ATLAS card. It performs no
-event selection or analysis.
+This directory turns the showered HepMC events from `Generation/` into a
+Delphes ROOT tree based on Delphes's bundled ATLAS card. The resolved card is
+adapted for a four-lepton fiducial cross-section and unfolding study. It
+performs no event selection or physics analysis.
 
 ## Version and detector card
 
@@ -12,6 +13,45 @@ its SHA-256 checksum before compiling. Delphes is a generic fast-simulation
 framework and this is an ATLAS-like public parameterization distributed by
 Delphes; it is not an official ATLAS detector simulation or centrally
 validated Run-3 configuration. Pile-up is not enabled in the standard card.
+
+### Event retention and truth/reconstruction content
+
+Delphes itself does not discard events merely because no detector object was
+reconstructed: its HepMC readers fill one `Delphes` tree entry after every
+input event. The runner now counts the `E` records in each HepMC file and
+requires the output entry count to match exactly (or to match `--max-events`
+for a smoke test). A mismatch is a failed simulation and cannot receive a
+`SUCCESS` marker.
+
+The resolved card keeps both truth and reconstructed views:
+
+| Branch | Meaning |
+|---|---|
+| `Particle` | All HepMC particles, including status and ancestry |
+| `StableParticle` | Explicit HepMC status-1, post-shower particles |
+| `RecoElectron`, `RecoMuon` | Loose reconstructed leptons before isolation |
+| `Electron`, `Muon` | Standard-card reconstructed leptons after isolation and overlap removal |
+| `HasFourRecoLeptons` | Technical marker: at least four loose reconstructed electrons plus muons |
+
+`HasFourRecoLeptons` is not the analysis selection: it imposes no charge,
+flavor, pairing, mass, ordered-pT, or isolation requirement. Those choices
+must remain downstream so every generated event can participate in response,
+efficiency, and out-of-fiducial migrations.
+
+The bundled card normally sets both electron and muon object efficiencies to
+zero below 10 GeV. This would remove part of the fourth-lepton phase space in
+an H-to-four-lepton measurement. In the per-job resolved copy only, the runner
+lowers that technical threshold to 0.1 GeV, matching the lower boundary of the
+card's tracking parameterization. The detector eta acceptance and efficiency
+parameterizations remain active. Analysis-level pT cuts should be applied
+later to both the truth and reconstructed definitions.
+
+No photon dressing or lepton-photon recombination is performed. The
+`StableParticle` leptons are therefore bare post-shower leptons and status-1
+photons remain separate particles. This is intentionally not collinear safe,
+as required for the present stage of the study; a dressed-lepton definition
+can be added later without regenerating or rerunning Delphes because the
+status-1 photons are retained.
 
 ## Install
 
@@ -88,10 +128,10 @@ written by HepMC3's `WriterAsciiHepMC2`, so its header reports a HepMC3 library
 version while its event records use HepMC2 `IO_GenEvent` syntax. Such files
 must be processed with `DelphesHepMC2`.
 
-After Delphes exits, the runner opens the ROOT file and requires the `Delphes`
-tree to contain at least one entry. A non-empty ROOT container with an empty
-tree is treated as a failed simulation rather than receiving a `SUCCESS`
-marker.
+After Delphes exits, the runner also checks the required truth and reconstructed
+branches, annotates each event with `HasFourRecoLeptons`, and validates exact
+event retention. A malformed or incomplete ROOT tree is treated as a failed
+simulation rather than receiving a `SUCCESS` marker.
 
 By default each result is written next to its HepMC input:
 
