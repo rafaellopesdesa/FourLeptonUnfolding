@@ -31,16 +31,28 @@ source env.sh
 ```
 
 This route expects `c++`, `make`, `git`, `curl`, `patch`, `tar`, `bzip2`, and
-the usual Ubuntu 24.04 runtime libraries. If ROOT is available as a Unity
-module, use its exact module name instead of installing another copy:
+the usual Ubuntu 24.04 runtime libraries.
+
+### Unity installation
+
+On Unity, `mpich/4.2.1` is the module that makes ROOT available. Install below
+`/work/pi_rclsa_umass_edu/` and always use `--skip-apt`:
 
 ```bash
-./install_delphes.sh --skip-apt --jobs 8 --root-module ROOT_MODULE_NAME
+cd /work/pi_rclsa_umass_edu/$USER/FourLeptonStudy/FourLeptonUnfolding/Simulation
+./install_delphes.sh \
+  --skip-apt \
+  --jobs 8 \
+  --root-module mpich/4.2.1
+source env.sh
 ```
 
-As with generator compilation, install below `/work/pi_rclsa_umass_edu/` on
-Unity so worker nodes can access the code, ROOT installation, and Delphes
-libraries.
+The `--root-module mpich/4.2.1` option performs the equivalent of
+`module load mpich/4.2.1`, verifies that `root-config` becomes available, and
+records the module in the generated `env.sh`. Sourcing `env.sh` therefore
+reloads the same module for later interactive or worker-node runs. Keeping the
+repository and installation under `/work` ensures that worker nodes can access
+the code, ROOT environment, and Delphes libraries.
 
 ## Run
 
