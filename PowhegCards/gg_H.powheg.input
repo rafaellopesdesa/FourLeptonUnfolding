@@ -1,0 +1,47 @@
+! POWHEG-BOX-V2/gg_H baseline for Run-3 pp collisions at sqrt(s)=13.6 TeV.
+! The runner overrides numevts, iseed, lhans1/2 and grid-reuse switches.
+
+! Higgs-production parameters
+hmass       125.0d0       ! Higgs pole mass [GeV]
+hwidth      4.07d-3       ! SM Higgs width [GeV]
+gfermi      1.1663787d-5  ! Fermi constant [GeV^-2]
+topmass     172.5d0       ! top-quark mass [GeV]
+hdecaymode  11            ! label the intended shower decay as H -> ZZ
+
+! Beam and PDF configuration
+numevts  1000
+iseed    1
+ih1      1
+ih2      1
+ebeam1   6800d0
+ebeam2   6800d0
+lhans1   303400           ! NNPDF31_nlo_as_0118, member 0
+lhans2   303400
+
+! Integration and upper-bound setup
+use-old-grid    0
+use-old-ubound  0
+ncall1   120000
+itmx1    5
+ncall2   250000
+itmx2    5
+foldcsi  1
+foldy    1
+foldphi  1
+nubound  50000
+icsimax  1
+iymax    1
+xupbound 2d0
+
+! Inclusive cross-section baseline: no Born-level generation suppression.
+bornsuppfact -1d0
+renscfact     1d0
+facscfact     1d0
+testplots     0
+
+! POWHEG's default ptsqmin=0.8 GeV is retained as the technical cutoff used
+! internally when generating QCD radiation; it is not a Higgs-event selection.
+ptsqmin 0.8d0
+
+! No hfact is set in the baseline. It can be introduced later as a dedicated
+! NLO+PS matching/modeling variation rather than folded into the acceptance.

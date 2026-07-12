@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(realpath "$SCRIPT_DIR/..")"
+POWHEG_CARD_DIR="$REPO_ROOT/PowhegCards"
 
 usage() {
   cat <<'EOF'
@@ -17,7 +19,7 @@ Required positional arguments:
 Options:
   --events N          Number of events (default: 1000; 0 means all input LHE events)
   --seed N            Positive random seed (default: 1)
-  --run-card FILE     POWHEG input card; otherwise use the process testrun-lhc card
+  --run-card FILE     Override the default PowhegCards/PROCESS.powheg.input card
   --lhe FILE          Skip POWHEG and shower this existing LHE file
   --output-dir DIR    Run directory (default: Generation/runs/PROCESS_SHOWER_seedSEED)
   --pdf-id ID         LHAPDF member ID written to lhans1/lhans2 (default: 303400)
@@ -163,12 +165,7 @@ set_powheg_value() {
 }
 
 choose_default_run_card() {
-  local preferred="$PROCESS_DIR/testrun-lhc/powheg.input"
-  if [[ -f "$preferred" ]]; then
-    printf '%s\n' "$preferred"
-    return
-  fi
-  find "$PROCESS_DIR" -maxdepth 3 -type f -name powheg.input -print -quit
+  printf '%s/%s.powheg.input\n' "$POWHEG_CARD_DIR" "$PROCESS"
 }
 
 run_powheg() {
@@ -281,9 +278,9 @@ EOF
   if [[ "$PROCESS" == "gg_H" ]]; then
     cat >>"$OUTPUT_DIR/herwig.in" <<'EOF'
 
-# Baseline forced decay: H -> ZZ(*) and Z -> e/mu.
+# Baseline forced decay: H -> ZZ(*) and Z -> e/mu/tau.
 do /Herwig/Particles/h0:SelectDecayModes h0->Z0,Z0;
-do /Herwig/Particles/Z0:SelectDecayModes /Herwig/Particles/Z0/Z0->e-,e+; /Herwig/Particles/Z0/Z0->mu-,mu+;
+do /Herwig/Particles/Z0:SelectDecayModes /Herwig/Particles/Z0/Z0->e-,e+; /Herwig/Particles/Z0/Z0->mu-,mu+; /Herwig/Particles/Z0/Z0->tau-,tau+;
 EOF
   fi
 
@@ -346,6 +343,7 @@ events=$EVENTS
 shower_events=$SHOWER_EVENTS
 seed=$SEED
 input_lhe=$INPUT_LHE
+powheg_card=${RUN_CARD:-external-LHE}
 powheg_commit=$(git -C "$POWHEG_ROOT" rev-parse HEAD)
 process_commit=$(git -C "$PROCESS_DIR" rev-parse HEAD)
 EOF

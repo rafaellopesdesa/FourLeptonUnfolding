@@ -1,0 +1,44 @@
+! POWHEG-BOX-V2/ZZ -> 4 charged leptons baseline for Run-3 pp collisions
+! at sqrt(s)=13.6 TeV. The runner overrides numevts, iseed, lhans1/2 and
+! grid-reuse switches.
+
+! The process contains off-shell Z/gamma* diagrams with massless leptons.
+! A positive dilepton-mass cutoff is therefore required to regulate the
+! gamma* -> l+l- singularity. Four GeV is deliberately below the later
+! analysis Z-mass requirements and just above the physical 2*m_tau threshold.
+mllmin 4d0
+
+! Both bosons decay to charged leptons. In this process "leptonic" includes
+! electrons, muons and taus, including mixed-flavour combinations.
+leptonic        1
+dronly          0         ! retain single- and double-resonant contributions
+zerowidth       0         ! retain off-shell Z/gamma* contributions
+withinterference 1        ! same-flavour interference
+
+! Beam and PDF configuration
+numevts  1000
+iseed    1
+ih1      1
+ih2      1
+ebeam1   6800d0
+ebeam2   6800d0
+lhans1   303400           ! NNPDF31_nlo_as_0118, member 0
+lhans2   303400
+
+! Integration and upper-bound setup from the upstream high-statistics card
+use-old-grid    0
+use-old-ubound  0
+ncall1   400000
+itmx1    4
+ncall2   1000000
+itmx2    5
+foldcsi  1
+foldy    1
+foldphi  1
+nubound  1000000
+
+! Inclusive QCD setup: no lepton-pT, lepton-eta or jet cuts are imposed.
+renscfact  1d0
+facscfact  1d0
+fixedscale -1            ! dynamic muR=muF=m(ZZ)
+testplots  0

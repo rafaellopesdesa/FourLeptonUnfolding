@@ -47,13 +47,13 @@ int main(int argc, char* argv[]) {
   pythia.readString("TimeShower:pTdampMatch = 0");
 
   // The gg_H LHE contains an undecayed Higgs. For this baseline, force
-  // H -> ZZ(*) and Z -> e/mu. The exact four-lepton decay model will be
+  // H -> ZZ(*) and Z -> e/mu/tau. The exact four-lepton decay model will be
   // validated and, if needed, upgraded in the next phase of the study.
   if (process == "gg_H") {
     pythia.readString("25:onMode = off");
     pythia.readString("25:onIfMatch = 23 23");
     pythia.readString("23:onMode = off");
-    pythia.readString("23:onIfAny = 11 13");
+    pythia.readString("23:onIfAny = 11 13 15");
   }
 
   auto powheg_hooks = std::make_shared<Pythia8::PowhegHooks>();
@@ -84,4 +84,3 @@ int main(int argc, char* argv[]) {
   std::cout << "Wrote " << accepted << " events to " << output_file << '\n';
   return accepted > 0 ? 0 : 5;
 }
-

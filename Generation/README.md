@@ -78,6 +78,17 @@ source env.sh
 
 ## Run the four combinations
 
+By default, the runner uses the validated Run-3 cards in `../PowhegCards`.
+These set 6800 GeV per beam and otherwise keep the generation phase space as
+inclusive as the matrix element permits. `--run-card` remains available for
+explicit alternatives.
+
+The forced `gg_H` shower decay includes `Z -> e+e-`, `mu+mu-` and
+`tau+tau-`. After pulling a change to `powheg_pythia8.cc`, rerun the installer
+once to rebuild the small PYTHIA bridge executable; PYTHIA and Herwig themselves
+do not need to be recompiled. The Herwig decay selection is generated at run
+time.
+
 ```bash
 ./run_generation.sh gg_H pythia --events 1000 --seed 101
 ./run_generation.sh gg_H herwig --events 1000 --seed 102
@@ -109,9 +120,12 @@ Generated samples and locally installed software are excluded from Git.
 ## Physics scope of this first baseline
 
 The `ZZ` process contains the leptonic diboson matrix element supplied by its
-POWHEG implementation. The `gg_H` process produces the Higgs and this baseline
-forces `H -> ZZ(*) -> 4e/4mu/2e2mu` in the shower. Before using these events for
-full phase-space unfolding, we must validate decay angles, off-shell behavior,
-identical-lepton effects, and the precise POWHEG shower-veto prescription in
-both showers. A later stage can compare this factorized baseline to a dedicated
+POWHEG implementation and is configured for charged electrons, muons and taus.
+Its only generation-level cut is `mll > 4 GeV`, which is required to regulate
+the low-mass virtual-photon singularity. The `gg_H` process produces the Higgs
+and this baseline forces `H -> ZZ(*)` with each Z decaying to `e`, `mu` or
+`tau` pairs in the shower. Before using these events for full phase-space
+unfolding, we must validate decay angles, off-shell behavior, identical-lepton
+effects, tau feed-down and the precise POWHEG shower-veto prescription in both
+showers. A later stage can compare this factorized baseline to a dedicated
 four-lepton matrix element such as POWHEG-BOX-RES `gg4l`.
