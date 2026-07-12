@@ -11,7 +11,10 @@ POWHEG is cloned from its current official GitLab repository. The two process
 repositories are initialized as pinned submodules, and the resolved commits are
 recorded in `software/versions.txt`. The installer also creates the process
 object/module directories expected by the upstream make-only build system;
-POWHEG does not use a separate `configure` step.
+POWHEG does not use a separate `configure` step. Its build is explicitly bound
+to the locally installed `lhapdf-config` and `fastjet-config`. The LHAPDF
+include flags and library directory are passed to the POWHEG compiler and
+linker instead of relying on system search paths.
 
 ## Install
 

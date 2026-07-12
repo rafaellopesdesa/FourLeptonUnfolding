@@ -146,6 +146,22 @@ configure_optional_prefix() {
   fi
 }
 
+validate_lhapdf_install() {
+  local config="$PREFIX/bin/lhapdf-config"
+  [[ -x "$config" ]] || return 1
+
+  local config_prefix include_dir lib_dir
+  config_prefix="$(realpath -m "$("$config" --prefix)")"
+  include_dir="$(realpath -m "$("$config" --includedir)")"
+  lib_dir="$(realpath -m "$("$config" --libdir)")"
+
+  [[ "$config_prefix" == "$PREFIX" ]] || return 1
+  [[ -f "$include_dir/LHAPDF/LHAPDF.h" ]] || return 1
+  [[ -e "$lib_dir/libLHAPDF.so" || \
+     -f "$lib_dir/libLHAPDF.a" || \
+     -e "$lib_dir/libLHAPDF.dylib" ]] || return 1
+}
+
 initialize_module_command() {
   type module >/dev/null 2>&1 && return 0
 
@@ -273,7 +289,12 @@ install_boost() {
 
 install_lhapdf() {
   local stamp="$PREFIX/.installed-lhapdf-$LHAPDF_VERSION"
-  [[ -e "$stamp" ]] && return
+  if [[ -e "$stamp" ]] && validate_lhapdf_install; then
+    return
+  fi
+  if [[ -e "$stamp" ]]; then
+    log "Existing LHAPDF stamp is invalid; rebuilding LHAPDF $LHAPDF_VERSION"
+  fi
   local archive
   archive="$(download \
     "https://lhapdf.hepforge.org/downloads/LHAPDF-${LHAPDF_VERSION}.tar.gz" \
@@ -283,10 +304,14 @@ install_lhapdf() {
   log "Building LHAPDF $LHAPDF_VERSION"
   (
     cd "$src"
-    ./configure --prefix="$PREFIX" --disable-pyext
+    ./configure --prefix="$PREFIX" --disable-python
     make -j"$JOBS"
     make install
   )
+  validate_lhapdf_install || {
+    echo "LHAPDF headers or libraries were not installed correctly below $PREFIX." >&2
+    exit 1
+  }
   touch "$stamp"
 }
 
@@ -456,6 +481,22 @@ install_pdfsets() {
 
 install_powheg() {
   local root="$PREFIX/src/POWHEG-BOX-V2"
+  local lhapdf_config="$PREFIX/bin/lhapdf-config"
+  local fastjet_config="$PREFIX/bin/fastjet-config"
+  validate_lhapdf_install || {
+    echo "A complete local LHAPDF installation is required before building POWHEG." >&2
+    exit 1
+  }
+  [[ -x "$fastjet_config" ]] || {
+    echo "Local fastjet-config not found at $fastjet_config." >&2
+    exit 1
+  }
+
+  local lhapdf_cppflags lhapdf_libdir powheg_cxx
+  lhapdf_cppflags="$("$lhapdf_config" --cppflags)"
+  lhapdf_libdir="$("$lhapdf_config" --libdir)"
+  powheg_cxx="${CXX:-g++}"
+
   mkdir -p "$PREFIX/src"
   if [[ ! -d "$root/.git" ]]; then
     log "Cloning POWHEG-BOX-V2"
@@ -474,7 +515,12 @@ install_powheg() {
       "$process_dir/obj-gfortran" \
       "$process_dir/mod"
     log "Building POWHEG-BOX-V2/$process"
-    make -C "$process_dir" -j1 pwhg_main
+    LIBRARY_PATH="$lhapdf_libdir:${LIBRARY_PATH:-}" \
+      make -C "$process_dir" -j1 \
+        LHAPDF_CONFIG="$lhapdf_config" \
+        FASTJET_CONFIG="$fastjet_config" \
+        CXX="$powheg_cxx $lhapdf_cppflags" \
+        pwhg_main
   done
 }
 
