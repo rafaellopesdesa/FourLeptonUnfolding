@@ -78,7 +78,8 @@ void check_delphes_output() {
 
   const char *required[] = {"Event",         "Weight",      "Particle",
                             "StableParticle", "RecoElectron", "RecoMuon",
-                            "Electron",       "Muon"};
+                            "DressedElectron", "DressedMuon",  "Electron",
+                            "Muon"};
   for (const char *name : required) {
     if (!require_branch(tree, name)) {
       file->Close();

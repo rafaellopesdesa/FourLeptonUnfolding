@@ -14,7 +14,10 @@ DELPHES_COMMIT="${DELPHES_COMMIT:-28658365abeb71ee36dfc739f9670c1514c0cb10}"
 DELPHES_URL="${DELPHES_URL:-https://github.com/delphes/delphes.git}"
 ROOT_VERSION="${ROOT_VERSION:-6.38.04}"
 ATLAS_CARD_SHA256="${ATLAS_CARD_SHA256:-b6a97bcd6e2b4f19e218eaa07b3afe1937d66452f0519de0b8c367eff46fe69d}"
-PATCH_FILE="$SCRIPT_DIR/patches/delphes-weight-scale.patch"
+PATCH_FILES=(
+  "$SCRIPT_DIR/patches/delphes-weight-scale.patch"
+  "$SCRIPT_DIR/patches/delphes-truth-lepton-dressing.patch"
+)
 
 usage() {
   cat <<'EOF'
@@ -168,19 +171,22 @@ RESOLVED_COMMIT="$(git -C "$DELPHES_ROOT" rev-parse HEAD)"
   exit 1
 }
 
-[[ -r "$PATCH_FILE" ]] || {
-  echo "Missing Delphes weight-scale patch: $PATCH_FILE" >&2
-  exit 1
-}
-if git -C "$DELPHES_ROOT" apply --reverse --check "$PATCH_FILE" >/dev/null 2>&1; then
-  log "Delphes weight-scale patch is already applied"
-elif git -C "$DELPHES_ROOT" apply --check "$PATCH_FILE"; then
-  log "Applying Delphes weight-scale patch"
-  git -C "$DELPHES_ROOT" apply "$PATCH_FILE"
-else
-  echo "The weight-scale patch does not apply cleanly to $DELPHES_ROOT" >&2
-  exit 1
-fi
+for patch_file in "${PATCH_FILES[@]}"; do
+  [[ -r "$patch_file" ]] || {
+    echo "Missing Delphes patch: $patch_file" >&2
+    exit 1
+  }
+  patch_name="$(basename "$patch_file")"
+  if git -C "$DELPHES_ROOT" apply --reverse --check "$patch_file" >/dev/null 2>&1; then
+    log "$patch_name is already applied"
+  elif git -C "$DELPHES_ROOT" apply --check "$patch_file"; then
+    log "Applying $patch_name"
+    git -C "$DELPHES_ROOT" apply "$patch_file"
+  else
+    echo "$patch_name does not apply cleanly to $DELPHES_ROOT" >&2
+    exit 1
+  fi
+done
 
 CARD="$DELPHES_ROOT/cards/delphes_card_ATLAS.tcl"
 CARD_CHECKSUM="$(sha256sum "$CARD" | awk '{print $1}')"
@@ -245,7 +251,8 @@ root_prefix=$ROOT_PREFIX
 root_init_mode=$ROOT_INIT_MODE
 atlas_card=$CARD
 atlas_card_sha256=$CARD_CHECKSUM
-weight_patch_sha256=$(sha256sum "$PATCH_FILE" | awk '{print $1}')
+weight_patch_sha256=$(sha256sum "${PATCH_FILES[0]}" | awk '{print $1}')
+truth_lepton_dressing_patch_sha256=$(sha256sum "${PATCH_FILES[1]}" | awk '{print $1}')
 EOF
 
 log "Installation complete"

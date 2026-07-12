@@ -303,7 +303,8 @@ for input_file in "${INPUT_FILES[@]}"; do
       printf 'input_events=%s\n' "$input_events"
       printf 'output_events=%s\n' "$expected_events"
       printf 'event_retention_validated=true\n'
-      printf 'truth_particles=StableParticle(status_1,bare,no_photon_dressing)\n'
+      printf 'truth_particles=StableParticle(status_1,bare),DressedElectron,DressedMuon\n'
+      printf 'truth_lepton_dressing=non_hadronic_status_1_photons,delta_r_lt_0.1,nearest_unique\n'
       printf 'loose_reco_leptons=RecoElectron,RecoMuon(pre_isolation)\n'
       printf 'reconstruction_marker=HasFourRecoLeptons\n'
       printf 'delphes_version=%s\n' "${DELPHES_VERSION:-unknown}"

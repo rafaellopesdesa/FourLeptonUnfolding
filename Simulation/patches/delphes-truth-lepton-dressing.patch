@@ -1,0 +1,196 @@
+diff --git a/modules/LeptonDressing.cc b/modules/LeptonDressing.cc
+index a1e52b7..3b6cf48 100644
+--- a/modules/LeptonDressing.cc
++++ b/modules/LeptonDressing.cc
+@@ -44,8 +44,10 @@
+ 
+ #include <algorithm>
+ #include <iostream>
++#include <set>
+ #include <sstream>
+ #include <stdexcept>
++#include <vector>
+ 
+ using namespace std;
+ 
+@@ -67,6 +69,9 @@ LeptonDressing::~LeptonDressing()
+ void LeptonDressing::Init()
+ {
+   fDeltaR = GetDouble("DeltaRMax", 0.4);
++  fDressingPTMin = GetDouble("DressingPTMin", 0.1);
++  fRequireNoHadronAncestor = GetBool("RequireNoHadronAncestor", false);
++  fUniqueAssignment = GetBool("UniqueAssignment", false);
+ 
+   // import input array(s)
+ 
+@@ -76,6 +81,8 @@ void LeptonDressing::Init()
+   fCandidateInputArray = ImportArray(GetString("CandidateInputArray", "UniqueObjectFinder/electrons"));
+   fItCandidateInputArray = fCandidateInputArray->MakeIterator();
+ 
++  fParticleInputArray = ImportArray(GetString("ParticleInputArray", "Delphes/allParticles"));
++
+   // create output array
+ 
+   fOutputArray = ExportArray(GetString("OutputArray", "electrons"));
+@@ -96,6 +103,55 @@ void LeptonDressing::Process()
+   Candidate *candidate, *dressing, *mother;
+   TLorentzVector momentum;
+ 
++  if(fUniqueAssignment)
++  {
++    vector<Candidate *> bareLeptons;
++    vector<Candidate *> dressedLeptons;
++
++    fItCandidateInputArray->Reset();
++    while((candidate = static_cast<Candidate *>(fItCandidateInputArray->Next())))
++    {
++      mother = candidate;
++      candidate = static_cast<Candidate *>(candidate->Clone());
++      candidate->AddCandidate(mother);
++      bareLeptons.push_back(mother);
++      dressedLeptons.push_back(candidate);
++    }
++
++    fItDressingInputArray->Reset();
++    while((dressing = static_cast<Candidate *>(fItDressingInputArray->Next())))
++    {
++      if(dressing->PID != 22 || dressing->Status != 1) continue;
++      if(dressing->Momentum.Pt() <= fDressingPTMin) continue;
++      if(fRequireNoHadronAncestor && HasHadronAncestor(dressing)) continue;
++
++      size_t nearest = bareLeptons.size();
++      Double_t nearestDeltaR = fDeltaR;
++      for(size_t index = 0; index < bareLeptons.size(); ++index)
++      {
++        const Double_t deltaR = bareLeptons[index]->Momentum.DeltaR(dressing->Momentum);
++        if(deltaR < nearestDeltaR)
++        {
++          nearest = index;
++          nearestDeltaR = deltaR;
++        }
++      }
++
++      if(nearest < dressedLeptons.size())
++      {
++        dressedLeptons[nearest]->Momentum += dressing->Momentum;
++        dressedLeptons[nearest]->AddCandidate(dressing);
++      }
++    }
++
++    for(vector<Candidate *>::iterator it = dressedLeptons.begin(); it != dressedLeptons.end(); ++it)
++    {
++      (*it)->Mass = (*it)->Momentum.M();
++      fOutputArray->Add(*it);
++    }
++    return;
++  }
++
+   // loop over all input candidate
+   fItCandidateInputArray->Reset();
+   while((candidate = static_cast<Candidate *>(fItCandidateInputArray->Next())))
+@@ -108,7 +164,8 @@ void LeptonDressing::Process()
+     while((dressing = static_cast<Candidate *>(fItDressingInputArray->Next())))
+     {
+       const TLorentzVector &dressingMomentum = dressing->Momentum;
+-      if(dressingMomentum.Pt() > 0.1)
++      if(dressingMomentum.Pt() > fDressingPTMin &&
++        (!fRequireNoHadronAncestor || !HasHadronAncestor(dressing)))
+       {
+         if(candidateMomentum.DeltaR(dressingMomentum) <= fDeltaR)
+         {
+@@ -128,3 +185,52 @@ void LeptonDressing::Process()
+ }
+ 
+ //------------------------------------------------------------------------------
++
++Bool_t LeptonDressing::IsHadron(Int_t pid) const
++{
++  const Int_t absolutePID = TMath::Abs(pid);
++  return (absolutePID >= 100 && absolutePID < 1000000) || absolutePID >= 1000000000;
++}
++
++//------------------------------------------------------------------------------
++
++void LeptonDressing::AddMothers(const Candidate *candidate, vector<Int_t> &indices) const
++{
++  const Int_t size = fParticleInputArray->GetEntriesFast();
++  const Int_t first = candidate->M1;
++  const Int_t last = candidate->M2 >= first ? candidate->M2 : first;
++
++  if(first >= 0)
++  {
++    for(Int_t index = first; index <= last && index < size; ++index) indices.push_back(index);
++  }
++  else if(candidate->M2 >= 0 && candidate->M2 < size)
++  {
++    indices.push_back(candidate->M2);
++  }
++}
++
++//------------------------------------------------------------------------------
++
++Bool_t LeptonDressing::HasHadronAncestor(const Candidate *candidate) const
++{
++  vector<Int_t> pending;
++  set<Int_t> visited;
++  AddMothers(candidate, pending);
++
++  while(!pending.empty())
++  {
++    const Int_t index = pending.back();
++    pending.pop_back();
++    if(index < 0 || index >= fParticleInputArray->GetEntriesFast()) continue;
++    if(!visited.insert(index).second) continue;
++
++    const Candidate *ancestor = static_cast<const Candidate *>(fParticleInputArray->At(index));
++    if(!ancestor) continue;
++    if(IsHadron(ancestor->PID)) return true;
++    AddMothers(ancestor, pending);
++  }
++  return false;
++}
++
++//------------------------------------------------------------------------------
+diff --git a/modules/LeptonDressing.h b/modules/LeptonDressing.h
+index 9663035..df2cb03 100644
+--- a/modules/LeptonDressing.h
++++ b/modules/LeptonDressing.h
+@@ -27,8 +27,11 @@
+ 
+ #include "classes/DelphesModule.h"
+ 
++#include <vector>
++
+ class TIterator;
+ class TObjArray;
++class Candidate;
+ 
+ class LeptonDressing: public DelphesModule
+ {
+@@ -42,6 +45,13 @@ public:
+ 
+ private:
+   Double_t fDeltaR;
++  Double_t fDressingPTMin;
++  Bool_t fRequireNoHadronAncestor;
++  Bool_t fUniqueAssignment;
++
++  Bool_t IsHadron(Int_t pid) const;
++  Bool_t HasHadronAncestor(const Candidate *candidate) const;
++  void AddMothers(const Candidate *candidate, std::vector<Int_t> &indices) const;
+ 
+   TIterator *fItDressingInputArray; //!
+ 
+@@ -51,9 +61,11 @@ private:
+ 
+   const TObjArray *fCandidateInputArray; //!
+ 
++  const TObjArray *fParticleInputArray; //!
++
+   TObjArray *fOutputArray; //!
+ 
+-  ClassDef(LeptonDressing, 1)
++  ClassDef(LeptonDressing, 2)
+ };
+ 
+ #endif

@@ -29,6 +29,7 @@ The resolved card keeps both truth and reconstructed views:
 |---|---|
 | `Particle` | All HepMC particles, including status and ancestry |
 | `StableParticle` | Explicit HepMC status-1, post-shower particles |
+| `DressedElectron`, `DressedMuon` | Fiducial-truth leptons dressed with eligible photons in `deltaR < 0.1` |
 | `RecoElectron`, `RecoMuon` | Loose reconstructed leptons before isolation |
 | `Electron`, `Muon` | Standard-card reconstructed leptons after isolation and overlap removal |
 | `HasFourRecoLeptons` | Technical marker: at least four loose reconstructed electrons plus muons |
@@ -46,12 +47,18 @@ card's tracking parameterization. The detector eta acceptance and efficiency
 parameterizations remain active. Analysis-level pT cuts should be applied
 later to both the truth and reconstructed definitions.
 
-No photon dressing or lepton-photon recombination is performed. The
-`StableParticle` leptons are therefore bare post-shower leptons and status-1
-photons remain separate particles. This is intentionally not collinear safe,
-as required for the present stage of the study; a dressed-lepton definition
-can be added later without regenerating or rerunning Delphes because the
-status-1 photons are retained.
+The fiducial-truth branches apply photon dressing to stable electrons and
+muons. A photon is eligible only when it is status 1, has no hadron anywhere
+in its generator ancestry, and satisfies `deltaR < 0.1` relative to a bare
+lepton. There is no photon-pT threshold. If one photon lies inside more than
+one lepton cone, it is assigned only to the nearest bare lepton, preventing
+double counting. The dressed four-momentum is the bare lepton four-momentum
+plus all photons assigned to it.
+
+The original bare leptons and photons remain available in `StableParticle`,
+and `Particle` retains the complete ancestry used to reject photons from
+hadron decays. No fiducial pT, eta, isolation, pairing, or mass requirement is
+applied while constructing the dressed branches.
 
 ## Install
 
@@ -62,6 +69,10 @@ cd FourLeptonUnfolding/Simulation
 ./install_delphes.sh --jobs 8
 source env.sh
 ```
+
+The truth-dressing implementation extends Delphes's `LeptonDressing` module.
+After pulling this change, rerun `install_delphes.sh` once so the incremental
+`make` recompiles that module. A full clean installation is not required.
 
 Without sudo, the script can bootstrap ROOT locally with micromamba:
 

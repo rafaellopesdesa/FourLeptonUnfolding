@@ -51,11 +51,85 @@ def _insert_after(text: str, anchor: str, addition: str) -> str:
     return text.replace(anchor, anchor + addition, 1)
 
 
+def _add_truth_dressing_modules(text: str) -> str:
+    execution_anchor = "set ExecutionPath {\n"
+    execution_modules = (
+        "  TruthLeptonFilter\n"
+        "  TruthPhotonFilter\n"
+        "  TruthLeptonDressing\n"
+        "  DressedElectronFilter\n"
+        "  DressedMuonFilter\n"
+    )
+    text = _insert_after(text, execution_anchor, execution_modules)
+
+    module_anchor = (
+        "#################################\n"
+        "# Propagate particles in cylinder\n"
+        "#################################\n"
+    )
+    modules = r"""
+##########################################
+# Particle-level lepton dressing for H->4l
+##########################################
+
+module PdgCodeFilter TruthLeptonFilter {
+  set InputArray Delphes/stableParticles
+  set OutputArray leptons
+  set Invert true
+  add PdgCode {11}
+  add PdgCode {-11}
+  add PdgCode {13}
+  add PdgCode {-13}
+}
+
+module PdgCodeFilter TruthPhotonFilter {
+  set InputArray Delphes/stableParticles
+  set OutputArray photons
+  set Invert true
+  add PdgCode {22}
+}
+
+module LeptonDressing TruthLeptonDressing {
+  set CandidateInputArray TruthLeptonFilter/leptons
+  set DressingInputArray TruthPhotonFilter/photons
+  set ParticleInputArray Delphes/allParticles
+  set OutputArray dressedLeptons
+  set DeltaRMax 0.1
+  set DressingPTMin 0.0
+  set RequireNoHadronAncestor true
+  set UniqueAssignment true
+}
+
+module PdgCodeFilter DressedElectronFilter {
+  set InputArray TruthLeptonDressing/dressedLeptons
+  set OutputArray electrons
+  set Invert true
+  add PdgCode {11}
+  add PdgCode {-11}
+}
+
+module PdgCodeFilter DressedMuonFilter {
+  set InputArray TruthLeptonDressing/dressedLeptons
+  set OutputArray muons
+  set Invert true
+  add PdgCode {13}
+  add PdgCode {-13}
+}
+
+"""
+    if "module LeptonDressing TruthLeptonDressing {" not in text:
+        if text.count(module_anchor) != 1:
+            raise ValueError("could not locate the ParticlePropagator section")
+        text = text.replace(module_anchor, modules + module_anchor, 1)
+    return text
+
+
 def prepare_card(text: str) -> str:
     """Return the fiducial-study variant of a Delphes ATLAS card."""
 
     text = _lower_lepton_threshold(text, "ElectronEfficiency")
     text = _lower_lepton_threshold(text, "MuonEfficiency")
+    text = _add_truth_dressing_modules(text)
 
     text = _insert_after(
         text,
@@ -63,6 +137,13 @@ def prepare_card(text: str) -> str:
         "\n"
         "  # Explicit post-shower status-1 truth particles (no photon dressing).\n"
         "  add Branch Delphes/stableParticles StableParticle GenParticle\n",
+    )
+    text = _insert_after(
+        text,
+        "  add Branch Delphes/stableParticles StableParticle GenParticle\n",
+        "  # Fiducial truth leptons dressed with non-hadronic status-1 photons.\n"
+        "  add Branch DressedElectronFilter/electrons DressedElectron GenParticle\n"
+        "  add Branch DressedMuonFilter/muons DressedMuon GenParticle\n",
     )
     text = _insert_after(
         text,

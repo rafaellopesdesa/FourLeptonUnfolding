@@ -6,6 +6,13 @@ from Simulation.prepare_fiducial_card import prepare_card
 
 
 CARD = """
+set ExecutionPath {
+  ParticlePropagator
+  TreeWriter
+}
+#################################
+# Propagate particles in cylinder
+#################################
 module Efficiency ElectronEfficiency {
   set EfficiencyFormula { (pt <= 10.0) * (0.0) + (pt > 10.0) * (0.9) }
 }
@@ -26,6 +33,14 @@ class PrepareFiducialCardTest(unittest.TestCase):
         self.assertIn("Delphes/stableParticles StableParticle GenParticle", result)
         self.assertIn("ElectronEfficiency/electrons RecoElectron Electron", result)
         self.assertIn("MuonEfficiency/muons RecoMuon Muon", result)
+        self.assertIn("module LeptonDressing TruthLeptonDressing", result)
+        self.assertIn("set DeltaRMax 0.1", result)
+        self.assertIn("set DressingPTMin 0.0", result)
+        self.assertIn("set RequireNoHadronAncestor true", result)
+        self.assertIn("set UniqueAssignment true", result)
+        self.assertIn("DressedElectronFilter/electrons DressedElectron GenParticle", result)
+        self.assertIn("DressedMuonFilter/muons DressedMuon GenParticle", result)
+        self.assertLess(result.index("TruthLeptonDressing\n"), result.index("ParticlePropagator\n"))
         self.assertNotIn("pt <= 10.0", result)
         self.assertNotIn("pt > 10.0", result)
         self.assertEqual(result.count("StableParticle GenParticle"), 1)
