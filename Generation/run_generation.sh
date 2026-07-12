@@ -176,6 +176,14 @@ run_powheg() {
     echo "No POWHEG run card found; pass one with --run-card." >&2
     exit 1
   }
+  if [[ "$PROCESS" == ZZ ]] && \
+      awk '$1 == "m4lmin" && $2 + 0 > 0 {found=1} END {exit !found}' "$RUN_CARD"; then
+    grep -Fq 'powheginput("#m4lmin")' "$PROCESS_DIR/Born_phsp.f" || {
+      echo "The ZZ card requests m4lmin, but the installed process lacks its source patch." >&2
+      echo "Rerun Generation/install_generators.sh before generating this sample." >&2
+      exit 1
+    }
+  fi
 
   cp "$RUN_CARD" "$OUTPUT_DIR/powheg.input"
   set_powheg_value numevts "$EVENTS" "$OUTPUT_DIR/powheg.input"

@@ -27,6 +27,7 @@ LHAPDF_SET_BASE_URL="${LHAPDF_SET_BASE_URL:-https://lhapdfsets.web.cern.ch/curre
 
 POWHEG_URL="${POWHEG_URL:-https://gitlab.com/POWHEG-BOX/V2/POWHEG-BOX-V2.git}"
 POWHEG_REF="${POWHEG_REF:-master}"
+POWHEG_ZZ_PATCH="$SCRIPT_DIR/patches/powheg-zz-m4lmin.patch"
 
 usage() {
   cat <<'EOF'
@@ -505,6 +506,20 @@ install_powheg() {
   git -C "$root" checkout "$POWHEG_REF"
   git -C "$root" submodule update --init gg_H ZZ
 
+  [[ -r "$POWHEG_ZZ_PATCH" ]] || {
+    echo "Missing POWHEG ZZ patch: $POWHEG_ZZ_PATCH" >&2
+    exit 1
+  }
+  if git -C "$root/ZZ" apply --reverse --check "$POWHEG_ZZ_PATCH" >/dev/null 2>&1; then
+    log "POWHEG ZZ m4lmin patch is already applied"
+  elif git -C "$root/ZZ" apply --check "$POWHEG_ZZ_PATCH"; then
+    log "Applying POWHEG ZZ m4lmin patch"
+    git -C "$root/ZZ" apply "$POWHEG_ZZ_PATCH"
+  else
+    echo "The POWHEG ZZ m4lmin patch does not apply cleanly to $root/ZZ" >&2
+    exit 1
+  fi
+
   for process in gg_H ZZ; do
     local process_dir="$root/$process"
     # The upstream process Makefiles write object and Fortran module files to
@@ -579,6 +594,8 @@ write_versions() {
     printf 'POWHEG-BOX-V2 %s\n' "$(git -C "$powheg_root" rev-parse HEAD)"
     printf 'POWHEG gg_H %s\n' "$(git -C "$powheg_root/gg_H" rev-parse HEAD)"
     printf 'POWHEG ZZ %s\n' "$(git -C "$powheg_root/ZZ" rev-parse HEAD)"
+    printf 'POWHEG ZZ m4lmin patch %s\n' \
+      "$(sha256sum "$POWHEG_ZZ_PATCH" | awk '{print $1}')"
   } >"$PREFIX/versions.txt"
 }
 

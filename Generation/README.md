@@ -128,11 +128,21 @@ Generated samples and locally installed software are excluded from Git.
 
 The `ZZ` process contains the leptonic diboson matrix element supplied by its
 POWHEG implementation and is configured for charged electrons, muons and taus.
-Its only generation-level cut is `mll > 4 GeV`, which is required to regulate
-the low-mass virtual-photon singularity. The `gg_H` process produces the Higgs
+Its generation-level cuts are `mll > 20 GeV` and `m4l > 95 GeV`. They regulate
+the low-mass virtual-photon region and avoid generating below the planned
+fiducial measurement while retaining margins below `mll >= 50 GeV` and
+`m4l >= 105 GeV`. The four-lepton threshold is supplied by a version-pinned
+patch because upstream POWHEG-BOX-V2/ZZ has no native `m4lmin` keyword. After
+pulling this change, rerun `install_generators.sh`; its incremental build will
+apply the patch and rebuild only the affected POWHEG process. The `gg_H`
+process produces the Higgs
 and this baseline forces `H -> ZZ(*)` with each Z decaying to `e`, `mu` or
 `tau` pairs in the shower. Before using these events for full phase-space
 unfolding, we must validate decay angles, off-shell behavior, identical-lepton
 effects, tau feed-down and the precise POWHEG shower-veto prescription in both
 showers. A later stage can compare this factorized baseline to a dedicated
 four-lepton matrix element such as POWHEG-BOX-RES `gg4l`.
+
+Do not reuse a `ZZ` integration or upper-bound grid produced with the old
+`mll > 4 GeV` card. The new generation cuts change the sampled phase space and
+require a fresh standalone run or a new Unity campaign/grid stage.

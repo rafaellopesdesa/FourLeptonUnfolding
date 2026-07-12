@@ -1,0 +1,58 @@
+diff --git a/Born_phsp.f b/Born_phsp.f
+index 6b700ba..51523d4 100644
+--- a/Born_phsp.f
++++ b/Born_phsp.f
+@@ -19,14 +19,14 @@
+       double precision m34,m56,smin,smax,s,z
+       double precision xmin,taumin,sqrts
+       integer i,k
+-      real * 8 mllmin34,mllmin56,mllmin,gamcut
++      real * 8 mllmin34,mllmin56,mllmin,m4lmin,gamcut
+       real * 8 powheginput
+       external powheginput
+       logical debug,ini,pwhg_isfinite
+       data ini/.true./
+       data debug/.false./
+       save ini,mllmin34,mllmin56
+-      save gamcut
++      save gamcut,m4lmin
+ 
+       double precision lntaum,ymax,ycm
+ 
+@@ -60,6 +60,8 @@ c kn_jacborn = 0 depending upon the charge of the decay products
+                call pwhg_exit(-1)
+             endif
+          endif
++         m4lmin = powheginput("#m4lmin")
++         if(m4lmin.lt.0) m4lmin=0d0
+          ini=.false.
+       endif
+ C     
+@@ -97,13 +99,13 @@ c
+       m56=sqrt(s)
+ 
+       if(zerowidth) then
+-         taumin = ((m34+m56)/sqrts)**2
++         taumin = (max(m34+m56,m4lmin)/sqrts)**2
+          lntaum = dlog(taumin)
+          tau = dexp(lntaum*(1d0-xborn(9)))
+          xjac = xjac*(-lntaum*tau)
+       else
+          z = xborn(9)
+-         smin = (m34+m56)**2
++         smin = max((m34+m56)**2,m4lmin**2)
+          smax = kn_sbeams
+ c use breit plus gamma importance sampling, even if it is a W;
+ c in decaying into gamma*+W it needs that
+@@ -194,9 +196,9 @@ c     now boost everything BACK along z-axis
+ 
+ c     minimal final state mass 
+       if(zerowidth) then
+-         kn_minmass= 2 * ph_zmass
++         kn_minmass=max(2 * ph_zmass,m4lmin)
+       else
+-         kn_minmass=mllmin34+mllmin56 
++         kn_minmass=max(mllmin34+mllmin56,m4lmin)
+       endif
+ 
+       if(.not.pwhg_isfinite(kn_jacborn)) kn_jacborn=0

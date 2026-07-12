@@ -3,10 +3,16 @@
 ! grid-reuse switches.
 
 ! The process contains off-shell Z/gamma* diagrams with massless leptons.
-! A positive dilepton-mass cutoff is therefore required to regulate the
-! gamma* -> l+l- singularity. Four GeV is deliberately below the later
-! analysis Z-mass requirements and just above the physical 2*m_tau threshold.
-mllmin 4d0
+! A positive dilepton-mass cutoff is required to regulate gamma* -> l+l-.
+! The upstream reference card uses 20 GeV. This is safely below the intended
+! 50 GeV analysis threshold while avoiding the extreme low-mass region that
+! makes integration and upper-bound construction inefficient. For 4e/4mu,
+! POWHEG also applies this cut to crossed opposite-sign pairings.
+mllmin 20d0
+
+! Version-pinned FourLeptonUnfolding extension to POWHEG-BOX-V2/ZZ.
+! Keep a 10 GeV buffer below the intended m4l >= 105 GeV analysis region.
+m4lmin 95d0
 
 ! Both bosons decay to charged leptons. In this process "leptonic" includes
 ! electrons, muons and taus, including mixed-flavour combinations.
