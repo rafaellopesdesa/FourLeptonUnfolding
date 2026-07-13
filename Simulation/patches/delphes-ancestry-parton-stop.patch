@@ -1,0 +1,39 @@
+diff --git a/modules/LeptonDressing.cc b/modules/LeptonDressing.cc
+index 3b6cf48..64a4ad9 100644
+--- a/modules/LeptonDressing.cc
++++ b/modules/LeptonDressing.cc
+@@ -192,6 +192,14 @@ Bool_t LeptonDressing::IsHadron(Int_t pid) const
+ 
+ //------------------------------------------------------------------------------
+ 
++Bool_t LeptonDressing::IsParton(Int_t pid) const
++{
++  const Int_t absolutePID = TMath::Abs(pid);
++  return absolutePID <= 6 || absolutePID == 21;
++}
++
++//------------------------------------------------------------------------------
++
+ void LeptonDressing::AddMothers(const Candidate *candidate, vector<Int_t> &indices) const
+ {
+   const Int_t size = fParticleInputArray->GetEntriesFast();
+@@ -229,6 +238,7 @@ Bool_t LeptonDressing::HasHadronAncestor(const Candidate *candidate) const
+     const Candidate *ancestor = static_cast<const Candidate *>(fParticleInputArray->At(index));
+     if(!ancestor) continue;
+     if(IsHadron(ancestor->PID)) return true;
++    if(IsParton(ancestor->PID)) continue;
+     AddMothers(ancestor, pending);
+   }
+   return false;
+diff --git a/modules/LeptonDressing.h b/modules/LeptonDressing.h
+index df2cb03..b0a554c 100644
+--- a/modules/LeptonDressing.h
++++ b/modules/LeptonDressing.h
+@@ -50,6 +50,7 @@ private:
+   Bool_t fUniqueAssignment;
+ 
+   Bool_t IsHadron(Int_t pid) const;
++  Bool_t IsParton(Int_t pid) const;
+   Bool_t HasHadronAncestor(const Candidate *candidate) const;
+   void AddMothers(const Candidate *candidate, std::vector<Int_t> &indices) const;
+ 

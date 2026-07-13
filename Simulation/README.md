@@ -49,12 +49,14 @@ acceptance. The original endcap efficiencies/resolutions are held constant
 from 2.5 to 2.7. Analysis-level ordered-pT and event cuts remain downstream.
 
 The fiducial-truth branches apply photon dressing to stable electrons and
-muons. A photon is eligible only when it is status 1, has no hadron anywhere
-in its generator ancestry, and satisfies `deltaR < 0.1` relative to a bare
-lepton. There is no photon-pT threshold. If one photon lies inside more than
-one lepton cone, it is assigned only to the nearest bare lepton, preventing
-double counting. The dressed four-momentum is the bare lepton four-momentum
-plus all photons assigned to it.
+muons. A photon is eligible only when it is status 1, has no hadron-decay
+ancestor before the ancestry chain reaches an incoming quark or gluon, and
+satisfies `deltaR < 0.1` relative to a bare lepton. Traversal stops at that
+parton so that the beam proton is not mistaken for a hadron-decay ancestor.
+There is no photon-pT threshold. If one photon lies inside more than one lepton
+cone, it is assigned only to the nearest bare lepton, preventing double
+counting. The dressed four-momentum is the bare lepton four-momentum plus all
+photons assigned to it.
 
 The original bare leptons and photons remain available in `StableParticle`,
 and `Particle` retains the complete ancestry used to reject photons from

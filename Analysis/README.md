@@ -60,11 +60,12 @@ Use `--mass-region signal` for `115 < m4l < 130 GeV`. Jets within
 definition; because this analysis has no jet requirement or jet output, that
 cleaning cannot change event selection and no jet branches are read.
 
-Truth uses `DressedElectron` and `DressedMuon`. Leptons with a hadron anywhere
-in their ancestry are excluded, while leptons from `Z -> tau tau` remain
-eligible. Reconstruction uses the loose pre-isolation `RecoElectron` and
-`RecoMuon` branches; no additional isolation requirement appears in the
-provided table.
+Truth uses `DressedElectron` and `DressedMuon`. Leptons with a hadron-decay
+ancestor before the chain reaches an incoming hard-scatter parton are excluded;
+ancestry traversal stops at the quark or gluon so the beam proton does not make
+every prompt lepton look nonprompt. Leptons from `Z -> tau tau` remain eligible.
+Reconstruction uses the loose pre-isolation `RecoElectron` and `RecoMuon`
+branches; no additional isolation requirement appears in the provided table.
 
 ## Running
 

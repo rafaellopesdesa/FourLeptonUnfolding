@@ -97,6 +97,11 @@ def _is_hadron(pid: int) -> bool:
     return 100 <= absolute < 1_000_000 or absolute >= 1_000_000_000
 
 
+def _is_parton(pid: int) -> bool:
+    absolute = abs(pid)
+    return absolute <= 6 or absolute == 21
+
+
 def _prompt_mask(
     lepton_m1: list[int],
     lepton_m2: list[int],
@@ -116,8 +121,14 @@ def _prompt_mask(
     def has_hadron_ancestor(index: int) -> bool:
         if index < 0 or index >= size:
             return False
-        if _is_hadron(int(particle_pid[index])):
+        pid = int(particle_pid[index])
+        if _is_hadron(pid):
             return True
+        # Stop at the incoming hard-scatter parton.  HepMC ancestry may link
+        # that parton to a beam proton; following it further would classify
+        # every hard-process lepton as a hadron-decay lepton.
+        if _is_parton(pid):
+            return False
         return any(
             mother != index and has_hadron_ancestor(mother)
             for mother in mothers(int(particle_m1[index]), int(particle_m2[index]))

@@ -6,7 +6,12 @@ import unittest
 import awkward as ak
 import vector
 
-from Analysis.build_analysis_tree import INPUT_BRANCHES, available_branch_names, reduce_chunk
+from Analysis.build_analysis_tree import (
+    INPUT_BRANCHES,
+    _prompt_mask,
+    available_branch_names,
+    reduce_chunk,
+)
 
 
 def p4(pt: float, eta: float, phi: float):
@@ -15,6 +20,26 @@ def p4(pt: float, eta: float, phi: float):
 
 
 class ReducerTest(unittest.TestCase):
+    def test_prompt_ancestry_stops_at_incoming_parton(self):
+        # lepton <- Z <- H <- gluon <- beam proton
+        particle_pid = [2212, 21, 25, 23, 11]
+        particle_m1 = [-1, 0, 1, 2, 3]
+        particle_m2 = [-1, 0, 1, 2, 3]
+        self.assertEqual(
+            _prompt_mask([3], [3], particle_pid, particle_m1, particle_m2),
+            [True],
+        )
+
+    def test_hadron_decay_lepton_is_rejected(self):
+        # lepton <- B hadron <- b quark
+        particle_pid = [5, 511, 11]
+        particle_m1 = [-1, 0, 1]
+        particle_m2 = [-1, 0, 1]
+        self.assertEqual(
+            _prompt_mask([1], [1], particle_pid, particle_m1, particle_m2),
+            [False],
+        )
+
     def test_nested_delphes_branches_are_compared_by_leaf_name(self):
         class NestedTree:
             def keys(self, *, recursive, full_paths):
