@@ -35,10 +35,6 @@ the original mass-ordering convention.
 convention is the laboratory `+z` beam; this resolves the unavoidable beam-sign
 ambiguity at a proton-proton collider reproducibly.
 
-The paper names the two decay polar variables `cos(theta1)` and `cos(theta2)`.
-The similarly written `cos(phi1)` and `cos(phi2)` are not observables in its
-convention, so the Python output uses `cos_theta1` and `cos_theta2`.
-
 The scalar-Higgs result is a differential decay-density kernel. Equation (5)
 of the paper defines the mass-and-angle distribution only up to an overall
 constant, so the result is appropriate for relative weights and shapes, not as
