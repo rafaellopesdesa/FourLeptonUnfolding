@@ -6,7 +6,7 @@ import unittest
 import awkward as ak
 import vector
 
-from Analysis.build_analysis_tree import reduce_chunk
+from Analysis.build_analysis_tree import INPUT_BRANCHES, available_branch_names, reduce_chunk
 
 
 def p4(pt: float, eta: float, phi: float):
@@ -15,6 +15,18 @@ def p4(pt: float, eta: float, phi: float):
 
 
 class ReducerTest(unittest.TestCase):
+    def test_nested_delphes_branches_are_compared_by_leaf_name(self):
+        class NestedTree:
+            def keys(self, *, recursive, full_paths):
+                self.arguments = (recursive, full_paths)
+                if full_paths:
+                    return [f"{name.split('.', 1)[0]}/{name}" for name in INPUT_BRANCHES]
+                return list(INPUT_BRANCHES)
+
+        tree = NestedTree()
+        self.assertEqual(available_branch_names(tree), set(INPUT_BRANCHES))
+        self.assertEqual(tree.arguments, (True, False))
+
     def test_one_row_per_event_and_weight(self):
         electron_vectors = [p4(46.0, 0.1, 0.0), p4(46.0, -0.1, 2.9)]
         muon_vectors = [p4(18.0, 0.3, 1.0), p4(18.0, -0.3, 1.0 + math.pi)]

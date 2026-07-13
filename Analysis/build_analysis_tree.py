@@ -67,6 +67,11 @@ INPUT_BRANCHES = (
 )
 
 
+def available_branch_names(tree: object) -> set[str]:
+    """Return recursive branch names without uproot's parent path prefixes."""
+    return set(tree.keys(recursive=True, full_paths=False))  # type: ignore[attr-defined]
+
+
 def discover_inputs(paths: Iterable[str]) -> list[Path]:
     files: list[Path] = []
     for item in paths:
@@ -281,7 +286,7 @@ def main() -> None:
                 if args.tree_name not in input_file:
                     raise KeyError(f"{input_path} does not contain tree {args.tree_name}")
                 tree = input_file[args.tree_name]
-                missing = sorted(set(INPUT_BRANCHES).difference(tree.keys()))
+                missing = sorted(set(INPUT_BRANCHES).difference(available_branch_names(tree)))
                 if missing:
                     raise KeyError(
                         f"{input_path} is missing required branches: {', '.join(missing)}; "
