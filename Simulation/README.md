@@ -53,6 +53,8 @@ muons. A photon is eligible only when it is status 1, has no hadron-decay
 ancestor before the ancestry chain reaches an incoming quark or gluon, and
 satisfies `deltaR < 0.1` relative to a bare lepton. Traversal stops at that
 parton so that the beam proton is not mistaken for a hadron-decay ancestor.
+The Delphes `M1` and `M2` fields are treated as two individual mother indices,
+not as the endpoints of an inclusive particle-index range.
 There is no photon-pT threshold. If one photon lies inside more than one lepton
 cone, it is assigned only to the nearest bare lepton, preventing double
 counting. The dressed four-momentum is the bare lepton four-momentum plus all

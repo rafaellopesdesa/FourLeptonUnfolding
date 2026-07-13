@@ -64,6 +64,8 @@ Truth uses `DressedElectron` and `DressedMuon`. Leptons with a hadron-decay
 ancestor before the chain reaches an incoming hard-scatter parton are excluded;
 ancestry traversal stops at the quark or gluon so the beam proton does not make
 every prompt lepton look nonprompt. Leptons from `Z -> tau tau` remain eligible.
+Delphes `M1` and `M2` are followed as two individual mother indices, never as
+an inclusive interval containing unrelated event-record particles.
 Reconstruction uses the loose pre-isolation `RecoElectron` and `RecoMuon`
 branches; no additional isolation requirement appears in the provided table.
 
@@ -177,3 +179,6 @@ variables are filled whenever a pairable four-lepton candidate exists, even if
 it fails the full selection;
 they are `NaN` only when no candidate exists or an angle is mathematically
 undefined. The booleans must therefore be used as masks in unfolding.
+The reducer also prints the full truth/reconstruction overlap (`both`,
+`fiducial-only`, `reconstructed-only`, and `neither`) after each run so that
+efficiency losses and migrations are immediately visible.

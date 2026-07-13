@@ -1,0 +1,22 @@
+diff --git a/modules/LeptonDressing.cc b/modules/LeptonDressing.cc
+index 64a4ad9..5cca35f 100644
+--- a/modules/LeptonDressing.cc
++++ b/modules/LeptonDressing.cc
+@@ -205,14 +205,8 @@ void LeptonDressing::AddMothers(const Candidate *candidate, vector<Int_t> &indices) const
+ {
+   const Int_t size = fParticleInputArray->GetEntriesFast();
+   const Int_t first = candidate->M1;
+-  const Int_t last = candidate->M2 >= first ? candidate->M2 : first;
++  const Int_t second = candidate->M2;
+ 
+-  if(first >= 0)
+-  {
+-    for(Int_t index = first; index <= last && index < size; ++index) indices.push_back(index);
+-  }
+-  else if(candidate->M2 >= 0 && candidate->M2 < size)
+-  {
+-    indices.push_back(candidate->M2);
+-  }
++  if(first >= 0 && first < size) indices.push_back(first);
++  if(second >= 0 && second < size && second != first) indices.push_back(second);
+ }

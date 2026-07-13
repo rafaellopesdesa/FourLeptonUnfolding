@@ -112,11 +112,15 @@ def _prompt_mask(
 ) -> list[bool]:
     size = len(particle_pid)
 
-    def mothers(first: int, last: int) -> range:
-        if first < 0:
-            return range(last, last + 1) if 0 <= last < size else range(0)
-        stop = last if last >= first else first
-        return range(first, min(stop, size - 1) + 1)
+    def mothers(first: int, second: int) -> tuple[int, ...]:
+        # Delphes stores two mother indices, not the endpoints of an inclusive
+        # particle-index range. Treating M1..M2 as a range walks through
+        # unrelated event-record entries and can invent hadron ancestors.
+        indices: list[int] = []
+        for index in (first, second):
+            if 0 <= index < size and index not in indices:
+                indices.append(index)
+        return tuple(indices)
 
     @lru_cache(maxsize=None)
     def has_hadron_ancestor(index: int) -> bool:
@@ -304,6 +308,9 @@ def main() -> None:
     event_id = 0
     fiducial_count = 0
     reconstructed_count = 0
+    both_count = 0
+    fiducial_only_count = 0
+    reconstructed_only_count = 0
     with uproot.recreate(output_path) as output_file:
         output_file.mktree("Analysis", output_schema(), title="Compact H to four-lepton analysis tree")
         output_tree = output_file["Analysis"]
@@ -332,11 +339,23 @@ def main() -> None:
                     output_tree.extend(reduced)
                     size = len(reduced["event_id"])
                     event_id += size
-                    fiducial_count += int(np.count_nonzero(reduced["fiducial"]))
-                    reconstructed_count += int(np.count_nonzero(reduced["reconstructed"]))
+                    fiducial = reduced["fiducial"]
+                    reconstructed = reduced["reconstructed"]
+                    fiducial_count += int(np.count_nonzero(fiducial))
+                    reconstructed_count += int(np.count_nonzero(reconstructed))
+                    both_count += int(np.count_nonzero(fiducial & reconstructed))
+                    fiducial_only_count += int(np.count_nonzero(fiducial & ~reconstructed))
+                    reconstructed_only_count += int(
+                        np.count_nonzero(~fiducial & reconstructed)
+                    )
 
     print(f"Wrote {event_id} events to {output_path}")
     print(f"Fiducial: {fiducial_count}; reconstructed and selected: {reconstructed_count}")
+    print(
+        f"Overlap: both={both_count}; fiducial-only={fiducial_only_count}; "
+        f"reconstructed-only={reconstructed_only_count}; "
+        f"neither={event_id - both_count - fiducial_only_count - reconstructed_only_count}"
+    )
 
 
 if __name__ == "__main__":

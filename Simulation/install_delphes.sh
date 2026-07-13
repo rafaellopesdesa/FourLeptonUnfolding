@@ -18,6 +18,7 @@ PATCH_FILES=(
   "$SCRIPT_DIR/patches/delphes-weight-scale.patch"
   "$SCRIPT_DIR/patches/delphes-truth-lepton-dressing.patch"
   "$SCRIPT_DIR/patches/delphes-ancestry-parton-stop.patch"
+  "$SCRIPT_DIR/patches/delphes-mother-indices.patch"
 )
 
 usage() {
@@ -255,6 +256,7 @@ atlas_card_sha256=$CARD_CHECKSUM
 weight_patch_sha256=$(sha256sum "${PATCH_FILES[0]}" | awk '{print $1}')
 truth_lepton_dressing_patch_sha256=$(sha256sum "${PATCH_FILES[1]}" | awk '{print $1}')
 ancestry_parton_stop_patch_sha256=$(sha256sum "${PATCH_FILES[2]}" | awk '{print $1}')
+mother_indices_patch_sha256=$(sha256sum "${PATCH_FILES[3]}" | awk '{print $1}')
 EOF
 
 log "Installation complete"

@@ -50,6 +50,17 @@ class ReducerTest(unittest.TestCase):
             [True],
         )
 
+    def test_mother_indices_are_not_an_inclusive_range(self):
+        # M1 and M2 point to two Z copies. The B hadron between their array
+        # indices is unrelated and must never enter the ancestry traversal.
+        particle_pid = [23, 511, 23]
+        particle_m1 = [-1, -1, -1]
+        particle_m2 = [-1, -1, -1]
+        self.assertEqual(
+            _prompt_mask([0], [2], particle_pid, particle_m1, particle_m2),
+            [True],
+        )
+
     def test_nested_delphes_branches_are_compared_by_leaf_name(self):
         class NestedTree:
             def keys(self, *, recursive, full_paths):
