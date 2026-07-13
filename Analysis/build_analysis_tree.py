@@ -39,6 +39,7 @@ KINEMATIC_FIELDS = (
 INPUT_BRANCHES = (
     "Event.Number",
     "Event.Weight",
+    "Event.CrossSection",
     "Particle.PID",
     "Particle.M1",
     "Particle.M2",
@@ -206,6 +207,7 @@ def _empty_output(size: int, first_event_id: int) -> dict[str, np.ndarray]:
         "event_id": np.arange(first_event_id, first_event_id + size, dtype=np.uint64),
         "event_number": np.zeros(size, dtype=np.int64),
         "weight": np.ones(size, dtype=np.float64),
+        "cross_section_pb": np.full(size, np.nan, dtype=np.float64),
         "fiducial": np.zeros(size, dtype=np.bool_),
         "reconstructed": np.zeros(size, dtype=np.bool_),
         "type": np.full(size, -1, dtype=np.int8),
@@ -240,6 +242,9 @@ def reduce_chunk(
     for event in range(size):
         output["event_number"][event] = int(_first(rows["Event.Number"][event], event))
         output["weight"][event] = float(_first(rows["Event.Weight"][event], 1.0))
+        output["cross_section_pb"][event] = float(
+            _first(rows["Event.CrossSection"][event], np.nan)
+        )
 
         truth = select_event(
             _truth_leptons(rows, event),

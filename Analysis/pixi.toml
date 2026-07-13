@@ -16,4 +16,5 @@ uproot = ">=5.3,<6"
 
 [tasks]
 analyze = { cmd = "python build_analysis_tree.py", description = "Build a compact analysis ROOT tree; append the CLI arguments" }
+merge = { cmd = "python merge_analysis_outputs.py", description = "Merge shower samples and build 300 fb^-1 Herwig pseudo-data" }
 test = { cmd = "python -m unittest discover -s Analysis/tests -v && python -m unittest discover -s Tools/tests -v", cwd = "..", description = "Run the Analysis and shared Tools unit tests" }

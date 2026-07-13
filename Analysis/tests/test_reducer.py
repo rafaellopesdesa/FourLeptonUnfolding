@@ -58,6 +58,7 @@ class ReducerTest(unittest.TestCase):
         arrays = {
             "Event.Number": ak.Array([[17]]),
             "Event.Weight": ak.Array([[2.5]]),
+            "Event.CrossSection": ak.Array([[0.125]]),
             "Particle.PID": ak.Array([[23, 11, -11, 13, -13]]),
             "Particle.M1": ak.Array([[-1, 0, 0, 0, 0]]),
             "Particle.M2": ak.Array([[-1, 0, 0, 0, 0]]),
@@ -92,6 +93,7 @@ class ReducerTest(unittest.TestCase):
         self.assertEqual(output["event_id"].tolist(), [100])
         self.assertEqual(output["event_number"].tolist(), [17])
         self.assertEqual(output["weight"].tolist(), [2.5])
+        self.assertEqual(output["cross_section_pb"].tolist(), [0.125])
         self.assertTrue(output["fiducial"][0])
         self.assertTrue(output["reconstructed"][0])
         self.assertEqual(output["type"][0], 2)
