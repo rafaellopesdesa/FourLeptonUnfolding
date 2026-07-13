@@ -1,0 +1,19 @@
+[workspace]
+name = "four-lepton-unfolding-analysis"
+version = "0.1.0"
+description = "Compact truth and reconstruction trees for the H to ZZ to 4l unfolding study"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+requires-pixi = ">=0.40,<1"
+readme = "README.md"
+
+[dependencies]
+python = "3.12.*"
+numpy = ">=1.26,<3"
+vector = ">=1.6,<2"
+awkward = ">=2.6,<3"
+uproot = ">=5.3,<6"
+
+[tasks]
+analyze = { cmd = "python build_analysis_tree.py", description = "Build a compact analysis ROOT tree; append the CLI arguments" }
+test = { cmd = "python -m unittest discover -s Analysis/tests -v && python -m unittest discover -s Tools/tests -v", cwd = "..", description = "Run the Analysis and shared Tools unit tests" }

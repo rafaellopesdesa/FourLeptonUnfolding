@@ -26,3 +26,6 @@ pwg*.top
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+
+# Pixi creates reproducible local environments; pixi.lock remains tracked
+.pixi/

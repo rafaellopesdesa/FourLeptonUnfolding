@@ -6,15 +6,41 @@ dropped when they fail the truth-fiducial or reconstruction-level selection.
 
 ## Installation
 
-From the repository root, install the Python dependencies in your environment:
+Pixi is the recommended environment manager. It installs Python and all
+analysis dependencies without root privileges, records the resolved package
+versions in `pixi.lock`, and runs commands in the environment without a
+separate activation step.
+
+If Pixi is not already available, install its single user-level executable:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+source ~/.bashrc
+```
+
+Then create/update the environment from the repository root:
+
+```bash
+pixi install --manifest-path Analysis/pixi.toml
+```
+
+The committed `Analysis/pixi.lock` makes every installation use the same
+complete dependency solution. When dependencies are intentionally changed,
+run `pixi update --manifest-path Analysis/pixi.toml` and commit both the
+manifest and refreshed lockfile. The local environment is stored under
+`Analysis/.pixi/` and should not be committed.
+
+On Unity, clone the repository under `/work/pi_rclsa_umass_edu/` before running
+`pixi install`; the resulting environment is then visible from the worker
+nodes. The reducer reads ROOT files with uproot, so neither the ROOT module nor
+PyROOT is required for this analysis step.
+
+As a compatibility fallback, the existing pip requirements can still be used
+from the repository root:
 
 ```bash
 python3 -m pip install -r Analysis/requirements.txt
 ```
-
-On Unity, first load/source the same ROOT and Delphes environment used for the
-simulation if needed. The reducer itself reads ROOT with uproot and does not
-require PyROOT.
 
 ## Selection
 
@@ -45,7 +71,7 @@ provided table.
 One simulation output:
 
 ```bash
-python3 Analysis/build_analysis_tree.py \
+pixi run --manifest-path Analysis/pixi.toml analyze \
   /path/to/job_000000_seed1001/delphes_ATLAS/delphes.root \
   -o /path/to/analysis/job_000000.root
 ```
@@ -53,13 +79,23 @@ python3 Analysis/build_analysis_tree.py \
 A complete campaign directory is discovered recursively:
 
 ```bash
-python3 Analysis/build_analysis_tree.py \
+pixi run --manifest-path Analysis/pixi.toml analyze \
   /work/pi_rclsa_umass_edu/FourLeptonUnfoldingGeneration/CAMPAIGN \
   -o /work/pi_rclsa_umass_edu/FourLeptonAnalysis/CAMPAIGN.root
 ```
 
 The default uproot chunk size is 50 MB and can be changed with
 `--step-size "100 MB"`.
+
+Run the Analysis and shared Tools unit tests in the same environment with:
+
+```bash
+pixi run --manifest-path Analysis/pixi.toml test
+```
+
+Alternatively, after `cd Analysis`, Pixi discovers `pixi.toml` automatically,
+so the shorter forms `pixi install`, `pixi run analyze ...`, and
+`pixi run test` are equivalent.
 
 ## Output branches
 
