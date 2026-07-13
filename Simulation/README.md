@@ -78,6 +78,9 @@ source env.sh
 The truth-dressing implementation extends Delphes's `LeptonDressing` module.
 After pulling this change, rerun `install_delphes.sh` once so the incremental
 `make` recompiles that module. A full clean installation is not required.
+The installer recognizes previously applied dressing features even after a
+later incremental patch modifies the same source region, so existing source
+trees can be upgraded in place.
 
 Without sudo, the script can bootstrap ROOT locally with micromamba:
 

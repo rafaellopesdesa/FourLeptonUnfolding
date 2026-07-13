@@ -173,13 +173,47 @@ RESOLVED_COMMIT="$(git -C "$DELPHES_ROOT" rev-parse HEAD)"
   exit 1
 }
 
+patch_features_present() {
+  local patch_name="$1"
+  case "$patch_name" in
+    delphes-weight-scale.patch)
+      grep -Fq 'void DelphesHepMC2Reader::SetWeightScale(double weightScale)' \
+        "$DELPHES_ROOT/classes/DelphesHepMC2Reader.cc" &&
+        grep -Fq 'void DelphesHepMC3Reader::SetWeightScale(double weightScale)' \
+          "$DELPHES_ROOT/classes/DelphesHepMC3Reader.cc"
+      ;;
+    delphes-truth-lepton-dressing.patch)
+      grep -Fq 'fRequireNoHadronAncestor = GetBool(' \
+        "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'Bool_t HasHadronAncestor(const Candidate *candidate) const;' \
+          "$DELPHES_ROOT/modules/LeptonDressing.h"
+      ;;
+    delphes-ancestry-parton-stop.patch)
+      grep -Fq 'Bool_t LeptonDressing::IsParton(Int_t pid) const' \
+        "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'if(IsParton(ancestor->PID)) continue;' \
+          "$DELPHES_ROOT/modules/LeptonDressing.cc"
+      ;;
+    delphes-mother-indices.patch)
+      grep -Fq 'const Int_t second = candidate->M2;' \
+        "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'if(second >= 0 && second < size && second != first)' \
+          "$DELPHES_ROOT/modules/LeptonDressing.cc"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 for patch_file in "${PATCH_FILES[@]}"; do
   [[ -r "$patch_file" ]] || {
     echo "Missing Delphes patch: $patch_file" >&2
     exit 1
   }
   patch_name="$(basename "$patch_file")"
-  if git -C "$DELPHES_ROOT" apply --reverse --check "$patch_file" >/dev/null 2>&1; then
+  if git -C "$DELPHES_ROOT" apply --reverse --check "$patch_file" >/dev/null 2>&1 ||
+      patch_features_present "$patch_name"; then
     log "$patch_name is already applied"
   elif git -C "$DELPHES_ROOT" apply --check "$patch_file"; then
     log "Applying $patch_name"
