@@ -40,6 +40,16 @@ class ReducerTest(unittest.TestCase):
             [False],
         )
 
+    def test_cyclic_generator_ancestry_terminates(self):
+        # Some generator status-copy records can contain A -> B -> A cycles.
+        particle_pid = [23, 11]
+        particle_m1 = [1, 0]
+        particle_m2 = [1, 0]
+        self.assertEqual(
+            _prompt_mask([0], [0], particle_pid, particle_m1, particle_m2),
+            [True],
+        )
+
     def test_nested_delphes_branches_are_compared_by_leaf_name(self):
         class NestedTree:
             def keys(self, *, recursive, full_paths):

@@ -120,20 +120,30 @@ def _prompt_mask(
 
     @lru_cache(maxsize=None)
     def has_hadron_ancestor(index: int) -> bool:
-        if index < 0 or index >= size:
-            return False
-        pid = int(particle_pid[index])
-        if _is_hadron(pid):
-            return True
-        # Stop at the incoming hard-scatter parton.  HepMC ancestry may link
-        # that parton to a beam proton; following it further would classify
-        # every hard-process lepton as a hadron-decay lepton.
-        if _is_parton(pid):
-            return False
-        return any(
-            mother != index and has_hadron_ancestor(mother)
-            for mother in mothers(int(particle_m1[index]), int(particle_m2[index]))
-        )
+        pending = [index]
+        visited: set[int] = set()
+        while pending:
+            current = pending.pop()
+            if current < 0 or current >= size or current in visited:
+                continue
+            visited.add(current)
+
+            pid = int(particle_pid[current])
+            if _is_hadron(pid):
+                return True
+            # Stop at the incoming hard-scatter parton. HepMC ancestry may
+            # link that parton to a beam proton; following it further would
+            # classify every hard-process lepton as a hadron-decay lepton.
+            if _is_parton(pid):
+                continue
+            pending.extend(
+                mother
+                for mother in mothers(
+                    int(particle_m1[current]), int(particle_m2[current])
+                )
+                if mother != current and mother not in visited
+            )
+        return False
 
     return [
         not any(has_hadron_ancestor(index) for index in mothers(int(first), int(last)))
