@@ -97,6 +97,20 @@ once to rebuild the small PYTHIA bridge executable; PYTHIA and Herwig themselves
 do not need to be recompiled. The Herwig decay selection is generated at run
 time.
 
+For PYTHIA matching, `POWHEG:nFinal` is set to 1 for `gg_H` and 2 for `ZZ`.
+The latter may look surprising because the LHE record contains four final-state
+leptons. POWHEG also records their two parent Z bosons as status-2 resonances;
+when `PowhegHooks` is initialized, PYTHIA's hard shower system contains the two
+Z bosons (and an optional POWHEG emission), while the decay leptons are attached
+afterwards. Counting the leptons instead would make `PowhegHooks` abort with
+`wrong number of final state particles in event`.
+
+Herwig does not use PYTHIA's `nFinal` logic. The generated Herwig input follows
+the upstream `LHE-POWHEG.in` prescription: it reads `SCALUP` from each LHE event
+as the shower-veto scale through `MaxPtIsMuF Yes` and
+`RestrictPhasespace Yes`. Consequently the resonance multiplicity issue does
+not occur in the Herwig path and no Herwig configuration change is required.
+
 ```bash
 ./run_generation.sh gg_H pythia --events 1000 --seed 101
 ./run_generation.sh gg_H herwig --events 1000 --seed 102

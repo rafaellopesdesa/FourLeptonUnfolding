@@ -31,8 +31,16 @@ int main(int argc, char* argv[]) {
   pythia.readString("Beams:LHEF = " + lhe_file);
 
   // Recommended POWHEG matching defaults from the PYTHIA 8.317 examples.
+  // nFinal is the number of outgoing particles in PYTHIA's *hard shower
+  // system*, not the number of stable daughters stored in the LHE record.
+  // POWHEG ZZ writes Z Z -> 4l with two status-2 Z resonances. PYTHIA first
+  // presents those two resonances (plus an optional POWHEG parton) to this
+  // hook and only attaches the four LHE decay leptons afterwards. Therefore
+  // the correct Born multiplicities are one Higgs for gg_H and two Z bosons
+  // for ZZ.
+  const int powheg_n_final = process == "gg_H" ? 1 : 2;
   pythia.readString("POWHEG:nFinal = " +
-                    std::to_string(process == "gg_H" ? 1 : 4));
+                    std::to_string(powheg_n_final));
   pythia.readString("POWHEG:veto = 1");
   pythia.readString("POWHEG:vetoCount = 3");
   pythia.readString("POWHEG:pThard = 0");
