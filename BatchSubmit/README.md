@@ -24,8 +24,8 @@ source env.sh
 
 # 10 million events = 1000 array tasks x 10000 events/task
 ./submit_generation.sh gg_H pythia \
-  --jobs 1000 \
-  --events-per-job 10000 \
+  --jobs 200 \
+  --events-per-job 50000 \
   --campaign ggH_pythia_run3_10M
 ```
 
