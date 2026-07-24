@@ -29,3 +29,4 @@ __pycache__/
 
 # Pixi creates reproducible local environments; pixi.lock remains tracked
 .pixi/
+install/
