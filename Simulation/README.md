@@ -192,6 +192,8 @@ On Unity, `mpich/4.2.1` is the module that makes ROOT available. Install below
 
 ```bash
 cd /work/pi_rclsa_umass_edu/$USER/FourLeptonStudy/FourLeptonUnfolding/Simulation
+module load mpich/4.2.1
+module load root/6.30.06
 ./install_delphes.sh \
   --skip-apt \
   --jobs 8 \
