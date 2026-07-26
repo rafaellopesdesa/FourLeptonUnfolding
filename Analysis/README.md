@@ -46,7 +46,7 @@ python3 -m pip install -r Analysis/requirements.txt
 
 Both truth and reconstruction levels use the supplied selection:
 
-- electrons and muons: `pT > 5 GeV`, `|eta| < 2.7`;
+- electrons and muons: `pT > 5 GeV`, `|eta| < 2.5`;
 - leading SFOS pair: smallest `|mZ-mll|`;
 - sub-leading SFOS pair: remaining pair with smallest `|mZ-mll|`;
 - ordered leading-lepton thresholds: 20, 15, and 10 GeV;
@@ -61,13 +61,27 @@ definition; because this analysis has no jet requirement or jet output, that
 cleaning cannot change event selection and no jet branches are read.
 
 Truth uses `DressedElectron` and `DressedMuon`. Leptons with a hadron-decay
-ancestor before the chain reaches an incoming hard-scatter parton are excluded;
-ancestry traversal stops at the quark or gluon so the beam proton does not make
-every prompt lepton look nonprompt. Leptons from `Z -> tau tau` remain eligible.
+origin are excluded and a `W`, `Z`, or hard virtual-photon ancestor is
+required. A photon ancestor must have mass above 5 GeV, retaining the
+continuum `gamma* -> ll` contribution while rejecting conversion electrons.
+Status copies and intermediate taus are traversed, so leptons from
+`Z/W -> tau -> e/mu` remain eligible. The ancestry traversal terminates at the
+decaying electroweak boson for the allowed-origin test. An independent hadron
+veto examines the complete ancestry until an incoming parton, matching the
+Delphes implementation and rejecting bosons produced in a hadron decay.
 Delphes `M1` and `M2` are followed as two individual mother indices, never as
 an inclusive interval containing unrelated event-record particles.
-Reconstruction uses the loose pre-isolation `RecoElectron` and `RecoMuon`
-branches; no additional isolation requirement appears in the provided table.
+
+Reconstruction uses the final `RecoElectron` and `RecoMuon` collections from
+the current Simulation card. These branches are post-smearing and include the
+simplified loose reconstruction/identification and isolation efficiencies.
+The reducer also requires the diagnostic `RecoElectronNoIso` and
+`RecoMuonNoIso` branches as a schema-version check, so stale files made with
+the former pre-isolation response cannot silently enter the analysis.
+The Python reducer then applies exactly the same kinematic, pairing, and event
+cuts to those reconstructed objects as it applies to truth. In particular,
+there is no second isolation cut in Analysis and no hidden electron-only
+7 GeV threshold.
 
 ## Running
 
@@ -168,17 +182,35 @@ The tree contains:
 - `event_id`, the original `event_number`, the nominal `weight`, and the
   physical `cross_section_pb` normalization;
 - `fiducial` and `reconstructed` booleans;
-- `type`: 0=`4mu`, 1=`2mu2e`, 2=`2e2mu`, 3=`4e`, or -1 if no candidate;
+- `truth_type` and `reco_type`: 0=`4mu`, 1=`2mu2e`, 2=`2e2mu`,
+  3=`4e`, or -1 when that level has no candidate;
+- `type`: a compatibility alias equal to `reco_type` when a reconstructed
+  candidate exists, otherwise `truth_type`;
 - truth and reconstructed copies of all Tools observables, prefixed by
   `truth_` and `reco_` respectively.
 
 `2mu2e` means that the leading, closest-to-mZ pair is the muon pair; `2e2mu`
-means that it is the electron pair. `type` comes from the truth candidate when
-one exists and otherwise falls back to the reconstructed candidate. Kinematic
-variables are filled whenever a pairable four-lepton candidate exists, even if
-it fails the full selection;
+means that it is the electron pair. Separate truth and reconstructed types
+preserve rare pairing migrations and prevent reconstructed pseudo-data from
+using a truth-biased category. Kinematic variables are filled whenever a
+pairable four-lepton candidate exists, even if it fails the full selection;
 they are `NaN` only when no candidate exists or an angle is mathematically
 undefined. The booleans must therefore be used as masks in unfolding.
 The reducer also prints the full truth/reconstruction overlap (`both`,
-`fiducial-only`, `reconstructed-only`, and `neither`) after each run so that
-efficiency losses and migrations are immediately visible.
+`fiducial-only`, `reconstructed-only`, and `neither`) after each run. It
+reports both raw event counts and sums of nominal POWHEG weights, inclusively
+and per four-lepton channel:
+
+- the correction factor `C = reco / fiducial`;
+- the conditional selection efficiency `both / fiducial`;
+- the nonfiducial leakage fraction `reco-only / reco`.
+
+The `_count` columns are useful debugging ratios. The `_weight` columns are
+the physical normalization diagnostics when event weights are nonuniform or
+signed.
+
+For channel rows, truth-selected counts and `Nboth` use the truth pairing,
+while reconstructed and reconstructed-only counts use the reconstructed
+pairing. This makes a rare `2mu2e`/`2e2mu` pairing migration visible rather
+than assigning both levels a shared channel by construction. These diagnostics
+are printed only; the compact ROOT schema is unchanged.

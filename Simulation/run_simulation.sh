@@ -22,6 +22,8 @@ Options:
   --output-root DIR    Put outputs below DIR/JOB_LABEL instead of beside input
   --card FILE          Override Delphes's bundled delphes_card_ATLAS.tcl
   --higgs-br VALUE     gg_H weight factor (default: 2.771E-04)
+  --random-seed N      Delphes base seed; increments for multiple inputs
+                       (default: generation metadata seed)
   --max-events N       Process at most N events per input; 0 means all (default)
   --max-files N        Process at most N discovered files; 0 means all (default)
   --overwrite          Replace an existing output from this script
@@ -49,6 +51,7 @@ PROCESS=auto
 OUTPUT_ROOT=""
 CARD=""
 HIGGS_BR="$HIGGS_BR_DEFAULT"
+DELPHES_SEED_OVERRIDE=""
 MAX_EVENTS=0
 MAX_FILES=0
 OVERWRITE=0
@@ -66,6 +69,7 @@ while (($#)); do
     --output-root) need_value "$@"; OUTPUT_ROOT="$2"; shift 2 ;;
     --card) need_value "$@"; CARD="$2"; shift 2 ;;
     --higgs-br) need_value "$@"; HIGGS_BR="$2"; shift 2 ;;
+    --random-seed) need_value "$@"; DELPHES_SEED_OVERRIDE="$2"; shift 2 ;;
     --max-events) need_value "$@"; MAX_EVENTS="$2"; shift 2 ;;
     --max-files) need_value "$@"; MAX_FILES="$2"; shift 2 ;;
     --overwrite) OVERWRITE=1; shift ;;
@@ -86,6 +90,13 @@ awk -v value="$HIGGS_BR" 'BEGIN { exit !(value > 0) }' || {
   echo "--higgs-br must be positive" >&2
   exit 2
 }
+if [[ -n "$DELPHES_SEED_OVERRIDE" ]]; then
+  [[ "$DELPHES_SEED_OVERRIDE" =~ ^[1-9][0-9]*$ ]] &&
+      ((10#$DELPHES_SEED_OVERRIDE <= 900000000)) || {
+    echo "--random-seed must be an integer from 1 through 900000000" >&2
+    exit 2
+  }
+fi
 [[ "$MAX_EVENTS" =~ ^[0-9]+$ ]] || {
   echo "--max-events must be a non-negative integer" >&2
   exit 2
@@ -210,7 +221,10 @@ count_hepmc_events() {
 
 failures=0
 completed=0
+file_index=0
 for input_file in "${INPUT_FILES[@]}"; do
+  current_file_index="$file_index"
+  file_index=$((file_index + 1))
   input_dir="$(dirname "$input_file")"
   metadata_file="$input_dir/run-metadata.txt"
   metadata_process="$(metadata_value process "$metadata_file")"
@@ -237,6 +251,25 @@ for input_file in "${INPUT_FILES[@]}"; do
   reader="$DELPHES_ROOT/DelphesHepMC${format}"
 
   label="$(basename "$input_dir")"
+  metadata_seed="$(metadata_value seed "$metadata_file")"
+  if [[ -n "$DELPHES_SEED_OVERRIDE" ]]; then
+    delphes_seed=$((10#$DELPHES_SEED_OVERRIDE + current_file_index))
+    if ((delphes_seed > 900000000)); then
+      echo "Derived Delphes seed exceeds 900000000 for $input_file" >&2
+      failures=$((failures + 1))
+      continue
+    fi
+  elif [[ "$metadata_seed" =~ ^[1-9][0-9]*$ ]] &&
+      ((10#$metadata_seed <= 900000000)); then
+    delphes_seed=$((10#$metadata_seed))
+  elif [[ "$label" =~ seed([1-9][0-9]*) ]] &&
+      ((10#${BASH_REMATCH[1]} <= 900000000)); then
+    delphes_seed=$((10#${BASH_REMATCH[1]}))
+  else
+    delphes_seed=$((current_file_index + 1))
+    printf '[simulation] No generation seed for %s; using deterministic fallback %d\n' \
+      "$input_file" "$delphes_seed" >&2
+  fi
   if [[ -n "$OUTPUT_ROOT" ]]; then
     output_dir="$OUTPUT_ROOT/$label"
   else
@@ -282,11 +315,13 @@ for input_file in "${INPUT_FILES[@]}"; do
   {
     printf '\n# Added by FourLeptonUnfolding/Simulation/run_simulation.sh\n'
     printf 'set WeightScale %.17g\n' "$weight_scale"
+    printf 'set RandomSeed %d\n' "$delphes_seed"
     ((MAX_EVENTS == 0)) || printf 'set MaxEvents %d\n' "$MAX_EVENTS"
   } >>"$resolved_card"
 
-  printf '[simulation] %s -> %s (HepMC%s, process=%s, weight scale=%s)\n' \
-    "$input_file" "$output_file" "$format" "$resolved_process" "$weight_scale"
+  printf '[simulation] %s -> %s (HepMC%s, process=%s, weight scale=%s, seed=%s)\n' \
+    "$input_file" "$output_file" "$format" "$resolved_process" "$weight_scale" \
+    "$delphes_seed"
 
   if "$reader" "$resolved_card" "$output_file" "$input_file" >"$log_file" 2>&1 && \
       [[ -s "$output_file" ]] && \
@@ -296,6 +331,7 @@ for input_file in "${INPUT_FILES[@]}"; do
       printf 'output_file=%s\n' "$output_file"
       printf 'process=%s\n' "$resolved_process"
       printf 'hepmc_format=%s\n' "$format"
+      printf 'random_seed=%s\n' "$delphes_seed"
       printf 'weight_scale=%s\n' "$weight_scale"
       printf 'higgs_br_h_to_zz_to_4l_including_taus=%s\n' "$HIGGS_BR"
       printf 'weight_branches_scaled=Event.Weight,Weight.Weight\n'
@@ -304,13 +340,21 @@ for input_file in "${INPUT_FILES[@]}"; do
       printf 'output_events=%s\n' "$expected_events"
       printf 'event_retention_validated=true\n'
       printf 'truth_particles=StableParticle(status_1,bare),DressedElectron,DressedMuon\n'
+      printf 'truth_lepton_origin=W_or_Z_or_gammaStar_mass_gt_5,non_hadronic,tau_decay_chains_enabled\n'
       printf 'truth_lepton_dressing=non_hadronic_status_1_photons,delta_r_lt_0.1,nearest_unique\n'
-      printf 'loose_reco_leptons=RecoElectron,RecoMuon(pre_isolation)\n'
+      printf 'reco_leptons=RecoElectron,RecoMuon(post_smearing_reco_id_isolation)\n'
+      printf 'reco_leptons_before_isolation=RecoElectronNoIso,RecoMuonNoIso\n'
+      printf 'reco_efficiency_model=atlas_run2_h4l_loose_proxy_pt_eta_no_phi\n'
+      printf 'reco_isolation_model=atlas_run2_loose_prompt_efficiency_proxy_pt_only\n'
+      printf 'analysis_acceptance=lepton_pt_gt_5_abs_eta_lt_2.5\n'
+      printf 'jet_model=anti_kt_R_0.4,generic_delphes_response,deterministic_pt_gt_30_abs_eta_lt_4.5_filter\n'
       printf 'reconstruction_marker=HasFourRecoLeptons\n'
       printf 'delphes_version=%s\n' "${DELPHES_VERSION:-unknown}"
       printf 'delphes_commit=%s\n' "$(git -C "$DELPHES_ROOT" rev-parse HEAD)"
       printf 'card=%s\n' "$CARD"
       printf 'card_sha256=%s\n' "$(sha256sum "$CARD" | awk '{print $1}')"
+      printf 'resolved_card=%s\n' "$resolved_card"
+      printf 'resolved_card_sha256=%s\n' "$(sha256sum "$resolved_card" | awk '{print $1}')"
       printf 'max_events=%s\n' "$MAX_EVENTS"
       printf 'completed_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     } >"$status_file"

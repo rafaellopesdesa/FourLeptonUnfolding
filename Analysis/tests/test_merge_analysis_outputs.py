@@ -20,6 +20,8 @@ def write_sample(path: Path, cross_section_pb: float) -> None:
             "cross_section_pb": np.full(4, cross_section_pb, dtype=np.float64),
             "fiducial": np.array([True, False, True, False]),
             "reconstructed": np.array([True, False, True, True]),
+            "truth_type": np.array([0, 1, 1, -1], dtype=np.int8),
+            "reco_type": np.array([0, -1, 2, 3], dtype=np.int8),
             "type": np.array([0, 1, 2, 3], dtype=np.int8),
             "reco_m_ZZ": np.array([120.0, 121.0, 122.0, 123.0], dtype=np.float32),
         }
@@ -59,6 +61,7 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                 self.assertGreater(tree.num_entries, 0)
                 self.assertTrue(np.all(arrays["reconstructed"]))
                 self.assertTrue(np.all(arrays["weight"] == 1.0))
+                self.assertTrue(np.all(arrays["type"] == arrays["reco_type"]))
                 self.assertEqual(arrays["event_id"].tolist(), list(range(tree.num_entries)))
                 metadata = json.loads(str(root_file["merge_metadata"]))
                 self.assertEqual(metadata["total_observed"], tree.num_entries)

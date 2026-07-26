@@ -1,0 +1,108 @@
+diff --git a/modules/LeptonDressing.cc b/modules/LeptonDressing.cc
+index 0186035..6c10bcd 100644
+--- a/modules/LeptonDressing.cc
++++ b/modules/LeptonDressing.cc
+@@ -71,6 +71,10 @@ void LeptonDressing::Init()
+   fDeltaR = GetDouble("DeltaRMax", 0.4);
+   fDressingPTMin = GetDouble("DressingPTMin", 0.1);
+   fRequireNoHadronAncestor = GetBool("RequireNoHadronAncestor", false);
++  fRequireNoHadronAncestorCandidate = GetBool("RequireNoHadronAncestorCandidate", false);
++  fRequireBosonAncestorCandidate = GetBool("RequireBosonAncestorCandidate", false);
++  fAllowTauDecayCandidate = GetBool("AllowTauDecayCandidate", false);
++  fVirtualPhotonMinMass = GetDouble("VirtualPhotonMinMass", 5.0);
+   fUniqueAssignment = GetBool("UniqueAssignment", false);
+
+   // import input array(s)
+@@ -111,6 +115,7 @@ void LeptonDressing::Process()
+     fItCandidateInputArray->Reset();
+     while((candidate = static_cast<Candidate *>(fItCandidateInputArray->Next())))
+     {
++      if(!IsCandidateEligible(candidate)) continue;
+       mother = candidate;
+       candidate = static_cast<Candidate *>(candidate->Clone());
+       candidate->AddCandidate(mother);
+@@ -156,6 +161,7 @@ void LeptonDressing::Process()
+   fItCandidateInputArray->Reset();
+   while((candidate = static_cast<Candidate *>(fItCandidateInputArray->Next())))
+   {
++    if(!IsCandidateEligible(candidate)) continue;
+     const TLorentzVector &candidateMomentum = candidate->Momentum;
+
+     // loop over all input tracks
+@@ -237,3 +243,45 @@ Bool_t LeptonDressing::HasHadronAncestor(const Candidate *candidate) const
+ }
+
+ //------------------------------------------------------------------------------
++
++Bool_t LeptonDressing::HasBosonAncestor(const Candidate *candidate) const
++{
++  vector<Int_t> pending;
++  set<Int_t> visited;
++  const Int_t leptonPID = TMath::Abs(candidate->PID);
++  AddMothers(candidate, pending);
++
++  while(!pending.empty())
++  {
++    const Int_t index = pending.back();
++    pending.pop_back();
++    if(index < 0 || index >= fParticleInputArray->GetEntriesFast()) continue;
++    if(!visited.insert(index).second) continue;
++
++    const Candidate *ancestor = static_cast<const Candidate *>(fParticleInputArray->At(index));
++    if(!ancestor) continue;
++    const Int_t absolutePID = TMath::Abs(ancestor->PID);
++    if(absolutePID == 23 || absolutePID == 24) return true;
++    if(absolutePID == 22 && ancestor->Momentum.M() > fVirtualPhotonMinMass) return true;
++
++    // Follow status copies of the same lepton and, when explicitly enabled,
++    // tau-decay chains.  Low-mass photons are not followed, which excludes
++    // conversion electrons while retaining hard gamma* -> ll decays.
++    if(absolutePID == leptonPID || (fAllowTauDecayCandidate && absolutePID == 15))
++    {
++      AddMothers(ancestor, pending);
++    }
++  }
++  return false;
++}
++
++//------------------------------------------------------------------------------
++
++Bool_t LeptonDressing::IsCandidateEligible(const Candidate *candidate) const
++{
++  if(fRequireNoHadronAncestorCandidate && HasHadronAncestor(candidate)) return false;
++  if(fRequireBosonAncestorCandidate && !HasBosonAncestor(candidate)) return false;
++  return true;
++}
++
++//------------------------------------------------------------------------------
+diff --git a/modules/LeptonDressing.h b/modules/LeptonDressing.h
+index b694637..b721c7e 100644
+--- a/modules/LeptonDressing.h
++++ b/modules/LeptonDressing.h
+@@ -47,11 +47,17 @@ private:
+   Double_t fDeltaR;
+   Double_t fDressingPTMin;
+   Bool_t fRequireNoHadronAncestor;
++  Bool_t fRequireNoHadronAncestorCandidate;
++  Bool_t fRequireBosonAncestorCandidate;
++  Bool_t fAllowTauDecayCandidate;
++  Double_t fVirtualPhotonMinMass;
+   Bool_t fUniqueAssignment;
+
+   Bool_t IsHadron(Int_t pid) const;
+   Bool_t IsParton(Int_t pid) const;
+   Bool_t HasHadronAncestor(const Candidate *candidate) const;
++  Bool_t HasBosonAncestor(const Candidate *candidate) const;
++  Bool_t IsCandidateEligible(const Candidate *candidate) const;
+   void AddMothers(const Candidate *candidate, std::vector<Int_t> &indices) const;
+
+   TIterator *fItDressingInputArray; //!
+@@ -66,7 +72,7 @@ private:
+
+   TObjArray *fOutputArray; //!
+
+-  ClassDef(LeptonDressing, 2)
++  ClassDef(LeptonDressing, 3)
+ };
+
+ #endif

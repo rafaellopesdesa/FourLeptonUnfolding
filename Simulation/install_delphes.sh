@@ -19,6 +19,7 @@ PATCH_FILES=(
   "$SCRIPT_DIR/patches/delphes-truth-lepton-dressing.patch"
   "$SCRIPT_DIR/patches/delphes-ancestry-parton-stop.patch"
   "$SCRIPT_DIR/patches/delphes-mother-indices.patch"
+  "$SCRIPT_DIR/patches/delphes-prompt-lepton-origin.patch"
 )
 
 usage() {
@@ -200,6 +201,20 @@ patch_features_present() {
         grep -Fq 'if(second >= 0 && second < size && second != first)' \
           "$DELPHES_ROOT/modules/LeptonDressing.cc"
       ;;
+    delphes-prompt-lepton-origin.patch)
+      grep -Fq 'fRequireBosonAncestorCandidate = GetBool(' \
+        "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'fAllowTauDecayCandidate = GetBool(' \
+          "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'fVirtualPhotonMinMass = GetDouble(' \
+          "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'Bool_t LeptonDressing::HasBosonAncestor(' \
+          "$DELPHES_ROOT/modules/LeptonDressing.cc" &&
+        grep -Fq 'Bool_t IsCandidateEligible(const Candidate *candidate) const;' \
+          "$DELPHES_ROOT/modules/LeptonDressing.h" &&
+        grep -Fq 'ClassDef(LeptonDressing, 3)' \
+          "$DELPHES_ROOT/modules/LeptonDressing.h"
+      ;;
     *)
       return 1
       ;;
@@ -291,6 +306,7 @@ weight_patch_sha256=$(sha256sum "${PATCH_FILES[0]}" | awk '{print $1}')
 truth_lepton_dressing_patch_sha256=$(sha256sum "${PATCH_FILES[1]}" | awk '{print $1}')
 ancestry_parton_stop_patch_sha256=$(sha256sum "${PATCH_FILES[2]}" | awk '{print $1}')
 mother_indices_patch_sha256=$(sha256sum "${PATCH_FILES[3]}" | awk '{print $1}')
+prompt_lepton_origin_patch_sha256=$(sha256sum "${PATCH_FILES[4]}" | awk '{print $1}')
 EOF
 
 log "Installation complete"

@@ -14,7 +14,7 @@ from Tools.four_lepton_kinematics import (
 
 Z_MASS = 91.1876
 LEPTON_PT_MIN = 5.0
-LEPTON_ETA_MAX = 2.7
+LEPTON_ETA_MAX = 2.5
 LEADING_PT_MINIMA = (20.0, 15.0, 10.0)
 Z1_MASS_WINDOW = (50.0, 106.0)
 Z2_MASS_WINDOW = (12.0, 115.0)
