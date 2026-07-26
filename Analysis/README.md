@@ -119,24 +119,62 @@ It writes `ZZ_pythia.root`, `ZZ_herwig.root`, `gg_H_pythia.root`, and
 `event_id` values. Within each merged file the common weight scale is chosen
 so that `sum(weight)` equals the number of entries. This removes the artificial
 normalization increase from concatenating independent jobs while preserving
-their weighted distributions and efficiencies.
+their weighted distributions and efficiencies. This assumes that all jobs for
+a process use compatible POWHEG weight conventions; the merger does not repair
+inconsistently normalized inputs.
 
-The same command creates `data.root` from the reconstructed-and-selected
-events in the two merged Herwig samples. For each process it calculates
+The same command creates an ensemble of pseudo-data files from the
+reconstructed-and-selected events in the two merged Herwig samples. Signed
+POWHEG weights are handled without discarding negative events or changing
+their sign. For each process, define
 
 ```text
-expected events = cross_section_pb * luminosity_fb * 1000
-                  * sum(weight[reconstructed]) / sum(weight[all])
+S  = sum(weight[all])
+W+ = sum(weight[reconstructed and weight > 0])
+W- = sum(abs(weight[reconstructed and weight < 0]))
+a  = 1000 * luminosity_fb * cross_section_pb / S
 ```
 
-and draws an independent Poisson event count. Events are then downselected
-without replacement according to their positive nominal weights, the two
-components are mixed and shuffled, and every output data event receives
-`weight = 1`. The command stops with a request for more Herwig events if the
-300 fb^-1 draw exceeds the available reconstructed sample.
-The default luminosity is 300 fb^-1 and the default random seed is 12345.
-The Pythia merged files can therefore be used as simulation while `data.root`
-acts as statistically independent Herwig pseudo-data.
+The tool independently draws `N+ ~ Poisson(a*W+)` and
+`N- ~ Poisson(a*W-)`, then samples the corresponding sign pool with
+replacement and probabilities proportional to `abs(weight)`. Selected events
+receive unit-magnitude weights `+1` or `-1`. This is the exact signed Poisson
+bootstrap: its expected signed yield is `a*(W+ - W-)`, and it reduces to
+ordinary positive unit-weight pseudo-data when the input has no reconstructed
+negative weights.
+
+The first file is named `data.root`; additional files are
+`data_0001.root`, `data_0002.root`, and so on. Independent random streams are
+derived reproducibly from `--seed`, conditional on the shared Herwig template.
+Each ROOT file contains detailed
+positive, negative, net, and effective-statistics metadata. The campaign
+summary is written to `pseudo_data_manifest.json`.
+
+By default, the number of files is selected automatically from a conservative
+finite-Monte-Carlo information budget. With
+
+```text
+Q+ = sum(weight^2[reconstructed and weight > 0])
+Q- = sum(weight^2[reconstructed and weight < 0])
+```
+
+the tool evaluates the positive, negative, and net effective sample sizes and
+equivalent luminosities:
+
+```text
+N_eff,+   = W+^2 / Q+
+N_eff,-   = W-^2 / Q-
+N_eff,net = (W+ - W-)^2 / (Q+ + Q-)
+
+L_eff,+   = S*W+       / (1000*cross_section_pb*Q+)
+L_eff,-   = S*W-       / (1000*cross_section_pb*Q-)
+L_eff,net = S*(W+-W-)  / (1000*cross_section_pb*(Q++Q-))
+```
+
+An absent sign component is non-limiting. The limiting luminosity is the
+smallest applicable value over the positive, negative, and net components of
+both `ZZ` and `gg_H`; the automatic ensemble count is
+`floor(L_eff,limiting / luminosity_fb)`.
 
 From the repository root:
 
@@ -145,6 +183,7 @@ pixi run --manifest-path Analysis/pixi.toml merge \
   /work/pi_rclsa_umass_edu/rclsa/FourLeptonUnfolding/Output \
   --luminosity-fb 300 \
   --seed 12345 \
+  --pseudo-data-ensembles auto \
   --overwrite
 ```
 
@@ -159,11 +198,23 @@ Compact files made with an older reducer can still be used by supplying both
 `--zz-cross-section-pb VALUE` and `--gg-h-cross-section-pb VALUE`, although
 rerunning the inexpensive Analysis reduction is preferred.
 
-Signed NLO event weights cannot define a unit-weight probability sample. The
-merger permits them in the four simulation outputs but deliberately refuses to
-construct `data.root` if either Herwig component contains a negative weight.
-This prevents silently biased pseudo-data; the present positive-weight POWHEG
-baseline is expected to satisfy this requirement.
+To request a fixed number of files, use `--pseudo-data-ensembles N`. A request
+above the recommendation is refused unless
+`--allow-ensemble-oversubscription` is also given. The recommendation is a
+quality criterion, not a mathematical maximum: sampling with replacement can
+make arbitrarily many random toys conditional on the same empirical Herwig
+template, but those toys share its finite-Monte-Carlo modeling uncertainty.
+
+Important: when negative events are present, these files are signed
+pseudo-observations. Their signed bin counts follow a difference of Poisson
+variables, not an ordinary Poisson distribution, and they are not literal
+all-positive detector data. A classifier or OmniFold loss must explicitly
+support signed sample weights. Dropping negative events, taking their absolute
+weights, or resetting every output weight to `+1` would bias differential
+shapes. A genuinely positive fake-data sample requires a separate local
+positive-resampling model; see the
+[Positive Resampler](https://arxiv.org/abs/2005.09375) and
+[unbiased cell-resampling](https://arxiv.org/abs/2109.07851) approaches.
 
 Run the Analysis and shared Tools unit tests in the same environment with:
 
