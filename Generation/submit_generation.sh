@@ -164,8 +164,8 @@ if ((DRY_RUN == 0)); then
     echo "Current repository: $REPO_ROOT" >&2
     exit 1
   }
-  [[ "$OUTPUT_ROOT" == "$UNITY_WORK_ROOT"/* ]] || {
-    echo "Campaign output must be below $UNITY_WORK_ROOT" >&2
+  [[ "$OUTPUT_ROOT" == /project/pi_rclsa_umass_edu/* ]] || {
+    echo "Campaign output must be below /project/pi_rclsa_umass_edu" >&2
     exit 1
   }
 fi
