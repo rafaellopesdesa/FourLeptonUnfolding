@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge compact analysis samples and build luminosity-scaled Herwig pseudo-data."""
+"""Merge compact samples and build luminosity-scaled signed Herwig pseudo-data ensembles."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 import numpy as np
 import uproot
@@ -28,10 +28,73 @@ ESSENTIAL_BRANCHES = {"event_id", "weight", "reconstructed"}
 class SampleStats:
     entries: int
     sum_weights: float
+    sum_squared_weights: float
     reconstructed_entries: int
     reconstructed_sum_weights: float
+    reconstructed_sum_squared_weights: float
+    reconstructed_positive_entries: int
+    reconstructed_negative_entries: int
+    reconstructed_positive_sum_weights: float
+    reconstructed_negative_sum_abs_weights: float
+    reconstructed_positive_sum_squared_weights: float
+    reconstructed_negative_sum_squared_weights: float
     cross_section_pb: float
     has_negative_weights: bool
+
+
+@dataclass(frozen=True)
+class SignedExpectation:
+    positive: float
+    negative: float
+
+    @property
+    def net(self) -> float:
+        return self.positive - self.negative
+
+
+@dataclass(frozen=True)
+class PseudoDataComponent:
+    name: str
+    path: Path
+    stats: SampleStats
+    expectation: SignedExpectation
+
+
+def _draw_signed_counts(
+    expectation: SignedExpectation,
+    positive_rng: np.random.Generator,
+    negative_rng: np.random.Generator,
+) -> tuple[int, int]:
+    """Draw the independent positive and negative Poisson components."""
+
+    return (
+        int(positive_rng.poisson(expectation.positive)),
+        int(negative_rng.poisson(expectation.negative)),
+    )
+
+
+def _effective_entries(sum_weights: float, sum_squared_weights: float) -> float:
+    if sum_weights <= 0.0 or sum_squared_weights <= 0.0:
+        return 0.0
+    return sum_weights * sum_weights / sum_squared_weights
+
+
+def _reconstructed_effective_entries(stats: SampleStats, sign: int) -> float:
+    if sign > 0:
+        return _effective_entries(
+            stats.reconstructed_positive_sum_weights,
+            stats.reconstructed_positive_sum_squared_weights,
+        )
+    return _effective_entries(
+        stats.reconstructed_negative_sum_abs_weights,
+        stats.reconstructed_negative_sum_squared_weights,
+    )
+
+
+def _reconstructed_sign_sum_weights(stats: SampleStats, sign: int) -> float:
+    if sign > 0:
+        return stats.reconstructed_positive_sum_weights
+    return stats.reconstructed_negative_sum_abs_weights
 
 
 def _branch_names(tree: object) -> set[str]:
@@ -81,8 +144,16 @@ def scan_files(
 ) -> tuple[SampleStats, set[str]]:
     entries = 0
     sum_weights = 0.0
+    sum_squared_weights = 0.0
     reconstructed_entries = 0
     reconstructed_sum_weights = 0.0
+    reconstructed_sum_squared_weights = 0.0
+    reconstructed_positive_entries = 0
+    reconstructed_negative_entries = 0
+    reconstructed_positive_sum_weights = 0.0
+    reconstructed_negative_sum_abs_weights = 0.0
+    reconstructed_positive_sum_squared_weights = 0.0
+    reconstructed_negative_sum_squared_weights = 0.0
     has_negative_weights = False
     cross_sections: list[tuple[float, int]] = []
     expected_branches: set[str] | None = None
@@ -112,9 +183,32 @@ def scan_files(
                 file_entries += weights.size
                 entries += weights.size
                 sum_weights += float(np.sum(weights, dtype=np.float64))
+                sum_squared_weights += float(
+                    np.sum(weights * weights, dtype=np.float64)
+                )
                 reconstructed_entries += int(np.count_nonzero(reconstructed))
+                reconstructed_weights = weights[reconstructed]
                 reconstructed_sum_weights += float(
-                    np.sum(weights[reconstructed], dtype=np.float64)
+                    np.sum(reconstructed_weights, dtype=np.float64)
+                )
+                reconstructed_sum_squared_weights += float(
+                    np.sum(reconstructed_weights * reconstructed_weights, dtype=np.float64)
+                )
+                positive_weights = reconstructed_weights[reconstructed_weights > 0.0]
+                negative_abs_weights = -reconstructed_weights[reconstructed_weights < 0.0]
+                reconstructed_positive_entries += int(positive_weights.size)
+                reconstructed_negative_entries += int(negative_abs_weights.size)
+                reconstructed_positive_sum_weights += float(
+                    np.sum(positive_weights, dtype=np.float64)
+                )
+                reconstructed_negative_sum_abs_weights += float(
+                    np.sum(negative_abs_weights, dtype=np.float64)
+                )
+                reconstructed_positive_sum_squared_weights += float(
+                    np.sum(positive_weights * positive_weights, dtype=np.float64)
+                )
+                reconstructed_negative_sum_squared_weights += float(
+                    np.sum(negative_abs_weights * negative_abs_weights, dtype=np.float64)
                 )
                 has_negative_weights |= bool(np.any(weights < 0.0))
                 if has_cross_section:
@@ -132,6 +226,17 @@ def scan_files(
         raise ValueError("sample contains no events")
     if not np.isfinite(sum_weights) or sum_weights <= 0.0:
         raise ValueError("sample has a non-positive total event weight")
+    aggregate_statistics = (
+        sum_squared_weights,
+        reconstructed_sum_weights,
+        reconstructed_sum_squared_weights,
+        reconstructed_positive_sum_weights,
+        reconstructed_negative_sum_abs_weights,
+        reconstructed_positive_sum_squared_weights,
+        reconstructed_negative_sum_squared_weights,
+    )
+    if not all(np.isfinite(value) for value in aggregate_statistics):
+        raise ValueError("sample has non-finite aggregate weight statistics")
 
     if cross_section_override_pb is not None:
         cross_section_pb = cross_section_override_pb
@@ -147,8 +252,20 @@ def scan_files(
         SampleStats(
             entries=entries,
             sum_weights=sum_weights,
+            sum_squared_weights=sum_squared_weights,
             reconstructed_entries=reconstructed_entries,
             reconstructed_sum_weights=reconstructed_sum_weights,
+            reconstructed_sum_squared_weights=reconstructed_sum_squared_weights,
+            reconstructed_positive_entries=reconstructed_positive_entries,
+            reconstructed_negative_entries=reconstructed_negative_entries,
+            reconstructed_positive_sum_weights=reconstructed_positive_sum_weights,
+            reconstructed_negative_sum_abs_weights=reconstructed_negative_sum_abs_weights,
+            reconstructed_positive_sum_squared_weights=(
+                reconstructed_positive_sum_squared_weights
+            ),
+            reconstructed_negative_sum_squared_weights=(
+                reconstructed_negative_sum_squared_weights
+            ),
             cross_section_pb=cross_section_pb,
             has_negative_weights=has_negative_weights,
         ),
@@ -227,6 +344,25 @@ def merge_sample(
                     "output_sum_weights": float(stats.entries),
                     "weight_scale": scale,
                     "cross_section_pb": stats.cross_section_pb,
+                    "has_negative_weights": stats.has_negative_weights,
+                    "reconstructed_positive_entries": (
+                        stats.reconstructed_positive_entries
+                    ),
+                    "reconstructed_negative_entries": (
+                        stats.reconstructed_negative_entries
+                    ),
+                    "reconstructed_positive_sum_weights": (
+                        stats.reconstructed_positive_sum_weights * scale
+                    ),
+                    "reconstructed_negative_sum_abs_weights": (
+                        stats.reconstructed_negative_sum_abs_weights * scale
+                    ),
+                    "reconstructed_positive_effective_entries": (
+                        _reconstructed_effective_entries(stats, +1)
+                    ),
+                    "reconstructed_negative_effective_entries": (
+                        _reconstructed_effective_entries(stats, -1)
+                    ),
                 },
                 sort_keys=True,
             )
@@ -238,29 +374,122 @@ def merge_sample(
     return SampleStats(
         entries=stats.entries,
         sum_weights=float(stats.entries),
+        sum_squared_weights=stats.sum_squared_weights * scale * scale,
         reconstructed_entries=stats.reconstructed_entries,
         reconstructed_sum_weights=stats.reconstructed_sum_weights * scale,
+        reconstructed_sum_squared_weights=(
+            stats.reconstructed_sum_squared_weights * scale * scale
+        ),
+        reconstructed_positive_entries=stats.reconstructed_positive_entries,
+        reconstructed_negative_entries=stats.reconstructed_negative_entries,
+        reconstructed_positive_sum_weights=(
+            stats.reconstructed_positive_sum_weights * scale
+        ),
+        reconstructed_negative_sum_abs_weights=(
+            stats.reconstructed_negative_sum_abs_weights * scale
+        ),
+        reconstructed_positive_sum_squared_weights=(
+            stats.reconstructed_positive_sum_squared_weights * scale * scale
+        ),
+        reconstructed_negative_sum_squared_weights=(
+            stats.reconstructed_negative_sum_squared_weights * scale * scale
+        ),
         cross_section_pb=stats.cross_section_pb,
         has_negative_weights=stats.has_negative_weights,
     )
 
 
-def _pseudo_data_count(
-    stats: SampleStats, luminosity_fb: float, rng: np.random.Generator
-) -> tuple[float, int]:
+def _signed_expectation(
+    stats: SampleStats, luminosity_fb: float
+) -> SignedExpectation:
+    if not np.isfinite(luminosity_fb) or luminosity_fb <= 0.0:
+        raise ValueError("pseudo-data luminosity must be finite and positive")
     if not np.isfinite(stats.cross_section_pb) or stats.cross_section_pb <= 0.0:
         raise ValueError(
             "a positive cross section is required for pseudo-data; rebuild the Analysis "
             "inputs with the current reducer or pass a process cross-section override"
         )
-    if stats.has_negative_weights:
+    normalization = stats.cross_section_pb * luminosity_fb * 1000.0 / stats.sum_weights
+    expectation = SignedExpectation(
+        positive=normalization * stats.reconstructed_positive_sum_weights,
+        negative=normalization * stats.reconstructed_negative_sum_abs_weights,
+    )
+    if stats.reconstructed_sum_weights <= 0.0:
         raise ValueError(
-            "cannot turn signed NLO weights into unit-weight pseudo-data; use a positive-weight "
-            "POWHEG sample or an explicit positive-probability resampling prescription"
+            "the reconstructed signed cross section is non-positive; the available Monte Carlo "
+            "sample cannot define pseudo-data"
         )
-    efficiency = stats.reconstructed_sum_weights / stats.sum_weights
-    expected = stats.cross_section_pb * luminosity_fb * 1000.0 * efficiency
-    return expected, int(rng.poisson(expected))
+    return expectation
+
+
+def _effective_luminosity_fb(stats: SampleStats, sign: int) -> float | None:
+    sign_sum_weights = _reconstructed_sign_sum_weights(stats, sign)
+    if sign_sum_weights <= 0.0:
+        return None
+    rate_per_fb = (
+        stats.cross_section_pb * 1000.0 * sign_sum_weights / stats.sum_weights
+    )
+    if rate_per_fb <= 0.0:
+        return None
+    return _reconstructed_effective_entries(stats, sign) / rate_per_fb
+
+
+def _net_effective_luminosity_fb(stats: SampleStats) -> float | None:
+    if stats.reconstructed_sum_weights <= 0.0:
+        return None
+    effective_entries = _effective_entries(
+        stats.reconstructed_sum_weights,
+        stats.reconstructed_sum_squared_weights,
+    )
+    rate_per_fb = (
+        stats.cross_section_pb
+        * 1000.0
+        * stats.reconstructed_sum_weights
+        / stats.sum_weights
+    )
+    if rate_per_fb <= 0.0:
+        return None
+    return effective_entries / rate_per_fb
+
+
+def _component_diagnostics(component: PseudoDataComponent) -> dict[str, Any]:
+    stats = component.stats
+    return {
+        "source": str(component.path),
+        "cross_section_pb": stats.cross_section_pb,
+        "inclusive_sum_weights": stats.sum_weights,
+        "reconstructed_sum_weights": stats.reconstructed_sum_weights,
+        "reconstructed_positive_entries": stats.reconstructed_positive_entries,
+        "reconstructed_negative_entries": stats.reconstructed_negative_entries,
+        "reconstructed_positive_sum_weights": (
+            stats.reconstructed_positive_sum_weights
+        ),
+        "reconstructed_negative_sum_abs_weights": (
+            stats.reconstructed_negative_sum_abs_weights
+        ),
+        "reconstructed_positive_effective_entries": (
+            _reconstructed_effective_entries(stats, +1)
+        ),
+        "reconstructed_negative_effective_entries": (
+            _reconstructed_effective_entries(stats, -1)
+        ),
+        "reconstructed_net_effective_entries": _effective_entries(
+            stats.reconstructed_sum_weights,
+            stats.reconstructed_sum_squared_weights,
+        ),
+        "reconstructed_positive_effective_luminosity_fb": (
+            _effective_luminosity_fb(stats, +1)
+        ),
+        "reconstructed_negative_effective_luminosity_fb": (
+            _effective_luminosity_fb(stats, -1)
+        ),
+        "reconstructed_net_effective_luminosity_fb": (
+            _net_effective_luminosity_fb(stats)
+        ),
+        "expected_positive": component.expectation.positive,
+        "expected_negative": component.expectation.negative,
+        "expected_net": component.expectation.net,
+    }
 
 
 def _empty_arrays(schema: dict[str, np.dtype]) -> dict[str, np.ndarray]:
@@ -271,28 +500,33 @@ def _sample_reconstructed(
     path: Path,
     count: int,
     *,
-    reconstructed_entries: int,
+    sign: int,
+    total_abs_weight: float,
     rng: np.random.Generator,
     step_size: str,
 ) -> dict[str, np.ndarray]:
+    if sign not in (-1, +1):
+        raise ValueError("the sampling sign must be +1 or -1")
     with uproot.open(path) as root_file:
         tree = root_file[TREE_NAME]
         branches = _branch_names(tree)
         schema = _tree_schema(path, branches)
         if count == 0:
             return _empty_arrays(schema)
-        if count > reconstructed_entries:
+        if not np.isfinite(total_abs_weight) or total_abs_weight <= 0.0:
             raise ValueError(
-                f"{path} has only {reconstructed_entries} reconstructed events but the "
-                f"pseudo-data draw requests {count}; generate more Herwig events"
+                f"{path} has no reconstructed events with sign {sign:+d}, but the "
+                f"pseudo-data draw requests {count}"
             )
 
-        # Exponential-race keys provide probability-proportional-to-weight
-        # sampling without replacement. Keep only the best `count` global
-        # entry indices, so memory scales with the pseudo-data size rather
-        # than with the full Monte Carlo sample.
-        selected_keys = np.empty(0, dtype=np.float64)
-        selected_indices = np.empty(0, dtype=np.int64)
+        # Inverse-CDF sampling provides an exact probability-proportional-to-|w|
+        # bootstrap with replacement. Sorted targets let us map the draws to
+        # global entry indices in one streaming pass without holding every
+        # source weight in memory.
+        targets = np.sort(rng.random(count) * total_abs_weight)
+        selected_indices = np.empty(count, dtype=np.int64)
+        target_start = 0
+        cumulative_offset = 0.0
         entry_offset = 0
         for arrays in tree.iterate(
             expressions=["weight", "reconstructed"],
@@ -302,25 +536,35 @@ def _sample_reconstructed(
         ):
             weights = np.asarray(arrays["weight"], dtype=np.float64)
             reconstructed = np.asarray(arrays["reconstructed"], dtype=np.bool_)
-            eligible = reconstructed & (weights > 0.0)
-            eligible_weights = weights[eligible]
-            if eligible_weights.size:
-                uniforms = np.maximum(
-                    rng.random(eligible_weights.size), np.finfo(np.float64).tiny
+            eligible = reconstructed & ((weights > 0.0) if sign > 0 else (weights < 0.0))
+            eligible_weights = np.abs(weights[eligible])
+            chunk_weight = float(np.sum(eligible_weights, dtype=np.float64))
+            if chunk_weight > 0.0:
+                cumulative_stop = cumulative_offset + chunk_weight
+                target_stop = int(
+                    np.searchsorted(targets, cumulative_stop, side="left")
                 )
-                keys = np.log(uniforms) / eligible_weights
-                indices = np.flatnonzero(eligible).astype(np.int64) + entry_offset
-                selected_keys = np.concatenate((selected_keys, keys))
-                selected_indices = np.concatenate((selected_indices, indices))
-                if selected_keys.size > count:
-                    keep = np.argpartition(selected_keys, -count)[-count:]
-                    selected_keys = selected_keys[keep]
-                    selected_indices = selected_indices[keep]
+                if target_stop > target_start:
+                    local_targets = (
+                        targets[target_start:target_stop] - cumulative_offset
+                    )
+                    local_cumulative = np.cumsum(eligible_weights, dtype=np.float64)
+                    positions = np.searchsorted(
+                        local_cumulative, local_targets, side="right"
+                    )
+                    eligible_indices = np.flatnonzero(eligible).astype(np.int64)
+                    selected_indices[target_start:target_stop] = (
+                        eligible_indices[positions] + entry_offset
+                    )
+                    target_start = target_stop
+                cumulative_offset = cumulative_stop
             entry_offset += weights.size
 
-        if selected_indices.size != count:
-            raise RuntimeError(f"failed to select all requested events from {path}")
-        selected_indices.sort()
+        if target_start != count:
+            raise RuntimeError(
+                f"failed to map all {count} sign {sign:+d} bootstrap draws from {path}; "
+                "the stored signed-weight statistics are inconsistent with the tree"
+            )
 
         pieces: dict[str, list[np.ndarray]] = {name: [] for name in schema}
         entry_offset = 0
@@ -343,6 +587,160 @@ def _sample_reconstructed(
     }
 
 
+def _pseudo_data_components(
+    zz_path: Path,
+    higgs_path: Path,
+    *,
+    luminosity_fb: float,
+    step_size: str,
+) -> list[PseudoDataComponent]:
+    components: list[PseudoDataComponent] = []
+    for name, path in (("ZZ", zz_path), ("gg_H", higgs_path)):
+        stats, _ = scan_files([path], step_size=step_size)
+        components.append(
+            PseudoDataComponent(
+                name=name,
+                path=path,
+                stats=stats,
+                expectation=_signed_expectation(stats, luminosity_fb),
+            )
+        )
+    return components
+
+
+def _build_pseudo_data_file(
+    components: list[PseudoDataComponent],
+    output_path: Path,
+    *,
+    luminosity_fb: float,
+    base_seed: int,
+    ensemble_index: int,
+    ensemble_count: int,
+    seed_sequence: np.random.SeedSequence,
+    step_size: str,
+    overwrite: bool,
+) -> dict[str, Any]:
+    child_sequences = seed_sequence.spawn(4 * len(components) + 1)
+    sampled: list[dict[str, np.ndarray]] = []
+    process_metadata: dict[str, dict[str, Any]] = {}
+
+    for component_index, component in enumerate(components):
+        stats = component.stats
+        expectation = component.expectation
+        offset = 4 * component_index
+        positive_count_rng = np.random.default_rng(child_sequences[offset])
+        negative_count_rng = np.random.default_rng(child_sequences[offset + 1])
+        positive_sample_rng = np.random.default_rng(child_sequences[offset + 2])
+        negative_sample_rng = np.random.default_rng(child_sequences[offset + 3])
+        observed_positive, observed_negative = _draw_signed_counts(
+            expectation,
+            positive_count_rng,
+            negative_count_rng,
+        )
+
+        for sign, observed, sample_rng in (
+            (+1, observed_positive, positive_sample_rng),
+            (-1, observed_negative, negative_sample_rng),
+        ):
+            arrays = _sample_reconstructed(
+                component.path,
+                observed,
+                sign=sign,
+                total_abs_weight=_reconstructed_sign_sum_weights(stats, sign),
+                rng=sample_rng,
+                step_size=step_size,
+            )
+            arrays["weight"] = np.full(observed, sign, dtype=np.float64)
+            sampled.append(arrays)
+
+        details = _component_diagnostics(component)
+        details.update(
+            {
+                "observed_positive": observed_positive,
+                "observed_negative": observed_negative,
+                "observed_net": observed_positive - observed_negative,
+                "observed_entries": observed_positive + observed_negative,
+            }
+        )
+        process_metadata[component.name] = details
+
+    branch_names = set(sampled[0])
+    if any(set(component) != branch_names for component in sampled[1:]):
+        raise KeyError("the ZZ and gg_H merged trees have different schemas")
+    combined = {
+        name: np.concatenate([component[name] for component in sampled])
+        for name in sorted(branch_names)
+    }
+    total = len(combined["weight"])
+    shuffle_rng = np.random.default_rng(child_sequences[-1])
+    order = shuffle_rng.permutation(total)
+    for name in combined:
+        combined[name] = combined[name][order]
+    combined["event_id"] = np.arange(total, dtype=np.uint64)
+    combined["reconstructed"] = np.ones(total, dtype=np.bool_)
+    combined["cross_section_pb"] = np.full(total, np.nan, dtype=np.float64)
+
+    schema = {name: values.dtype for name, values in combined.items()}
+    temporary = _prepare_output(output_path, overwrite)
+    total_expected_positive = float(
+        sum(component.expectation.positive for component in components)
+    )
+    total_expected_negative = float(
+        sum(component.expectation.negative for component in components)
+    )
+    total_observed_positive = int(
+        sum(details["observed_positive"] for details in process_metadata.values())
+    )
+    total_observed_negative = int(
+        sum(details["observed_negative"] for details in process_metadata.values())
+    )
+    total_expected_net = total_expected_positive - total_expected_negative
+    total_observed_signed = total_observed_positive - total_observed_negative
+    metadata: dict[str, Any] = {
+        "format_version": 2,
+        "statistical_model": "signed_poisson_bootstrap_with_replacement",
+        "sampling_with_replacement": True,
+        "signed_weights": any(
+            component.expectation.negative > 0.0 for component in components
+        ),
+        "luminosity_fb": luminosity_fb,
+        "seed": base_seed,
+        "ensemble_index": ensemble_index,
+        "ensemble_count": ensemble_count,
+        "seed_spawn_key": list(seed_sequence.spawn_key),
+        "components": process_metadata,
+        "ZZ_expected": process_metadata["ZZ"]["expected_net"],
+        "ZZ_observed": process_metadata["ZZ"]["observed_net"],
+        "gg_H_expected": process_metadata["gg_H"]["expected_net"],
+        "gg_H_observed": process_metadata["gg_H"]["observed_net"],
+        "total_expected_positive": total_expected_positive,
+        "total_expected_negative": total_expected_negative,
+        "total_expected": total_expected_net,
+        "total_observed_positive": total_observed_positive,
+        "total_observed_negative": total_observed_negative,
+        "total_observed": total_observed_signed,
+        "total_entries": total,
+        "total_sum_abs_weights": int(
+            sum(details["observed_entries"] for details in process_metadata.values())
+        ),
+    }
+    try:
+        with uproot.recreate(temporary) as output_file:
+            output_file.mktree(
+                TREE_NAME,
+                schema,
+                title="Unit-magnitude signed Herwig pseudo-data",
+            )
+            output_file[TREE_NAME].extend(combined)
+            output_file["merge_metadata"] = json.dumps(metadata, sort_keys=True)
+        os.replace(temporary, output_path)
+    except Exception:
+        if temporary.exists():
+            temporary.unlink()
+        raise
+    return metadata
+
+
 def build_pseudo_data(
     zz_path: Path,
     higgs_path: Path,
@@ -352,62 +750,188 @@ def build_pseudo_data(
     seed: int,
     step_size: str,
     overwrite: bool,
-) -> dict[str, float | int]:
-    rng = np.random.default_rng(seed)
-    components: list[tuple[str, Path, SampleStats, float, int]] = []
-    for name, path in (("ZZ", zz_path), ("gg_H", higgs_path)):
-        stats, _ = scan_files([path], step_size=step_size)
-        expected, observed = _pseudo_data_count(stats, luminosity_fb, rng)
-        components.append((name, path, stats, expected, observed))
+) -> dict[str, Any]:
+    """Build one pseudo-data file while preserving the original public API."""
 
-    sampled = [
-        _sample_reconstructed(
-            path,
-            observed,
-            reconstructed_entries=stats.reconstructed_entries,
-            rng=rng,
-            step_size=step_size,
+    components = _pseudo_data_components(
+        zz_path,
+        higgs_path,
+        luminosity_fb=luminosity_fb,
+        step_size=step_size,
+    )
+    return _build_pseudo_data_file(
+        components,
+        output_path,
+        luminosity_fb=luminosity_fb,
+        base_seed=seed,
+        ensemble_index=0,
+        ensemble_count=1,
+        seed_sequence=np.random.SeedSequence(seed),
+        step_size=step_size,
+        overwrite=overwrite,
+    )
+
+
+def _recommended_ensemble_count(
+    components: list[PseudoDataComponent], luminosity_fb: float
+) -> tuple[int, float]:
+    sign_effective_luminosities = [
+        effective_luminosity
+        for component in components
+        for sign, expected in (
+            (+1, component.expectation.positive),
+            (-1, component.expectation.negative),
         )
-        for _, path, stats, _, observed in components
+        if expected > 0.0
+        for effective_luminosity in (
+            _effective_luminosity_fb(component.stats, sign),
+        )
+        if effective_luminosity is not None
     ]
-    branch_names = set(sampled[0])
-    if any(set(component) != branch_names for component in sampled[1:]):
-        raise KeyError("the ZZ and gg_H merged trees have different schemas")
-    combined = {
-        name: np.concatenate([component[name] for component in sampled])
-        for name in sorted(branch_names)
-    }
-    total = len(combined["weight"])
-    order = rng.permutation(total)
-    for name in combined:
-        combined[name] = combined[name][order]
-    combined["event_id"] = np.arange(total, dtype=np.uint64)
-    combined["weight"] = np.ones(total, dtype=np.float64)
-    combined["reconstructed"] = np.ones(total, dtype=np.bool_)
-    combined["cross_section_pb"] = np.full(total, np.nan, dtype=np.float64)
+    net_effective_luminosities = [
+        effective_luminosity
+        for component in components
+        for effective_luminosity in (
+            _net_effective_luminosity_fb(component.stats),
+        )
+        if effective_luminosity is not None
+    ]
+    effective_luminosities = [
+        *sign_effective_luminosities,
+        *net_effective_luminosities,
+    ]
+    if not effective_luminosities:
+        return 0, 0.0
+    limiting_luminosity = float(min(effective_luminosities))
+    ratio = limiting_luminosity / luminosity_fb
+    recommended = int(np.floor(ratio + 1.0e-12))
+    return recommended, limiting_luminosity
 
-    schema = {name: values.dtype for name, values in combined.items()}
-    temporary = _prepare_output(output_path, overwrite)
-    metadata: dict[str, float | int] = {
-        "luminosity_fb": luminosity_fb,
-        "seed": seed,
-        "ZZ_expected": components[0][3],
-        "ZZ_observed": components[0][4],
-        "gg_H_expected": components[1][3],
-        "gg_H_observed": components[1][4],
-        "total_observed": total,
-    }
+
+def _pseudo_data_output_path(
+    output_directory: Path, ensemble_index: int
+) -> Path:
+    if ensemble_index == 0:
+        return output_directory / "data.root"
+    return output_directory / f"data_{ensemble_index:04d}.root"
+
+
+def _write_json(path: Path, payload: dict[str, Any], overwrite: bool) -> None:
+    temporary = _prepare_output(path, overwrite)
     try:
-        with uproot.recreate(temporary) as output_file:
-            output_file.mktree(TREE_NAME, schema, title="Unit-weight Herwig pseudo-data")
-            output_file[TREE_NAME].extend(combined)
-            output_file["merge_metadata"] = json.dumps(metadata, sort_keys=True)
-        os.replace(temporary, output_path)
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
     except Exception:
         if temporary.exists():
             temporary.unlink()
         raise
-    return metadata
+
+
+def build_pseudo_data_ensembles(
+    zz_path: Path,
+    higgs_path: Path,
+    output_directory: Path,
+    *,
+    luminosity_fb: float,
+    seed: int,
+    ensemble_count: int | None,
+    allow_ensemble_oversubscription: bool,
+    step_size: str,
+    overwrite: bool,
+) -> dict[str, Any]:
+    components = _pseudo_data_components(
+        zz_path,
+        higgs_path,
+        luminosity_fb=luminosity_fb,
+        step_size=step_size,
+    )
+    recommended_count, limiting_luminosity_fb = _recommended_ensemble_count(
+        components, luminosity_fb
+    )
+    auto = ensemble_count is None
+    generated_count = recommended_count if auto else ensemble_count
+    if generated_count is None or generated_count <= 0:
+        raise ValueError(
+            "the available Herwig effective luminosity does not support one "
+            f"{luminosity_fb:g} fb^-1 pseudo-experiment; explicitly request an "
+            "ensemble count and pass --allow-ensemble-oversubscription to bootstrap anyway"
+        )
+    if (
+        generated_count > recommended_count
+        and not allow_ensemble_oversubscription
+    ):
+        raise ValueError(
+            f"requested {generated_count} pseudo-data ensembles, but the signed-weight "
+            f"effective-luminosity recommendation is {recommended_count}; pass "
+            "--allow-ensemble-oversubscription to override"
+        )
+
+    output_directory = output_directory.resolve()
+    output_paths = [
+        _pseudo_data_output_path(output_directory, index)
+        for index in range(generated_count)
+    ]
+    manifest_path = output_directory / "pseudo_data_manifest.json"
+    if not overwrite:
+        existing = [path for path in [*output_paths, manifest_path] if path.exists()]
+        if existing:
+            raise FileExistsError(
+                f"output already exists: {existing[0]}; pass --overwrite to replace it"
+            )
+
+    seed_sequences = np.random.SeedSequence(seed).spawn(generated_count)
+    files: list[dict[str, Any]] = []
+    for index, (path, seed_sequence) in enumerate(
+        zip(output_paths, seed_sequences, strict=True)
+    ):
+        metadata = _build_pseudo_data_file(
+            components,
+            path,
+            luminosity_fb=luminosity_fb,
+            base_seed=seed,
+            ensemble_index=index,
+            ensemble_count=generated_count,
+            seed_sequence=seed_sequence,
+            step_size=step_size,
+            overwrite=overwrite,
+        )
+        files.append(
+            {
+                "ensemble_index": index,
+                "path": path.name,
+                "total_entries": metadata["total_entries"],
+                "total_observed_positive": metadata["total_observed_positive"],
+                "total_observed_negative": metadata["total_observed_negative"],
+                "total_observed": metadata["total_observed"],
+                "seed_spawn_key": metadata["seed_spawn_key"],
+            }
+        )
+
+    manifest: dict[str, Any] = {
+        "format_version": 2,
+        "statistical_model": "signed_poisson_bootstrap_with_replacement",
+        "sampling_with_replacement": True,
+        "signed_weights": any(
+            component.expectation.negative > 0.0 for component in components
+        ),
+        "luminosity_fb": luminosity_fb,
+        "seed": seed,
+        "ensemble_request": "auto" if auto else generated_count,
+        "recommended_ensemble_count": recommended_count,
+        "generated_ensemble_count": generated_count,
+        "allow_ensemble_oversubscription": allow_ensemble_oversubscription,
+        "limiting_effective_luminosity_fb": limiting_luminosity_fb,
+        "components": {
+            component.name: _component_diagnostics(component)
+            for component in components
+        },
+        "files": files,
+    }
+    _write_json(manifest_path, manifest, overwrite)
+    return manifest
 
 
 def merge_directory(
@@ -420,6 +944,8 @@ def merge_directory(
     zz_cross_section_pb: float | None,
     higgs_cross_section_pb: float | None,
     overwrite: bool,
+    pseudo_data_ensembles: int | None = None,
+    allow_ensemble_oversubscription: bool = False,
 ) -> dict[str, SampleStats]:
     input_directory = input_directory.expanduser().resolve()
     output_directory = output_directory.expanduser().resolve()
@@ -443,20 +969,31 @@ def merge_directory(
             f"cross_section_pb={outputs[sample].cross_section_pb:.8g}"
         )
 
-    metadata = build_pseudo_data(
+    manifest = build_pseudo_data_ensembles(
         output_directory / "ZZ_herwig.root",
         output_directory / "gg_H_herwig.root",
-        output_directory / "data.root",
+        output_directory,
         luminosity_fb=luminosity_fb,
         seed=seed,
+        ensemble_count=pseudo_data_ensembles,
+        allow_ensemble_oversubscription=allow_ensemble_oversubscription,
         step_size=step_size,
         overwrite=overwrite,
     )
+    first_file = manifest["files"][0]
     print(
-        f"data: {output_directory / 'data.root'}; luminosity={luminosity_fb:g} fb^-1, "
-        f"ZZ={metadata['ZZ_observed']} (expected {metadata['ZZ_expected']:.3f}), "
-        f"gg_H={metadata['gg_H_observed']} (expected {metadata['gg_H_expected']:.3f})"
+        f"pseudo-data: {manifest['generated_ensemble_count']} files beginning with "
+        f"{output_directory / first_file['path']}; luminosity={luminosity_fb:g} fb^-1, "
+        f"recommended={manifest['recommended_ensemble_count']}, "
+        f"limiting effective luminosity="
+        f"{manifest['limiting_effective_luminosity_fb']:.8g} fb^-1, "
+        f"weights={'signed +/-1' if manifest['signed_weights'] else '+1'}"
     )
+    if manifest["signed_weights"]:
+        print(
+            "warning: negative Herwig weights make these signed pseudo-observations; "
+            "downstream losses must support signed sample weights"
+        )
     return outputs
 
 
@@ -464,6 +1001,29 @@ def _positive_float(value: str) -> float:
     parsed = float(value)
     if not np.isfinite(parsed) or parsed <= 0.0:
         raise argparse.ArgumentTypeError("value must be finite and positive")
+    return parsed
+
+
+def _nonnegative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be non-negative")
+    return parsed
+
+
+def _ensemble_count(value: str) -> int | None:
+    if value.lower() == "auto":
+        return None
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            "value must be 'auto' or a positive integer"
+        ) from error
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(
+            "value must be 'auto' or a positive integer"
+        )
     return parsed
 
 
@@ -477,10 +1037,25 @@ def main() -> None:
         help="output directory (default: input directory)",
     )
     parser.add_argument("--luminosity-fb", type=_positive_float, default=300.0)
-    parser.add_argument("--seed", type=int, default=12345)
+    parser.add_argument("--seed", type=_nonnegative_int, default=12345)
     parser.add_argument("--step-size", default="100 MB", help="uproot chunk size")
     parser.add_argument("--zz-cross-section-pb", type=_positive_float)
     parser.add_argument("--gg-h-cross-section-pb", type=_positive_float)
+    parser.add_argument(
+        "--pseudo-data-ensembles",
+        type=_ensemble_count,
+        default=None,
+        metavar="auto|N",
+        help=(
+            "number of Herwig pseudo-data files; default auto uses the "
+            "signed-weight effective-luminosity recommendation"
+        ),
+    )
+    parser.add_argument(
+        "--allow-ensemble-oversubscription",
+        action="store_true",
+        help="allow an explicit ensemble count above the effective-luminosity recommendation",
+    )
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
@@ -494,6 +1069,8 @@ def main() -> None:
         zz_cross_section_pb=args.zz_cross_section_pb,
         higgs_cross_section_pb=args.gg_h_cross_section_pb,
         overwrite=args.overwrite,
+        pseudo_data_ensembles=args.pseudo_data_ensembles,
+        allow_ensemble_oversubscription=args.allow_ensemble_oversubscription,
     )
 
 

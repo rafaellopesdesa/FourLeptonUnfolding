@@ -5,7 +5,7 @@ import unittest
 
 import vector
 
-from Analysis.selection import Lepton, select_event
+from Analysis.selection import LEPTON_ETA_MAX, Lepton, select_event
 
 
 def massless(pt: float, eta: float, phi: float):
@@ -35,6 +35,18 @@ class SelectionTest(unittest.TestCase):
         ]
         result = select_event(leptons)
         self.assertIsNotNone(result.candidate)
+        self.assertFalse(result.selected)
+
+    def test_common_acceptance_rejects_leptons_at_or_beyond_eta_2p5(self):
+        self.assertEqual(LEPTON_ETA_MAX, 2.5)
+        leptons = [
+            Lepton(massless(46.0, 0.1, 0.0), "electron", -1),
+            Lepton(massless(46.0, -0.1, math.pi), "electron", 1),
+            Lepton(massless(18.0, 2.5, 1.0), "muon", -1),
+            Lepton(massless(18.0, -0.3, 1.0 + math.pi), "muon", 1),
+        ]
+        result = select_event(leptons)
+        self.assertIsNone(result.candidate)
         self.assertFalse(result.selected)
 
 

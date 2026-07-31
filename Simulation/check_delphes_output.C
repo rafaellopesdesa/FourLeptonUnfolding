@@ -29,6 +29,12 @@ bool require_branch(TTree *tree, const char *name) {
   Error("check_delphes_output", "required branch %s is missing", name);
   return false;
 }
+
+bool require_leaf(TTree *tree, const char *name) {
+  if (tree->GetLeaf(name)) return true;
+  Error("check_delphes_output", "required leaf %s is missing", name);
+  return false;
+}
 }  // namespace
 
 void check_delphes_output() {
@@ -76,14 +82,44 @@ void check_delphes_output() {
     return;
   }
 
-  const char *required[] = {"Event",         "Weight",      "Particle",
-                            "StableParticle", "RecoElectron", "RecoMuon",
-                            "DressedElectron", "DressedMuon",  "Electron",
-                            "Muon"};
+  const char *required[] = {
+      "Event",             "Weight",          "Particle",
+      "StableParticle",    "DressedElectron", "DressedMuon",
+      "RecoElectronNoIso", "RecoMuonNoIso",   "RecoElectron",
+      "RecoMuon",          "Electron",        "Muon"};
   for (const char *name : required) {
     if (!require_branch(tree, name)) {
       file->Close();
       gSystem->Exit(8);
+      return;
+    }
+  }
+
+  const char *required_leaves[] = {
+      "Event.Number",             "Event.Weight",
+      "Particle.PID",             "Particle.E",
+      "Particle.Px",              "Particle.Py",
+      "Particle.Pz",              "Particle.M1",
+      "Particle.M2",              "DressedElectron.PID",
+      "DressedElectron.E",        "DressedElectron.Px",
+      "DressedElectron.Py",       "DressedElectron.Pz",
+      "DressedElectron.M1",       "DressedElectron.M2",
+      "DressedMuon.PID",          "DressedMuon.E",
+      "DressedMuon.Px",           "DressedMuon.Py",
+      "DressedMuon.Pz",           "DressedMuon.M1",
+      "DressedMuon.M2",           "RecoElectronNoIso.PT",
+      "RecoElectronNoIso.Eta",    "RecoElectronNoIso.Phi",
+      "RecoElectronNoIso.Charge", "RecoMuonNoIso.PT",
+      "RecoMuonNoIso.Eta",        "RecoMuonNoIso.Phi",
+      "RecoMuonNoIso.Charge",     "RecoElectron.PT",
+      "RecoElectron.Eta",         "RecoElectron.Phi",
+      "RecoElectron.Charge",      "RecoMuon.PT",
+      "RecoMuon.Eta",             "RecoMuon.Phi",
+      "RecoMuon.Charge"};
+  for (const char *name : required_leaves) {
+    if (!require_leaf(tree, name)) {
+      file->Close();
+      gSystem->Exit(9);
       return;
     }
   }
@@ -93,9 +129,9 @@ void check_delphes_output() {
     TLeaf *electron_size = tree->GetLeaf("RecoElectron_size");
     TLeaf *muon_size = tree->GetLeaf("RecoMuon_size");
     if (!electron_size || !muon_size) {
-      Error("check_delphes_output", "loose reconstructed-lepton counts are missing");
+      Error("check_delphes_output", "H4l reconstructed-lepton counts are missing");
       file->Close();
-      gSystem->Exit(9);
+      gSystem->Exit(10);
       return;
     }
 
@@ -114,7 +150,7 @@ void check_delphes_output() {
           "HasFourRecoLeptons has %lld entries but the tree has %lld",
           marker->GetEntries(), entries);
     file->Close();
-    gSystem->Exit(10);
+    gSystem->Exit(11);
     return;
   }
 
