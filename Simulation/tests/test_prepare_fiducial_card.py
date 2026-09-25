@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import re
 import unittest
 
 from Simulation.prepare_fiducial_card import _module_block, prepare_card
@@ -56,6 +58,117 @@ module TreeWriter TreeWriter {
 class PrepareFiducialCardTest(unittest.TestCase):
     def setUp(self) -> None:
         self.result = prepare_card(CARD)
+
+    def electron_resolution(
+        self, energy: float, eta: float, pt: float = 45.0
+    ) -> float:
+        """Evaluate the emitted Delphes formula without duplicating its model."""
+        _, _, block = _module_block(
+            self.result, "module MomentumSmearing H4lElectronECalSmearing {"
+        )
+        match = re.search(r"set ResolutionFormula\s*\{([^{}]+)\}", block)
+        self.assertIsNotNone(match, "electron module has no resolution formula")
+        formula = match.group(1).replace("&&", " and ").replace("^", "**")
+        return float(
+            eval(  # noqa: S307 - fixed formula generated in this test
+                f"({formula})",
+                {
+                    "__builtins__": {},
+                    "abs": abs,
+                    "max": max,
+                    "sqrt": math.sqrt,
+                    "cosh": math.cosh,
+                },
+                {"energy": energy, "eta": eta, "pt": pt},
+            )
+        )
+
+    def test_electron_ecal_response_is_applied_once_to_dressed_input(self):
+        _, _, smearing = _module_block(
+            self.result, "module MomentumSmearing H4lElectronECalSmearing {"
+        )
+        self.assertIn("set InputArray DressedElectronFilter/electrons", smearing)
+        self.assertIn("set OutputArray electrons", smearing)
+        self.assertIn("set UseMomentumVector true", smearing)
+        _, _, reco_id = _module_block(
+            self.result, "module Efficiency H4lElectronRecoID {"
+        )
+        self.assertIn("set InputArray H4lElectronECalSmearing/electrons", reco_id)
+        execution = self.result.split("set ExecutionPath {", 1)[1].split("}", 1)[0]
+        self.assertEqual(execution.count("H4lElectronECalSmearing"), 1)
+        self.assertLess(
+            execution.index("DressedElectronFilter"),
+            execution.index("H4lElectronECalSmearing"),
+        )
+        self.assertLess(
+            execution.index("H4lElectronECalSmearing"),
+            execution.index("H4lElectronRecoID"),
+        )
+        self.assertNotIn("H4lElectronMomentumSmearing", self.result)
+
+    def test_electron_resolution_at_z_scale_matches_reference_model(self):
+        for eta, expected_percent in (
+            (0.3, 2.095),
+            (1.1, 3.025),
+            (1.45, 4.667),
+            (1.75, 2.811),
+            (2.25, 2.736),
+        ):
+            with self.subTest(eta=eta):
+                actual = 100.0 * self.electron_resolution(
+                    45.0 * math.cosh(eta), eta
+                )
+                self.assertAlmostEqual(actual, expected_percent, delta=0.002)
+
+    def test_electron_resolution_uses_dressed_energy_not_track_pt(self):
+        for eta in (0.3, 1.1, 1.45, 1.75, 2.25):
+            energy = 45.0 * math.cosh(eta)
+            reference = self.electron_resolution(energy, eta)
+            for pt in (0.0, 4.5, 20.0, 100.0):
+                with self.subTest(eta=eta, pt=pt):
+                    self.assertEqual(
+                        self.electron_resolution(energy, eta, pt), reference
+                    )
+
+    def test_electron_resolution_is_symmetric_and_improves_with_energy(self):
+        for eta in (0.3, 1.1, 1.45, 1.75, 2.25):
+            previous = math.inf
+            for transverse_energy in (4.001, 4.5, 5.0, 10.0, 45.0, 100.0, 1000.0):
+                energy = transverse_energy * math.cosh(eta)
+                resolution = self.electron_resolution(energy, eta)
+                with self.subTest(eta=eta, transverse_energy=transverse_energy):
+                    self.assertGreater(resolution, 0.0)
+                    self.assertLess(resolution, previous)
+                    self.assertEqual(
+                        resolution, self.electron_resolution(energy, -eta)
+                    )
+                previous = resolution
+
+    def test_electron_resolution_eta_edges_have_no_gaps(self):
+        for eta in (0.8, 1.37, 1.52, 2.0):
+            with self.subTest(eta=eta):
+                values = [
+                    self.electron_resolution(45.0 * math.cosh(value), value)
+                    for value in (eta - 1.0e-8, eta, eta + 1.0e-8)
+                ]
+                self.assertAlmostEqual(values[0], values[1], places=12)
+                self.assertGreater(values[2], 0.0)
+        for eta in (-2.5, 2.5, -3.0, 3.0):
+            self.assertEqual(
+                self.electron_resolution(45.0 * math.cosh(eta), eta), 0.0
+            )
+        self.assertGreater(
+            self.electron_resolution(45.0 * math.cosh(2.499999), 2.499999), 0.0
+        )
+
+    def test_electron_resolution_floor_keeps_zero_energy_finite(self):
+        for eta in (0.0, 0.8, 1.37, 1.52, 2.0, 2.499, 2.5, 3.0):
+            with self.subTest(eta=eta):
+                value = self.electron_resolution(0.0, eta)
+                self.assertTrue(math.isfinite(value))
+                self.assertAlmostEqual(
+                    value, self.electron_resolution(math.cosh(eta), eta)
+                )
 
     def test_builds_exact_prompt_dressing_definition(self):
         result = self.result

@@ -60,7 +60,7 @@ def _add_h4l_lepton_modules(text: str) -> str:
         "  TruthLeptonDressing\n"
         "  DressedElectronFilter\n"
         "  DressedMuonFilter\n"
-        "  H4lElectronMomentumSmearing\n"
+        "  H4lElectronECalSmearing\n"
         "  H4lElectronRecoID\n"
         "  H4lElectronIsolation\n"
         "  H4lMuonMomentumSmearing\n"
@@ -133,20 +133,44 @@ module PdgCodeFilter DressedMuonFilter {
 # dressed particles used at truth level.  This supplies the simplified FSR
 # recovery requested for the response study, while the standard Delphes
 # Electron and Muon branches remain available independently.
-module MomentumSmearing H4lElectronMomentumSmearing {
+# atlas_run2_ecal_snc_v1: total calibrated ECAL response, with no track-energy
+# combination. Effective coefficients versus ET = energy/cosh(eta), in GeV:
+# r^2 = S_T^2/ET + (N0_T^2 + NPU_T^2)/ET^2 + C_MC^2 + c_data^2.
+# NPU_T represents fixed Run-2 pile-up noise; c_data is already included.
+# Source-informed proxy, NOT official calibration constants. See README.md:
+# arXiv:1908.00005 Figs. 7-8; arXiv:2309.05471 Sec. 7.
+# MomentumSmearing is only the positive log-normal response engine here:
+# for relativistic electrons at fixed direction, sigma(pT)/pT ~ sigma(E)/E.
+# It evaluates energy and eta from the dressed momentum (not track position).
+# The 1 GeV ET floor prevents division by zero below the 4 GeV response buffer.
+module MomentumSmearing H4lElectronECalSmearing {
   set InputArray DressedElectronFilter/electrons
   set OutputArray electrons
   set UseMomentumVector true
-  set ResolutionFormula {                  (abs(eta) <= 0.5) * (pt > 0.1) * sqrt(0.03^2 + pt^2*1.3e-3^2) +
-                         (abs(eta) > 0.5 && abs(eta) <= 1.5) * (pt > 0.1) * sqrt(0.05^2 + pt^2*1.7e-3^2) +
-                         (abs(eta) > 1.5 && abs(eta) <  2.5) * (pt > 0.1) * sqrt(0.15^2 + pt^2*3.1e-3^2)}
+  set ResolutionFormula {
+    (abs(eta) <= 0.8) *
+      sqrt(0.09^2/max(energy/cosh(eta), 1.0) +
+           (0.30^2 + 0.55^2)/max(energy/cosh(eta), 1.0)^2 + 0.004^2 + 0.007^2) +
+    (abs(eta) > 0.8 && abs(eta) <= 1.37) *
+      sqrt(0.12^2/max(energy/cosh(eta), 1.0) +
+           (0.84^2 + 0.55^2)/max(energy/cosh(eta), 1.0)^2 + 0.004^2 + 0.009^2) +
+    (abs(eta) > 1.37 && abs(eta) <= 1.52) *
+      sqrt(0.15^2/max(energy/cosh(eta), 1.0) +
+           (1.20^2 + 0.70^2)/max(energy/cosh(eta), 1.0)^2 + 0.010^2 + 0.025^2) +
+    (abs(eta) > 1.52 && abs(eta) <= 2.0) *
+      sqrt(0.10^2/max(energy/cosh(eta), 1.0) +
+           (0.55^2 + 0.60^2)/max(energy/cosh(eta), 1.0)^2 + 0.004^2 + 0.015^2) +
+    (abs(eta) > 2.0 && abs(eta) < 2.5) *
+      sqrt(0.08^2/max(energy/cosh(eta), 1.0) +
+           (0.50^2 + 0.60^2)/max(energy/cosh(eta), 1.0)^2 + 0.004^2 + 0.017^2)
+  }
 }
 
 # Approximate H4l Loose reconstruction+identification efficiency.  The
 # 5--7 GeV bin and 2.47--2.5 edge are explicit extrapolations.  The eta
 # multipliers describe broad detector regions only; there is no phi model.
 module Efficiency H4lElectronRecoID {
-  set InputArray H4lElectronMomentumSmearing/electrons
+  set InputArray H4lElectronECalSmearing/electrons
   set OutputArray electrons
   set UseMomentumVector true
   set EfficiencyFormula {

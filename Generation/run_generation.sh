@@ -4,6 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(realpath "$SCRIPT_DIR/..")"
 POWHEG_CARD_DIR="$REPO_ROOT/PowhegCards"
+BEAM_ENERGY_GEV=6800
+SQRT_S_GEV=13600
 
 usage() {
   cat <<'EOF'
@@ -137,6 +139,92 @@ log() {
   printf '[run] %s\n' "$*"
 }
 
+powheg_card_value() {
+  local key="$1"
+  local file="$2"
+  awk -v wanted="$key" '
+    $1 == wanted {
+      value = $2
+      gsub(/[dD]/, "e", value)
+      print value + 0
+      exit
+    }
+  ' "$file"
+}
+
+validate_run_card_energy() {
+  local file="$1"
+  local beam1 beam2
+  beam1="$(powheg_card_value ebeam1 "$file")"
+  beam2="$(powheg_card_value ebeam2 "$file")"
+  [[ -n "$beam1" && -n "$beam2" ]] || {
+    echo "POWHEG run card must define ebeam1 and ebeam2: $file" >&2
+    return 1
+  }
+  awk -v beam1="$beam1" -v beam2="$beam2" -v expected="$BEAM_ENERGY_GEV" '
+    BEGIN {
+      tolerance = 1.0e-6
+      ok1 = (beam1 - expected < tolerance && expected - beam1 < tolerance)
+      ok2 = (beam2 - expected < tolerance && expected - beam2 < tolerance)
+      exit !(ok1 && ok2)
+    }
+  ' || {
+    echo "This project requires 6800 GeV per beam (sqrt(s)=13.6 TeV)." >&2
+    echo "Run card $file has ebeam1=$beam1 GeV and ebeam2=$beam2 GeV." >&2
+    return 1
+  }
+}
+
+read_lhe_beam_energies() {
+  local file="$1"
+  awk '
+    /^[[:space:]]*<init([[:space:]>])/ { in_init = 1; next }
+    in_init {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      if (line == "" || substr(line, 1, 1) == "#") next
+      fields = split(line, value)
+      if (fields < 4) exit 2
+      beam1 = value[3]
+      beam2 = value[4]
+      gsub(/[dD]/, "e", beam1)
+      gsub(/[dD]/, "e", beam2)
+      printf "%.17g %.17g\n", beam1 + 0, beam2 + 0
+      exit
+    }
+  ' "$file"
+}
+
+validate_lhe_energy() {
+  local file="$1"
+  local energies
+  energies="$(read_lhe_beam_energies "$file")" || {
+    echo "Could not parse the LHE <init> beam energies from $file" >&2
+    return 1
+  }
+  [[ -n "$energies" ]] || {
+    echo "Could not find an LHE <init> record in $file" >&2
+    return 1
+  }
+  read -r LHE_BEAM1_GEV LHE_BEAM2_GEV <<<"$energies"
+  awk \
+    -v beam1="$LHE_BEAM1_GEV" \
+    -v beam2="$LHE_BEAM2_GEV" \
+    -v expected="$BEAM_ENERGY_GEV" '
+      BEGIN {
+        tolerance = 1.0e-6
+        ok1 = (beam1 - expected < tolerance && expected - beam1 < tolerance)
+        ok2 = (beam2 - expected < tolerance && expected - beam2 < tolerance)
+        exit !(ok1 && ok2)
+      }
+    ' || {
+      echo "This project requires 6800 GeV per beam (sqrt(s)=13.6 TeV)." >&2
+      echo "LHE file $file has beam energies $LHE_BEAM1_GEV and $LHE_BEAM2_GEV GeV." >&2
+      return 1
+    }
+  export LHE_BEAM1_GEV LHE_BEAM2_GEV
+}
+
 set_powheg_value() {
   local key="$1"
   local value="$2"
@@ -176,6 +264,7 @@ run_powheg() {
     echo "No POWHEG run card found; pass one with --run-card." >&2
     exit 1
   }
+  validate_run_card_energy "$RUN_CARD"
   if [[ "$PROCESS" == ZZ ]] && \
       awk '$1 == "m4lmin" && $2 + 0 > 0 {found=1} END {exit !found}' "$RUN_CARD"; then
     grep -Fq 'powheginput("#m4lmin")' "$PROCESS_DIR/Born_phsp.f" || {
@@ -329,6 +418,11 @@ else
   run_powheg
 fi
 
+# The LHE record is the authoritative beam configuration seen by both Pythia
+# and Herwig. Validate generated and externally supplied files alike so a
+# custom card or --lhe input cannot silently mix collision energies.
+validate_lhe_energy "$INPUT_LHE"
+
 if ((EVENTS == 0)); then
   SHOWER_EVENTS="$(awk '/<event([[:space:]>])/{count++} END{print count+0}' "$INPUT_LHE")"
   ((SHOWER_EVENTS > 0)) || {
@@ -354,6 +448,9 @@ input_lhe=$INPUT_LHE
 powheg_card=${RUN_CARD:-external-LHE}
 powheg_commit=$(git -C "$POWHEG_ROOT" rev-parse HEAD)
 process_commit=$(git -C "$PROCESS_DIR" rev-parse HEAD)
+beam_energy_1_gev=$LHE_BEAM1_GEV
+beam_energy_2_gev=$LHE_BEAM2_GEV
+sqrt_s_gev=$SQRT_S_GEV
 EOF
 
 log "Run complete; metadata: $OUTPUT_DIR/run-metadata.txt"

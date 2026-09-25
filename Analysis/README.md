@@ -21,7 +21,7 @@ source ~/.bashrc
 Then create/update the environment from the repository root:
 
 ```bash
-pixi install --manifest-path Analysis/pixi.toml
+pixi install --locked --manifest-path Analysis/pixi.toml
 ```
 
 The committed `Analysis/pixi.lock` makes every installation use the same
@@ -116,12 +116,25 @@ matching:
 
 It writes `ZZ_pythia.root`, `ZZ_herwig.root`, `gg_H_pythia.root`, and
 `gg_H_herwig.root`. All events are retained and assigned new sequential
-`event_id` values. Within each merged file the common weight scale is chosen
-so that `sum(weight)` equals the number of entries. This removes the artificial
-normalization increase from concatenating independent jobs while preserving
-their weighted distributions and efficiencies. This assumes that all jobs for
-a process use compatible POWHEG weight conventions; the merger does not repair
-inconsistently normalized inputs.
+`event_id` values. The default luminosity is 312 fb$^{-1}$. For input generator
+weights $g_i$, aggregate sum $S=\sum_i g_i$, process cross section $\sigma$ in
+pb, and $L=312000$ pb$^{-1}$, the merged branches are
+
+```text
+weight_shape      = g_i * N / S
+weight_nominal_pb = g_i * cross_section_pb / S
+lumi              = 1000 * luminosity_fb
+weight            = weight_nominal_pb * lumi
+```
+
+Thus `sum(weight_shape)=N`, `sum(weight_nominal_pb)=cross_section_pb`, and
+`sum(weight)=cross_section_pb*lumi`. Signs and differential distributions are
+preserved. `luminosity_fb` is also stored explicitly as 312.0. The
+`cross_section_pb` branch is the sample-level process cross section repeated
+on each row; multiplying that branch by luminosity separately for every event
+would overcount by the sample size. This assumes compatible POWHEG weight
+conventions across jobs; the merger cannot repair inconsistently normalized
+inputs.
 
 The same command creates an ensemble of pseudo-data files from the
 reconstructed-and-selected events in the two merged Herwig samples. Signed
@@ -180,15 +193,18 @@ From the repository root:
 
 ```bash
 pixi run --manifest-path Analysis/pixi.toml merge \
-  /work/pi_rclsa_umass_edu/rclsa/FourLeptonUnfolding/Output \
-  --luminosity-fb 300 \
+  /work/pi_rclsa_umass_edu/$USER/FourLeptonAnalysis/shards \
+  --output-directory /work/pi_rclsa_umass_edu/$USER/FourLeptonAnalysis/merged \
+  --luminosity-fb 312 \
   --seed 12345 \
   --pseudo-data-ensembles auto \
   --overwrite
 ```
 
-By default outputs are written into the input directory. Use
-`--output-directory DIR` to separate them. The current reducer stores the
+The full-chain batch worker writes all four filename patterns directly into
+the shared flat shard directory, so no manual renaming or movement is needed.
+By default merged outputs are written into the input directory; use
+`--output-directory DIR` as above to separate them. The current reducer stores the
 physical POWHEG normalization in `cross_section_pb`; the Higgs value already
 includes the `2.771E-04` branching-fraction correction applied by Simulation.
 If a shower converter records a running cross-section estimate, the merger uses
@@ -216,19 +232,20 @@ positive-resampling model; see the
 [Positive Resampler](https://arxiv.org/abs/2005.09375) and
 [unbiased cell-resampling](https://arxiv.org/abs/2109.07851) approaches.
 
-Run the Analysis and shared Tools unit tests in the same environment with:
+Run the complete Analysis, Tools, Simulation, Generation, batch-worker, and
+plotting regression suite in the same environment with:
 
 ```bash
 pixi run --manifest-path Analysis/pixi.toml test
 ```
 
 Alternatively, after `cd Analysis`, Pixi discovers `pixi.toml` automatically,
-so the shorter forms `pixi install`, `pixi run analyze ...`, and
+so the shorter forms `pixi install --locked`, `pixi run analyze ...`, and
 `pixi run test` are equivalent.
 
 ## Output branches
 
-The tree contains:
+An unmerged compact tree produced by `build_analysis_tree.py` contains:
 
 - `event_id`, the original `event_number`, the nominal `weight`, and the
   physical `cross_section_pb` normalization;
@@ -239,6 +256,14 @@ The tree contains:
   candidate exists, otherwise `truth_type`;
 - truth and reconstructed copies of all Tools observables, prefixed by
   `truth_` and `reco_` respectively.
+
+Merged MC trees add/replace the normalization branches described above:
+`weight_shape`, `weight_nominal_pb`, `lumi`, `luminosity_fb`, and the
+luminosity-scaled `weight`. In a pseudo-data tree, `weight` is instead the
+signed unit observation weight (`+1` or `-1`), `lumi` remains the selected
+luminosity in pb$^{-1}$, and `weight_nominal_pb=weight/lumi`, so the same
+row-wise formula remains true. Mixed-process pseudo-data has
+`cross_section_pb=NaN` by design.
 
 `2mu2e` means that the leading, closest-to-mZ pair is the muon pair; `2e2mu`
 means that it is the electron pair. Separate truth and reconstructed types

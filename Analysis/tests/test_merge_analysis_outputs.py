@@ -19,6 +19,7 @@ from Analysis.merge_analysis_outputs import (
     build_pseudo_data,
     build_pseudo_data_ensembles,
     merge_directory,
+    merge_sample,
     scan_files,
 )
 
@@ -183,6 +184,59 @@ class SignedStatisticsTest(unittest.TestCase):
 
 
 class MergeAnalysisOutputsTest(unittest.TestCase):
+    def test_merged_luminosity_weights_preserve_signs_and_close(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "signed.root"
+            destination = directory / "merged.root"
+            write_sample(
+                source,
+                0.01,
+                weights=np.array([2.0, -1.0, 1.0]),
+                reconstructed=np.ones(3, dtype=np.bool_),
+            )
+            stats = merge_sample(
+                [source],
+                destination,
+                step_size="1 MB",
+                cross_section_override_pb=None,
+                luminosity_fb=10.0,
+                overwrite=False,
+            )
+            with uproot.open(destination) as root_file:
+                arrays = root_file["Analysis"].arrays(library="np")
+                metadata = json.loads(str(root_file["merge_metadata"]))
+            self.assertAlmostEqual(float(np.sum(arrays["weight_shape"])), 3.0)
+            self.assertAlmostEqual(
+                float(np.sum(arrays["weight_nominal_pb"])), 0.01
+            )
+            self.assertAlmostEqual(float(np.sum(arrays["weight"])), 100.0)
+            self.assertAlmostEqual(stats.sum_weights, 100.0)
+            self.assertEqual(np.sign(arrays["weight"]).tolist(), [1.0, -1.0, 1.0])
+            np.testing.assert_allclose(
+                arrays["weight"], arrays["weight_nominal_pb"] * arrays["lumi"]
+            )
+            self.assertEqual(metadata["format_version"], 2)
+            self.assertEqual(
+                metadata["weight_semantics"], "expected_events_at_luminosity"
+            )
+            self.assertEqual(metadata["weight_units"], "events")
+
+    def test_merged_luminosity_weights_require_a_cross_section(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "missing_xsec.root"
+            write_sample(source, float("nan"))
+            with self.assertRaisesRegex(ValueError, "positive cross section"):
+                merge_sample(
+                    [source],
+                    directory / "merged.root",
+                    step_size="1 MB",
+                    cross_section_override_pb=None,
+                    luminosity_fb=312.0,
+                    overwrite=False,
+                )
+
     def test_positive_only_auto_ensembles_preserve_legacy_data_root(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -204,7 +258,7 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
             merge_directory(
                 directory,
                 directory,
-                luminosity_fb=300.0,
+                luminosity_fb=312.0,
                 seed=7,
                 step_size="1 MB",
                 zz_cross_section_pb=None,
@@ -222,7 +276,21 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                     tree = root_file["Analysis"]
                     arrays = tree.arrays(library="np")
                     self.assertEqual(tree.num_entries, 8)
-                    self.assertAlmostEqual(float(np.sum(arrays["weight"])), 8.0)
+                    self.assertAlmostEqual(
+                        float(np.sum(arrays["weight_shape"])), 8.0
+                    )
+                    self.assertAlmostEqual(
+                        float(np.sum(arrays["weight_nominal_pb"])), 1.0e-5
+                    )
+                    self.assertAlmostEqual(
+                        float(np.sum(arrays["weight"])), 3.12
+                    )
+                    self.assertTrue(np.all(arrays["lumi"] == 312_000.0))
+                    self.assertTrue(np.all(arrays["luminosity_fb"] == 312.0))
+                    np.testing.assert_allclose(
+                        arrays["weight"],
+                        arrays["weight_nominal_pb"] * arrays["lumi"],
+                    )
                     self.assertEqual(
                         arrays["event_id"].tolist(), list(range(8))
                     )
@@ -232,6 +300,7 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
             )
             self.assertEqual(manifest["recommended_ensemble_count"], 2)
             self.assertEqual(manifest["generated_ensemble_count"], 2)
+            self.assertEqual(manifest["luminosity_fb"], 312.0)
             self.assertTrue((directory / "data.root").exists())
             self.assertTrue((directory / "data_0001.root").exists())
 
@@ -241,6 +310,14 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                 self.assertGreater(tree.num_entries, 0)
                 self.assertTrue(np.all(arrays["reconstructed"]))
                 self.assertTrue(np.all(arrays["weight"] == 1.0))
+                self.assertTrue(np.all(arrays["weight_shape"] == 1.0))
+                self.assertTrue(np.all(arrays["lumi"] == 312_000.0))
+                self.assertTrue(np.all(arrays["luminosity_fb"] == 312.0))
+                np.testing.assert_allclose(
+                    arrays["weight_nominal_pb"],
+                    arrays["weight"] / arrays["lumi"],
+                )
+                self.assertTrue(np.all(np.isnan(arrays["cross_section_pb"])))
                 self.assertTrue(np.all(arrays["type"] == arrays["reco_type"]))
                 self.assertEqual(
                     arrays["event_id"].tolist(), list(range(tree.num_entries))
@@ -305,6 +382,12 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                     set(np.unique(first_arrays["weight"]).tolist()), {-1.0, 1.0}
                 )
                 self.assertTrue(np.all(first_arrays["reconstructed"]))
+                np.testing.assert_allclose(
+                    first_arrays["weight"],
+                    first_arrays["weight_nominal_pb"] * first_arrays["lumi"],
+                )
+                self.assertTrue(np.all(first_arrays["lumi"] == 100_000.0))
+                self.assertTrue(np.all(first_arrays["luminosity_fb"] == 100.0))
                 metadata = json.loads(str(first_file["merge_metadata"]))
 
             self.assertEqual(

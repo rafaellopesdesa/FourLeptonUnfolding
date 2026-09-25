@@ -22,6 +22,7 @@ SAMPLE_PATTERNS = {
     "gg_H_herwig": "gg_H_herwig_*.root",
 }
 ESSENTIAL_BRANCHES = {"event_id", "weight", "reconstructed"}
+DEFAULT_LUMINOSITY_FB = 312.0
 
 
 @dataclass(frozen=True)
@@ -273,7 +274,9 @@ def scan_files(
     )
 
 
-def _tree_schema(path: Path, branches: set[str]) -> dict[str, np.dtype]:
+def _tree_schema(
+    path: Path, branches: set[str], *, include_merged_weights: bool = False
+) -> dict[str, np.dtype]:
     schema: dict[str, np.dtype] = {}
     with uproot.open(path) as root_file:
         tree = root_file[TREE_NAME]
@@ -284,6 +287,11 @@ def _tree_schema(path: Path, branches: set[str]) -> dict[str, np.dtype]:
                 tree[name].array(entry_start=0, entry_stop=1, library="np")
             ).dtype
     schema["cross_section_pb"] = np.dtype(np.float64)
+    if include_merged_weights:
+        schema["weight_shape"] = np.dtype(np.float64)
+        schema["weight_nominal_pb"] = np.dtype(np.float64)
+        schema["lumi"] = np.dtype(np.float64)
+        schema["luminosity_fb"] = np.dtype(np.float64)
     return schema
 
 
@@ -304,6 +312,7 @@ def merge_sample(
     *,
     step_size: str,
     cross_section_override_pb: float | None,
+    luminosity_fb: float = DEFAULT_LUMINOSITY_FB,
     overwrite: bool,
 ) -> SampleStats:
     stats, branches = scan_files(
@@ -311,8 +320,19 @@ def merge_sample(
         step_size=step_size,
         cross_section_override_pb=cross_section_override_pb,
     )
-    scale = stats.entries / stats.sum_weights
-    schema = _tree_schema(files[0], branches)
+    if not np.isfinite(luminosity_fb) or luminosity_fb <= 0.0:
+        raise ValueError("merged-sample luminosity must be finite and positive")
+    if not np.isfinite(stats.cross_section_pb) or stats.cross_section_pb <= 0.0:
+        raise ValueError(
+            "a positive cross section is required to construct luminosity-scaled "
+            "merged weights; rebuild the Analysis inputs or pass a process "
+            "cross-section override"
+        )
+    luminosity_pb_inverse = luminosity_fb * 1000.0
+    shape_scale = stats.entries / stats.sum_weights
+    nominal_pb_scale = stats.cross_section_pb / stats.sum_weights
+    yield_scale = nominal_pb_scale * luminosity_pb_inverse
+    schema = _tree_schema(files[0], branches, include_merged_weights=True)
     temporary = _prepare_output(output_path, overwrite)
     next_event_id = 0
     try:
@@ -330,7 +350,22 @@ def merge_sample(
                         arrays["event_id"] = np.arange(
                             next_event_id, next_event_id + size, dtype=np.uint64
                         )
-                        arrays["weight"] = np.asarray(arrays["weight"], dtype=np.float64) * scale
+                        input_weight = np.asarray(
+                            arrays["weight"], dtype=np.float64
+                        )
+                        arrays["weight_shape"] = input_weight * shape_scale
+                        arrays["weight_nominal_pb"] = (
+                            input_weight * nominal_pb_scale
+                        )
+                        arrays["lumi"] = np.full(
+                            size, luminosity_pb_inverse, dtype=np.float64
+                        )
+                        arrays["luminosity_fb"] = np.full(
+                            size, luminosity_fb, dtype=np.float64
+                        )
+                        arrays["weight"] = (
+                            arrays["weight_nominal_pb"] * arrays["lumi"]
+                        )
                         arrays["cross_section_pb"] = np.full(
                             size, stats.cross_section_pb, dtype=np.float64
                         )
@@ -338,11 +373,26 @@ def merge_sample(
                         next_event_id += size
             output_file["merge_metadata"] = json.dumps(
                 {
+                    "format_version": 2,
+                    "weight_semantics": "expected_events_at_luminosity",
+                    "weight_units": "events",
                     "inputs": [str(path) for path in files],
                     "entries": stats.entries,
                     "input_sum_weights": stats.sum_weights,
-                    "output_sum_weights": float(stats.entries),
-                    "weight_scale": scale,
+                    "output_sum_weight_shape": float(stats.entries),
+                    "output_sum_weight_nominal_pb": stats.cross_section_pb,
+                    "output_sum_weights": (
+                        stats.cross_section_pb * luminosity_pb_inverse
+                    ),
+                    "shape_weight_scale": shape_scale,
+                    "weight_nominal_pb_scale": nominal_pb_scale,
+                    "yield_weight_scale": yield_scale,
+                    "weight_formula": "weight = weight_nominal_pb * lumi",
+                    "weight_nominal_pb_formula": (
+                        "input_weight * cross_section_pb / input_sum_weights"
+                    ),
+                    "luminosity_fb": luminosity_fb,
+                    "lumi_pb_inverse": luminosity_pb_inverse,
                     "cross_section_pb": stats.cross_section_pb,
                     "has_negative_weights": stats.has_negative_weights,
                     "reconstructed_positive_entries": (
@@ -352,10 +402,10 @@ def merge_sample(
                         stats.reconstructed_negative_entries
                     ),
                     "reconstructed_positive_sum_weights": (
-                        stats.reconstructed_positive_sum_weights * scale
+                        stats.reconstructed_positive_sum_weights * yield_scale
                     ),
                     "reconstructed_negative_sum_abs_weights": (
-                        stats.reconstructed_negative_sum_abs_weights * scale
+                        stats.reconstructed_negative_sum_abs_weights * yield_scale
                     ),
                     "reconstructed_positive_effective_entries": (
                         _reconstructed_effective_entries(stats, +1)
@@ -373,26 +423,30 @@ def merge_sample(
         raise
     return SampleStats(
         entries=stats.entries,
-        sum_weights=float(stats.entries),
-        sum_squared_weights=stats.sum_squared_weights * scale * scale,
+        sum_weights=stats.cross_section_pb * luminosity_pb_inverse,
+        sum_squared_weights=stats.sum_squared_weights * yield_scale * yield_scale,
         reconstructed_entries=stats.reconstructed_entries,
-        reconstructed_sum_weights=stats.reconstructed_sum_weights * scale,
+        reconstructed_sum_weights=stats.reconstructed_sum_weights * yield_scale,
         reconstructed_sum_squared_weights=(
-            stats.reconstructed_sum_squared_weights * scale * scale
+            stats.reconstructed_sum_squared_weights * yield_scale * yield_scale
         ),
         reconstructed_positive_entries=stats.reconstructed_positive_entries,
         reconstructed_negative_entries=stats.reconstructed_negative_entries,
         reconstructed_positive_sum_weights=(
-            stats.reconstructed_positive_sum_weights * scale
+            stats.reconstructed_positive_sum_weights * yield_scale
         ),
         reconstructed_negative_sum_abs_weights=(
-            stats.reconstructed_negative_sum_abs_weights * scale
+            stats.reconstructed_negative_sum_abs_weights * yield_scale
         ),
         reconstructed_positive_sum_squared_weights=(
-            stats.reconstructed_positive_sum_squared_weights * scale * scale
+            stats.reconstructed_positive_sum_squared_weights
+            * yield_scale
+            * yield_scale
         ),
         reconstructed_negative_sum_squared_weights=(
-            stats.reconstructed_negative_sum_squared_weights * scale * scale
+            stats.reconstructed_negative_sum_squared_weights
+            * yield_scale
+            * yield_scale
         ),
         cross_section_pb=stats.cross_section_pb,
         has_negative_weights=stats.has_negative_weights,
@@ -620,6 +674,7 @@ def _build_pseudo_data_file(
     step_size: str,
     overwrite: bool,
 ) -> dict[str, Any]:
+    luminosity_pb_inverse = luminosity_fb * 1000.0
     child_sequences = seed_sequence.spawn(4 * len(components) + 1)
     sampled: list[dict[str, np.ndarray]] = []
     process_metadata: dict[str, dict[str, Any]] = {}
@@ -651,6 +706,18 @@ def _build_pseudo_data_file(
                 step_size=step_size,
             )
             arrays["weight"] = np.full(observed, sign, dtype=np.float64)
+            arrays["weight_shape"] = np.full(
+                observed, sign, dtype=np.float64
+            )
+            arrays["weight_nominal_pb"] = np.full(
+                observed, sign / luminosity_pb_inverse, dtype=np.float64
+            )
+            arrays["lumi"] = np.full(
+                observed, luminosity_pb_inverse, dtype=np.float64
+            )
+            arrays["luminosity_fb"] = np.full(
+                observed, luminosity_fb, dtype=np.float64
+            )
             sampled.append(arrays)
 
         details = _component_diagnostics(component)
@@ -704,6 +771,8 @@ def _build_pseudo_data_file(
             component.expectation.negative > 0.0 for component in components
         ),
         "luminosity_fb": luminosity_fb,
+        "lumi_pb_inverse": luminosity_pb_inverse,
+        "weight_formula": "weight = weight_nominal_pb * lumi",
         "seed": base_seed,
         "ensemble_index": ensemble_index,
         "ensemble_count": ensemble_count,
@@ -961,6 +1030,7 @@ def merge_directory(
             output_path,
             step_size=step_size,
             cross_section_override_pb=override,
+            luminosity_fb=luminosity_fb,
             overwrite=overwrite,
         )
         print(
@@ -1036,7 +1106,9 @@ def main() -> None:
         type=Path,
         help="output directory (default: input directory)",
     )
-    parser.add_argument("--luminosity-fb", type=_positive_float, default=300.0)
+    parser.add_argument(
+        "--luminosity-fb", type=_positive_float, default=DEFAULT_LUMINOSITY_FB
+    )
     parser.add_argument("--seed", type=_nonnegative_int, default=12345)
     parser.add_argument("--step-size", default="100 MB", help="uproot chunk size")
     parser.add_argument("--zz-cross-section-pb", type=_positive_float)

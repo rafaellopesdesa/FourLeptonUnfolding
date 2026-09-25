@@ -80,16 +80,22 @@ cd FourLeptonUnfolding/Generation
 source env.sh
 ```
 
-After installation, use `submit_generation.sh` to create Unity Slurm campaigns
-with 1000--10000 events per job. The full workflow and output layout are in
+After installing Generation, Delphes, and the Analysis Pixi environment, use
+`submit_generation.sh` to create Unity Slurm campaigns with 1000--10000 events
+per job. Each task now runs the complete generation, simulation, and compact
+analysis chain in transient worker scratch. The full workflow and output
+layout are in
 [`../BatchSubmit/README.md`](../BatchSubmit/README.md).
 
 ## Run the four combinations
 
 By default, the runner uses the validated Run-3 cards in `../PowhegCards`.
-These set 6800 GeV per beam and otherwise keep the generation phase space as
-inclusive as the matrix element permits. `--run-card` remains available for
-explicit alternatives.
+These set 6800 GeV per beam ($\sqrt{s}=13.6$ TeV) and otherwise keep the
+generation phase space as inclusive as the matrix element permits.
+`--run-card` remains available for explicit alternatives, but every run card
+must retain that beam energy. Before either shower starts, the runner parses
+the authoritative LHE `<init>` record and refuses any file whose two beam
+energies are not 6800 GeV. This check also covers external `--lhe` inputs.
 
 The forced `gg_H` shower decay includes `Z -> e+e-`, `mu+mu-` and
 `tau+tau-`. After pulling a change to `powheg_pythia8.cc`, rerun the installer
@@ -137,6 +143,11 @@ switches in the private run copy.
 Each run gets its own directory under `runs/` and contains the resolved
 `powheg.input`, logs, LHE input, showered HepMC output, and `run-metadata.txt`.
 Generated samples and locally installed software are excluded from Git.
+The metadata records both beam energies and `sqrt_s_gev=13600`.
+
+Standalone runs retain their intermediates. In a submitted Unity campaign,
+the same files live only in worker scratch and are deleted after the compact
+Analysis ROOT shard has been validated and published.
 
 ## Physics scope of this first baseline
 

@@ -85,7 +85,9 @@ nonprompt leptons and creates an artificial reconstructed-only population.
 The resolved card now builds dedicated `RecoElectron` and `RecoMuon`
 collections from the prompt dressed leptons. It applies:
 
-1. the bundled ATLAS-like momentum-resolution formula;
+1. the Run-2 ECAL energy-resolution proxy used in
+   `OffshellAngularProduction` for electrons, and the existing momentum proxy
+   for muons;
 2. a loose reconstruction+identification efficiency;
 3. a separate loose prompt-lepton isolation efficiency.
 
@@ -138,6 +140,49 @@ on Medium electron identification, as a proxy rather than the exact H4l
 conditional performance measurements (Medium identification and vertex
 association) applied here after a Loose-ID proxy. Treating these factors as
 independent Bernoulli stages is a deliberate phenomenology approximation.
+
+### Electron ECAL resolution
+
+`RecoElectron` and `RecoElectronNoIso` now use
+`H4lElectronECalSmearing`, model `atlas_run2_ecal_snc_v1`, ported unchanged
+from `OffshellAngularProduction`. It represents the total calibrated ECAL
+energy response without a track-energy combination. The former tracking-like
+formula was not appropriate as the final electron energy resolution.
+
+For dressed energy $E$ and pseudorapidity $\eta$, define
+$T=\max(E/\cosh\eta,1\;\mathrm{GeV})$. The relative response is
+
+$$
+\left(\frac{\sigma_E}{E}\right)^2 =
+\frac{S_T^2}{T} +
+\frac{N_{0,T}^2+N_{\mathrm{PU},T}^2}{T^2} +
+C_{\mathrm{MC}}^2+c_{\mathrm{data}}^2.
+$$
+
+The effective coefficients are:
+
+| $\lvert\eta\rvert$ interval | $S_T$ | $N_{0,T}$ | $N_{\mathrm{PU},T}$ | $C_{\mathrm{MC}}$ | $c_{\mathrm{data}}$ |
+|---|---:|---:|---:|---:|---:|
+| $[0,0.8]$ | 0.09 | 0.30 | 0.55 | 0.004 | 0.007 |
+| $(0.8,1.37]$ | 0.12 | 0.84 | 0.55 | 0.004 | 0.009 |
+| $(1.37,1.52]$ | 0.15 | 1.20 | 0.70 | 0.010 | 0.025 |
+| $(1.52,2.0]$ | 0.10 | 0.55 | 0.60 | 0.004 | 0.015 |
+| $(2.0,2.5)$ | 0.08 | 0.50 | 0.60 | 0.004 | 0.017 |
+
+These are source-informed phenomenological coefficients, not an official
+ATLAS calibration table. Their basis is the Run-2 electron-response behavior
+in [arXiv:1908.00005](https://arxiv.org/abs/1908.00005) and the additional
+data smearing discussed in
+[arXiv:2309.05471](https://arxiv.org/abs/2309.05471). The fixed pile-up-noise
+term is an effective Run-2 contribution; this setup still has no overlaid
+pile-up events. The Delphes `MomentumSmearing` module is used only as the
+positive response engine, evaluating the dressed energy and eta. The response
+is applied once, before reconstruction/ID and isolation efficiencies.
+
+This is a generated-card change. Existing Delphes and compact Analysis files
+must be regenerated, but Delphes does not need to be recompiled and POWHEG
+events do not need to be regenerated. New full-chain batch tasks pick up the
+model automatically.
 
 Both truth and reconstruction are finally selected in `Analysis/` with the
 user-chosen common acceptance `pT > 5 GeV`, `|eta| < 2.5`. The attached note

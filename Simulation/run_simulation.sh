@@ -344,6 +344,8 @@ for input_file in "${INPUT_FILES[@]}"; do
       printf 'truth_lepton_dressing=non_hadronic_status_1_photons,delta_r_lt_0.1,nearest_unique\n'
       printf 'reco_leptons=RecoElectron,RecoMuon(post_smearing_reco_id_isolation)\n'
       printf 'reco_leptons_before_isolation=RecoElectronNoIso,RecoMuonNoIso\n'
+      printf 'reco_electron_resolution_model=atlas_run2_ecal_snc_v1\n'
+      printf 'reco_muon_resolution_model=atlas_run2_momentum_proxy\n'
       printf 'reco_efficiency_model=atlas_run2_h4l_loose_proxy_pt_eta_no_phi\n'
       printf 'reco_isolation_model=atlas_run2_loose_prompt_efficiency_proxy_pt_only\n'
       printf 'analysis_acceptance=lepton_pt_gt_5_abs_eta_lt_2.5\n'
