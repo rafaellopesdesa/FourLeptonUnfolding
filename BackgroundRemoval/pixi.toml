@@ -1,0 +1,30 @@
+[workspace]
+name = "four-lepton-background-removal"
+version = "0.1.0"
+description = "Calibrated density-ratio background removal for H to four leptons"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+requires-pixi = ">=0.40,<1"
+readme = "README.md"
+
+[dependencies]
+python = "3.12.*"
+numpy = ">=1.26,<2"
+uproot = ">=5.6,<6"
+awkward = ">=2.8,<3"
+matplotlib-base = ">=3.10,<4"
+hist = ">=2.8,<3"
+mplhep = ">=0.4,<1"
+
+[pypi-dependencies]
+torch = "==2.10.0"
+pytorch-lightning = "==2.6.1"
+nsbi-common-utils = { git = "https://github.com/iris-hep/nsbi-lhc-toolkit.git", rev = "fc09848fc6540fd32310faebbe9db6eea7ecd17b" }
+
+[activation.env]
+PYTHONNOUSERSITE = "1"
+
+[tasks]
+train = { cmd = "python -m BackgroundRemoval.Training.train_background_ratio", cwd = "..", description = "Train and validate the calibrated background density ratio" }
+apply = { cmd = "python -m BackgroundRemoval.Application.apply_background_ratio", cwd = "..", description = "Decorate data.root with signal-purity weights" }
+test = { cmd = "python -m unittest discover -s BackgroundRemoval/tests -v", cwd = "..", description = "Run background-removal regression tests" }

@@ -16,7 +16,9 @@ The workflow is split into:
 - [`Analysis/`](Analysis/) for reduction, merging, and 312 fb$^{-1}$ Herwig
   pseudo-data ensembles;
 - [`Plotting/`](Plotting/) for the multipage Herwig-versus-Pythia validation
-  report.
+  report;
+- [`BackgroundRemoval/`](BackgroundRemoval/) for the calibrated, decay-only
+  signal/background density ratio and `data.root` purity-weight decoration.
 
 The built-in samples use 6800 GeV per beam, $\sqrt{s}=13.6$ TeV. The runtime
 also validates the LHE beam record so custom cards and external LHE inputs
