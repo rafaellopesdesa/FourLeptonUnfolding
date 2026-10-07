@@ -21,4 +21,5 @@ mplhep = ">=0.4,<1"
 analyze = { cmd = "python build_analysis_tree.py", description = "Build a compact analysis ROOT tree; append the CLI arguments" }
 merge = { cmd = "python merge_analysis_outputs.py", description = "Merge shower samples and build a luminosity-scaled Herwig pseudo-data ensemble" }
 plot = { cmd = "python ../Plotting/plot_data_mc.py", description = "Create the Herwig pseudo-data versus Pythia comparison PDF" }
+plot-background-removed = { cmd = "python ../Plotting/plot_background_removed.py", description = "Compare background-removed data with fiducial ggH at reconstruction level" }
 test = { cmd = "python -m unittest discover -s Analysis/tests -v && python -m unittest discover -s Tools/tests -v && python -m unittest discover -s Simulation/tests -v && python -m unittest discover -s Generation/tests -v && python -m unittest discover -s BatchSubmit/tests -v && python -m unittest discover -s Plotting/tests -v && python -m unittest discover -s BackgroundRemoval/tests -v", cwd = "..", description = "Run the complete Python regression suite" }

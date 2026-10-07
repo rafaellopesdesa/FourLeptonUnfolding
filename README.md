@@ -16,7 +16,8 @@ The workflow is split into:
 - [`Analysis/`](Analysis/) for reduction, merging, and 312 fb$^{-1}$ Herwig
   pseudo-data ensembles;
 - [`Plotting/`](Plotting/) for the multipage Herwig-versus-Pythia validation
-  report;
+  report and the reconstruction-level background-removed-data versus ggH
+  starting-point comparison;
 - [`BackgroundRemoval/`](BackgroundRemoval/) for the decay-only, strict
   130--160 GeV sideband data-to-MC correction, strict 115--130 GeV
   signal-purity training, and consistent frozen-model decoration of nominal
