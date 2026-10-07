@@ -13,16 +13,24 @@ import importlib.metadata
 import json
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 
 
 TREE_NAME = "Analysis"
-ARTIFACT_FORMAT_VERSION = 1
+ARTIFACT_FORMAT_VERSION = 2
 TOOLKIT_COMMIT = "fc09848fc6540fd32310faebbe9db6eea7ecd17b"
 
-# Keep this order identical to the order requested for the decay-only model.
+MASS_BRANCH = "reco_m_ZZ"
+ANALYSIS_MASS_WINDOW = (115.0, 130.0)
+CORRECTION_MASS_WINDOW = (130.0, 160.0)
+MODEL_KIND_BACKGROUND_REMOVAL = "background_removal"
+MODEL_KIND_DATA_MC_CORRECTION = "data_mc_correction"
+
+# Keep this order identical for the correction and background-removal models.
+# reco_m_ZZ is deliberately only a region-selection variable and never enters
+# either neural network.
 FEATURES = (
     "reco_Phi",
     "reco_Phi1",
@@ -32,7 +40,6 @@ FEATURES = (
     "reco_cos_theta_star",
     "reco_m_Z1",
     "reco_m_Z2",
-    "reco_m_ZZ",
 )
 MODEL_FEATURES = (
     "sin(reco_Phi)",
@@ -46,10 +53,10 @@ MODEL_FEATURES = (
     "reco_cos_theta_star",
     "reco_m_Z1",
     "reco_m_Z2",
-    "reco_m_ZZ",
 )
 
 PRIMARY_OUTPUT_BRANCH = "background_removal_weight"
+ANALYSIS_REGION_BRANCH = "analysis_region"
 DIAGNOSTIC_OUTPUT_BRANCHES = (
     "signal_score_balanced",
     "signal_score_ensemble_std",
@@ -57,13 +64,18 @@ DIAGNOSTIC_OUTPUT_BRANCHES = (
     "signal_to_background_ratio",
     "weight_background_removed",
 )
-OUTPUT_BRANCHES = (PRIMARY_OUTPUT_BRANCH, *DIAGNOSTIC_OUTPUT_BRANCHES)
+OUTPUT_BRANCHES = (
+    PRIMARY_OUTPUT_BRANCH,
+    ANALYSIS_REGION_BRANCH,
+    *DIAGNOSTIC_OUTPUT_BRANCHES,
+)
 
 FIT_SPLIT = np.uint8(0)
 VALIDATION_SPLIT = np.uint8(1)
 CLOSURE_SPLIT = np.uint8(2)
 SPLIT_NAMES = {0: "fit", 1: "validation", 2: "closure"}
 SOURCE_SALTS = {
+    "data": np.uint64(0xA4093822299F31D0),
     "gg_H": np.uint64(0x243F6A8885A308D3),
     "ZZ": np.uint64(0x13198A2E03707344),
 }
@@ -75,6 +87,117 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def capture_file_provenance(
+    path: Path, *, include_sha256: bool = True
+) -> dict[str, Any]:
+    """Snapshot an input before it is read by a multi-pass workflow."""
+
+    path = path.expanduser().resolve()
+    stat = path.stat()
+    return {
+        "path": str(path),
+        "size_bytes": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "sha256": sha256_file(path) if include_sha256 else None,
+    }
+
+
+def assert_file_unchanged(
+    path: Path,
+    provenance: Mapping[str, Any],
+    *,
+    verify_sha256: bool = True,
+) -> None:
+    """Fail if an input changed after its provenance snapshot was captured."""
+
+    path = path.expanduser().resolve()
+    stat = path.stat()
+    if (
+        stat.st_size != provenance.get("size_bytes")
+        or stat.st_mtime_ns != provenance.get("mtime_ns")
+    ):
+        raise RuntimeError(f"input changed while it was being processed: {path}")
+    expected_sha256 = provenance.get("sha256")
+    if (
+        verify_sha256
+        and expected_sha256 is not None
+        and sha256_file(path) != expected_sha256
+    ):
+        raise RuntimeError(f"input changed while it was being processed: {path}")
+
+
+def weight_measure_contract(
+    branch: str, *, luminosity_fb: float
+) -> dict[str, Any]:
+    """Describe how a training branch represents the nominal event measure.
+
+    ``weight`` and ``weight_nominal_pb`` differ only by the common integrated
+    luminosity factor written by the merge step.  That constant cancels from
+    each calibrated density ratio, so those two branches are a known-compatible
+    pair.  Any other branch is deliberately classified as custom rather than
+    guessing its units or normalization semantics.
+    """
+
+    if not isinstance(branch, str) or not branch:
+        raise ValueError("weight branch must be a non-empty string")
+    if not np.isfinite(luminosity_fb) or luminosity_fb <= 0.0:
+        raise ValueError("luminosity must be finite and positive")
+    if branch == "weight":
+        return {
+            "branch": branch,
+            "family": "nominal_cross_section",
+            "units": "expected_events_at_luminosity",
+            "scale_to_pb": 1.0 / (1000.0 * float(luminosity_fb)),
+        }
+    if branch == "weight_nominal_pb":
+        return {
+            "branch": branch,
+            "family": "nominal_cross_section",
+            "units": "pb",
+            "scale_to_pb": 1.0,
+        }
+    return {
+        "branch": branch,
+        "family": "custom",
+        "units": "arbitrary",
+        "scale_to_pb": None,
+    }
+
+
+def known_weight_measures_compatible(
+    first: Mapping[str, Any], second: Mapping[str, Any]
+) -> bool:
+    """Return true only for the explicitly understood nominal-weight family."""
+
+    return (
+        first.get("family") == "nominal_cross_section"
+        and second.get("family") == "nominal_cross_section"
+        and first.get("branch") in {"weight", "weight_nominal_pb"}
+        and second.get("branch") in {"weight", "weight_nominal_pb"}
+    )
+
+
+def validate_manifest_mass_window(
+    manifest: Mapping[str, Any],
+    expected_window: tuple[float, float],
+    *,
+    artifact_label: str,
+) -> None:
+    """Validate the standard strict-open mass-window artifact contract."""
+
+    selections = manifest.get("selections")
+    window = selections.get("mass_window_gev") if isinstance(selections, Mapping) else None
+    if not isinstance(window, Mapping) or not (
+        window.get("branch") == MASS_BRANCH
+        and window.get("low_exclusive") == expected_window[0]
+        and window.get("high_exclusive") == expected_window[1]
+    ):
+        raise ValueError(
+            f"{artifact_label} does not use the required strict "
+            f"{expected_window[0]:g} < {MASS_BRANCH} < {expected_window[1]:g} GeV window"
+        )
 
 
 def toolkit_runtime_provenance() -> dict[str, Any]:
@@ -113,7 +236,7 @@ def toolkit_runtime_provenance() -> dict[str, Any]:
 
 
 def transformed_features(raw: np.ndarray) -> np.ndarray:
-    """Apply periodic encoding while using only the nine requested inputs."""
+    """Apply periodic encoding while using only the eight requested inputs."""
 
     raw = np.asarray(raw)
     if raw.ndim != 2 or raw.shape[1] != len(FEATURES):
@@ -171,6 +294,45 @@ def deterministic_split(
         FIT_SPLIT,
         np.where(uniform < boundary, VALIDATION_SPLIT, CLOSURE_SPLIT),
     ).astype(np.uint8)
+
+
+def row_fingerprint_ids(values: np.ndarray) -> np.ndarray:
+    """Create deterministic uint64 identities for exact duplicate rows.
+
+    Pseudo-data are sampled with replacement and receive fresh sequential
+    ``event_id`` values.  Hashing the selected reconstructed values keeps all
+    copies of one underlying event in the same fit/validation/closure split.
+    This is a grouping identity, not a cryptographic content checksum.
+    """
+
+    values = np.asarray(values, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] == 0:
+        raise ValueError("row fingerprints require a non-empty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("row fingerprints cannot contain non-finite values")
+    fingerprints = np.full(
+        values.shape[0], np.uint64(0x6A09E667F3BCC909), dtype=np.uint64
+    )
+    with np.errstate(over="ignore"):
+        for column in range(values.shape[1]):
+            bits = np.ascontiguousarray(values[:, column]).view(np.uint32).astype(
+                np.uint64
+            )
+            mixed = bits ^ np.uint64(
+                (0x9E3779B97F4A7C15 * (column + 1)) & ((1 << 64) - 1)
+            )
+            mixed = (mixed ^ (mixed >> np.uint64(30))) * np.uint64(
+                0xBF58476D1CE4E5B9
+            )
+            mixed = (mixed ^ (mixed >> np.uint64(27))) * np.uint64(
+                0x94D049BB133111EB
+            )
+            mixed ^= mixed >> np.uint64(31)
+            fingerprints ^= mixed
+            fingerprints = (fingerprints ^ (fingerprints >> np.uint64(29))) * np.uint64(
+                0x319642B2D24D8EC3
+            )
+    return fingerprints
 
 
 def stable_sigmoid(values: np.ndarray | float) -> np.ndarray:
@@ -232,7 +394,7 @@ def ratio_outputs(
         2.0 * abs(logit_clip),
     )
     physical_ratio = np.exp(log_physical_ratio)
-    return {
+    result = {
         "raw_score": raw_score,
         "signal_score_balanced": stable_sigmoid(log_shape_ratio),
         "signal_score_ensemble_std": np.std(scores, axis=1),
@@ -240,6 +402,12 @@ def ratio_outputs(
         "signal_to_background_ratio": physical_ratio,
         "background_removal_weight": stable_sigmoid(log_physical_ratio),
     }
+    # Generic names make the same calibrated estimator usable both for
+    # target/reference data-MC correction and for signal/background purity.
+    result["shape_ratio"] = result["background_shape_ratio"]
+    result["physical_ratio"] = result["signal_to_background_ratio"]
+    result["target_purity"] = result["background_removal_weight"]
+    return result
 
 
 def build_toolkit_model(architecture: dict[str, Any]):
@@ -275,7 +443,13 @@ class ModelBundle:
     device: Any
 
     @classmethod
-    def load(cls, model_directory: Path, *, device_name: str = "auto") -> "ModelBundle":
+    def load(
+        cls,
+        model_directory: Path,
+        *,
+        device_name: str = "auto",
+        expected_model_kind: str | None = None,
+    ) -> "ModelBundle":
         try:
             import torch
         except ImportError as error:  # pragma: no cover - environment error path
@@ -292,29 +466,82 @@ class ModelBundle:
                 f"unsupported model format {manifest.get('format_version')!r}; "
                 f"expected {ARTIFACT_FORMAT_VERSION}"
             )
+        model_kind = manifest.get("model_kind")
+        if model_kind not in {
+            MODEL_KIND_BACKGROUND_REMOVAL,
+            MODEL_KIND_DATA_MC_CORRECTION,
+        }:
+            raise ValueError(f"unsupported model kind {model_kind!r}")
+        if expected_model_kind is not None and model_kind != expected_model_kind:
+            raise ValueError(
+                f"model kind {model_kind!r} is incompatible with the requested "
+                f"{expected_model_kind!r} application"
+            )
         if tuple(manifest.get("features", ())) != FEATURES:
             raise ValueError("model feature order is incompatible with this application")
         if tuple(manifest.get("model_features", ())) != MODEL_FEATURES:
             raise ValueError("model preprocessing schema is incompatible with this application")
         if manifest.get("toolkit", {}).get("pinned_commit") != TOOLKIT_COMMIT:
             raise ValueError("model toolkit revision is incompatible with this application")
+        ratio_convention = manifest.get("ratio_convention")
+        if not isinstance(ratio_convention, Mapping) or (
+            ratio_convention.get("orientation") != "target_to_reference"
+        ):
+            raise ValueError(
+                "model ratio orientation is incompatible with target/reference application"
+            )
         toolkit_runtime_provenance()
 
         if device_name == "auto":
             device_name = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device_name)
-        models: list[Any] = []
-        for member in manifest.get("members", []):
+        members = manifest.get("members")
+        if not isinstance(members, list):
+            raise ValueError("model manifest has no valid ensemble member list")
+        ensemble = manifest.get("ensemble")
+        if not isinstance(ensemble, dict):
+            raise ValueError("model manifest has no valid ensemble metadata")
+        declared_size = ensemble.get("size")
+        if declared_size != len(members):
+            raise ValueError(
+                "model manifest ensemble size does not match its member list"
+            )
+        slots = [member.get("slot") for member in members if isinstance(member, dict)]
+        if len(slots) != len(members) or set(slots) != set(range(len(members))):
+            raise ValueError("ensemble member slots must be unique and contiguous")
+        seeds = [member.get("seed") for member in members if isinstance(member, dict)]
+        if (
+            len(seeds) != len(members)
+            or any(isinstance(seed, bool) or not isinstance(seed, int) for seed in seeds)
+            or len(set(seeds)) != len(seeds)
+        ):
+            raise ValueError("ensemble member seeds must be present and unique")
+        member_paths: list[Path] = []
+        for member in members:
             relative = Path(member["file"])
             path = (root / relative).resolve()
             try:
                 path.relative_to(root)
             except ValueError as error:
-                raise ValueError(f"model path escapes artifact directory: {relative}") from error
+                raise ValueError(
+                    f"model path escapes artifact directory: {relative}"
+                ) from error
+            member_paths.append(path)
+        if len(set(member_paths)) != len(member_paths):
+            raise ValueError("duplicate ensemble member path")
+        checksums = [
+            member.get("sha256") for member in members if isinstance(member, dict)
+        ]
+        if len(checksums) != len(members) or len(set(checksums)) != len(checksums):
+            raise ValueError("ensemble member checksums must be unique")
+        models: list[Any] = []
+        for member, path in zip(members, member_paths, strict=True):
             if not path.is_file():
                 raise FileNotFoundError(f"ensemble member is missing: {path}")
             expected_sha = member.get("sha256")
-            if expected_sha and sha256_file(path) != expected_sha:
+            if not expected_sha:
+                raise ValueError(f"ensemble member checksum is missing for {path.name}")
+            if sha256_file(path) != expected_sha:
                 raise ValueError(f"checksum mismatch for ensemble member {path.name}")
             model = build_toolkit_model(manifest["architecture"])
             state = torch.load(path, map_location="cpu", weights_only=True)
@@ -323,7 +550,7 @@ class ModelBundle:
             model.eval()
             models.append(model)
         if len(models) < 4:
-            raise ValueError("a background-removal artifact must contain at least four members")
+            raise ValueError("a density-ratio artifact must contain at least four members")
         return cls(root=root, manifest=manifest, models=models, device=device)
 
     def predict_member_scores(
@@ -360,10 +587,16 @@ class ModelBundle:
     ) -> dict[str, np.ndarray]:
         scores = self.predict_member_scores(raw_features, batch_size=batch_size)
         calibration = self.manifest["calibration"]
+        yields = self.manifest["yields"]
+        yield_ratio = yields.get(
+            "target_to_reference", yields.get("signal_to_background")
+        )
+        if yield_ratio is None:
+            raise ValueError("model manifest does not define a target/reference yield ratio")
         return ratio_outputs(
             scores,
             calibration_scale=float(calibration["scale"]),
             calibration_bias=float(calibration["bias_after_normalization"]),
-            yield_ratio=float(self.manifest["yields"]["signal_to_background"]),
+            yield_ratio=float(yield_ratio),
             logit_clip=float(calibration["logit_clip"]),
         )

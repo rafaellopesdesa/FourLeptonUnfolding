@@ -25,6 +25,8 @@ nsbi-common-utils = { git = "https://github.com/iris-hep/nsbi-lhc-toolkit.git", 
 PYTHONNOUSERSITE = "1"
 
 [tasks]
-train = { cmd = "python -m BackgroundRemoval.Training.train_background_ratio", cwd = "..", description = "Train and validate the calibrated background density ratio" }
-apply = { cmd = "python -m BackgroundRemoval.Application.apply_background_ratio", cwd = "..", description = "Decorate data.root with signal-purity weights" }
+correction-train = { cmd = "python -m BackgroundRemoval.Correction.train_data_mc_correction", cwd = "..", description = "Train the strict 130-160 GeV data-to-Pythia correction" }
+train = { cmd = "python -m BackgroundRemoval.Training.train_background_ratio", cwd = "..", description = "Train the strict 115-130 GeV signal-purity ratio" }
+apply = { cmd = "python -m BackgroundRemoval.Application.apply_background_ratio", cwd = "..", description = "Decorate one merged sample with its role-specific factor" }
+apply-directory = { cmd = "python -m BackgroundRemoval.Application.apply_merged_directory", cwd = "..", description = "Decorate merged data, pseudo-data, and Pythia files with one frozen model pair" }
 test = { cmd = "python -m unittest discover -s BackgroundRemoval/tests -v", cwd = "..", description = "Run background-removal regression tests" }

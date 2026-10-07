@@ -15,7 +15,11 @@ from matplotlib.backends.backend_pdf import PdfPages  # noqa: E402
 import mplhep as hep  # noqa: E402
 import numpy as np  # noqa: E402
 
-from BackgroundRemoval.common import FEATURES, ratio_outputs
+from BackgroundRemoval.common import (
+    FEATURES,
+    MODEL_KIND_DATA_MC_CORRECTION,
+    ratio_outputs,
+)
 
 
 hep.style.use("ATLAS")
@@ -30,7 +34,6 @@ FEATURE_LABELS = {
     "reco_cos_theta_star": r"Reco $\cos\theta^{*}$",
     "reco_m_Z1": r"Reco $m_{Z_1}$ [GeV]",
     "reco_m_Z2": r"Reco $m_{Z_2}$ [GeV]",
-    "reco_m_ZZ": r"Reco $m_{4\ell}$ [GeV]",
 }
 
 
@@ -43,8 +46,6 @@ def _edges(name: str) -> np.ndarray:
         return np.linspace(50.0, 106.0, 25)
     if name == "reco_m_Z2":
         return np.linspace(12.0, 115.0, 25)
-    if name == "reco_m_ZZ":
-        return np.linspace(105.0, 160.0, 25)
     raise KeyError(name)
 
 
@@ -70,11 +71,15 @@ def _histogram(
 
 def _model_outputs(predictions: Any, manifest: dict[str, Any]) -> dict[str, np.ndarray]:
     calibration = manifest["calibration"]
+    yields = manifest["yields"]
+    yield_ratio = yields.get(
+        "target_to_reference", yields.get("signal_to_background")
+    )
     return ratio_outputs(
         predictions.member_scores,
         calibration_scale=float(calibration["scale"]),
         calibration_bias=float(calibration["bias_after_normalization"]),
-        yield_ratio=float(manifest["yields"]["signal_to_background"]),
+        yield_ratio=float(yield_ratio),
         logit_clip=float(calibration["logit_clip"]),
     )
 
@@ -267,6 +272,7 @@ def make_diagnostics_pdf(
     cache: dict[str, Any],
     validation: dict[str, Any],
     closure: dict[str, Any],
+    reference_is_zz: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Create the calibration and all-variable closure evidence report."""
 
@@ -284,41 +290,83 @@ def make_diagnostics_pdf(
         name: np.asarray(cache[name].weights[item.indices], dtype=np.float64)
         for name, item in closure.items()
     }
-    report_metrics: dict[str, Any] = {"shape_closure": {}, "purity_closure": {}}
+    correction_mode = manifest.get("model_kind") == MODEL_KIND_DATA_MC_CORRECTION
+    if correction_mode:
+        if reference_is_zz is None:
+            raise ValueError(
+                "Correction diagnostics require the ZZ/reference component mask"
+            )
+        reference_is_zz = np.asarray(reference_is_zz, dtype=np.bool_)
+        if reference_is_zz.shape != cache["background"].weights.shape:
+            raise ValueError("Correction reference-component mask has the wrong shape")
+        report_metrics: dict[str, Any] = {
+            "shape_closure": {},
+            "combined_reference_yield_closure": {},
+            "requested_application_closure": {},
+        }
+    else:
+        report_metrics = {"shape_closure": {}, "purity_closure": {}}
 
     with PdfPages(output_path) as pdf:
         figure = plt.figure(figsize=(8.3, 11.7))
-        figure.suptitle(
-            "Background-removal density-ratio validation", fontsize=18, y=0.97
+        title = (
+            "Sideband data/MC correction validation"
+            if correction_mode
+            else "Background-removal density-ratio validation"
         )
-        lines = [
-            "Model domain: reconstructed decay observables only",
-            "Label 1: ggH reconstructed and fiducial",
-            "Label 0: reconstructed ZZ + reconstructed, nonfiducial ggH",
-            "",
-            f"Signal yield: {manifest['yields']['signal']:.8g} {manifest['yields']['units']}",
-            (
-                f"Background yield: {manifest['yields']['background']:.8g} "
-                f"{manifest['yields']['units']}"
-            ),
-            f"Yield ratio S/B: {manifest['yields']['signal_to_background']:.8g}",
-            f"Luminosity check: {manifest['luminosity_fb']:g} fb$^{{-1}}$",
-            "",
-            "Balanced BCE: score -> r_shape = score/(1-score)",
-            "Physical odds: r_phys = (S/B) r_shape",
-            "Applied data factor: w_remove = r_phys/(1+r_phys)",
-            "",
-            "The validation split sets early stopping and calibration.",
-            "Every plotted closure below uses the untouched 25% closure split.",
-            "Selected negative training weights are rejected, never abs-weighted.",
-            "",
-            f"Toolkit pin: {manifest['toolkit']['pinned_commit']}",
-            f"Ensemble: {manifest['ensemble']['size']} arithmetic-mean members",
-            (
-                f"Network: {manifest['architecture']['hidden_layers']} x "
-                f"{manifest['architecture']['neurons']} SiLU; no dropout/weight decay"
-            ),
-        ]
+        figure.suptitle(title, fontsize=18, y=0.97)
+        if correction_mode:
+            lines = [
+                "Model domain: reconstructed decay observables only; m4l is selection-only",
+                "Label 1 / target: nominal stat-limited Herwig pseudo-data",
+                "Label 0 / reference: reconstructed ZZ + ggH Pythia",
+                "Sideband: 130 < reco_m_ZZ < 160 GeV",
+                "",
+                f"Data yield: {manifest['yields']['target']:.8g} {manifest['yields']['units']}",
+                f"MC yield: {manifest['yields']['reference']:.8g} {manifest['yields']['units']}",
+                f"Yield ratio D/MC: {manifest['yields']['target_to_reference']:.8g}",
+                (
+                    "Reference ggH fraction: "
+                    f"{manifest['yields']['gg_H_fraction_of_reference']:.3%}"
+                ),
+                f"Luminosity check: {manifest['luminosity_fb']:g} fb$^{{-1}}$",
+                "",
+                "Balanced BCE: score -> r_shape = p_data/p_MC",
+                "Learned ratio: C = (D/MC) r_shape for the combined MC reference",
+                "Requested application uses C on ZZ only (qqZZ-dominance approximation)",
+            ]
+        else:
+            lines = [
+                "Model domain: reconstructed decay observables only; m4l is selection-only",
+                "Label 1: ggH reconstructed and fiducial",
+                "Label 0: Correction-weighted ZZ + reconstructed, nonfiducial ggH",
+                "Signal region: 115 < reco_m_ZZ < 130 GeV",
+                "",
+                f"Signal yield: {manifest['yields']['signal']:.8g} {manifest['yields']['units']}",
+                f"Background yield: {manifest['yields']['background']:.8g} {manifest['yields']['units']}",
+                f"Yield ratio S/B: {manifest['yields']['signal_to_background']:.8g}",
+                f"Luminosity check: {manifest['luminosity_fb']:g} fb$^{{-1}}$",
+                "",
+                "Balanced BCE: score -> r_shape = p_signal/p_background",
+                "Physical odds: r_phys = (S/B) r_shape",
+                "Applied data factor: w_remove = r_phys/(1+r_phys)",
+            ]
+        lines.extend(
+            [
+                "",
+                "The validation split sets early stopping and calibration.",
+                "Learned-shape plots use the untouched 25% closure split.",
+                "The scalar yield ratio uses the full selected totals by definition.",
+                "Selected negative training weights are rejected, never abs-weighted.",
+                "",
+                f"Toolkit pin: {manifest['toolkit']['pinned_commit']}",
+                f"Ensemble: {manifest['ensemble']['size']} arithmetic-mean members",
+                (
+                    f"Network: {manifest['architecture']['hidden_layers']} x "
+                    f"{manifest['architecture']['neurons']} SiLU; no dropout/weight decay"
+                ),
+            ]
+        )
         figure.text(
             0.08,
             0.90,
@@ -359,6 +407,13 @@ def make_diagnostics_pdf(
             ("closure", closure, closure_outputs, "-"),
         ):
             for class_name, color in (("signal", "#D62728"), ("background", "#4C78A8")):
+                class_label = (
+                    {"signal": "data target", "background": "Pythia reference"}[
+                        class_name
+                    ]
+                    if correction_mode
+                    else class_name
+                )
                 values = outputs[class_name]["signal_score_balanced"]
                 weights = (
                     validation_weights[class_name]
@@ -373,7 +428,7 @@ def make_diagnostics_pdf(
                     linewidth=1.5,
                     linestyle=linestyle,
                     color=color,
-                    label=f"{class_name}, {split_name}",
+                    label=f"{class_label}, {split_name}",
                 )
         axes[0].set_xlabel("Calibrated balanced-prior score")
         axes[0].set_ylabel("Normalized entries")
@@ -432,7 +487,9 @@ def make_diagnostics_pdf(
         axes[1].set_xlim(0.0, 1.0)
         axes[1].set_ylim(0.0, 1.0)
         axes[1].set_xlabel("Mean predicted score")
-        axes[1].set_ylabel("Weighted signal fraction")
+        axes[1].set_ylabel(
+            "Weighted target fraction" if correction_mode else "Weighted signal fraction"
+        )
         axes[1].set_title("Balanced-prior reliability")
         axes[1].legend(fontsize=9)
         figure.tight_layout()
@@ -467,19 +524,21 @@ def make_diagnostics_pdf(
             forward_normalizations.append(forward)
             inverse_normalizations.append(inverse)
         positions = np.arange(len(split_labels), dtype=np.float64)
+        reference_symbol = "MC" if correction_mode else "B"
+        target_symbol = "D" if correction_mode else "S"
         axes[0].bar(
             positions - 0.18,
             forward_normalizations,
             width=0.36,
             color="#4C78A8",
-            label=r"$E_B[r_{\mathrm{shape}}]$",
+            label=rf"$E_{{{reference_symbol}}}[r_{{\mathrm{{shape}}}}]$",
         )
         axes[0].bar(
             positions + 0.18,
             inverse_normalizations,
             width=0.36,
             color="#F58518",
-            label=r"$E_S[1/r_{\mathrm{shape}}]$",
+            label=rf"$E_{{{target_symbol}}}[1/r_{{\mathrm{{shape}}}}]$",
         )
         axes[0].set_xticks(positions, split_labels)
         axes[0].axhline(1.0, color="black", linestyle="--")
@@ -514,8 +573,13 @@ def make_diagnostics_pdf(
         background_indices = closure["background"].indices
         signal_features = cache["signal"].features
         background_features = cache["background"].features
+        closure_reference_is_zz = (
+            reference_is_zz[background_indices] if correction_mode else None
+        )
         for feature_index, feature_name in enumerate(FEATURES):
             edges = _edges(feature_name)
+            target_label = "Data target" if correction_mode else "Signal target"
+            reference_label = "MC" if correction_mode else "Background"
             shape_metrics = _draw_comparison(
                 pdf,
                 values_target=np.asarray(signal_features[signal_indices, feature_index]),
@@ -529,86 +593,217 @@ def make_diagnostics_pdf(
                 ),
                 edges=edges,
                 xlabel=FEATURE_LABELS[feature_name],
-                title=f"Shape closure: background reweighted to signal — {feature_name}",
-                target_label="Signal target",
-                estimate_label=r"Background $\times\ r_{\mathrm{shape}}$",
+                title=(
+                    f"Shape closure: {reference_label} reweighted to "
+                    f"{target_label.lower()} — {feature_name}"
+                ),
+                target_label=target_label,
+                estimate_label=rf"{reference_label} $\times\ r_{{\mathrm{{shape}}}}$",
                 normalize=True,
             )
             report_metrics["shape_closure"][feature_name] = shape_metrics
 
-            mixture_values = np.concatenate(
-                [
-                    np.asarray(signal_features[signal_indices, feature_index]),
-                    np.asarray(background_features[background_indices, feature_index]),
-                ]
-            )
-            mixture_weights = np.concatenate(
-                [
-                    closure_weights["signal"]
-                    * closure_outputs["signal"]["background_removal_weight"],
-                    closure_weights["background"]
-                    * closure_outputs["background"]["background_removal_weight"],
-                ]
-            )
-            purity_metrics = _draw_comparison(
-                pdf,
-                values_target=np.asarray(signal_features[signal_indices, feature_index]),
-                weights_target=closure_weights["signal"],
-                values_estimate=mixture_values,
-                weights_estimate=mixture_weights,
-                edges=edges,
-                xlabel=FEATURE_LABELS[feature_name],
-                title=f"Yield closure: (signal + background) weighted to signal — {feature_name}",
-                target_label="True signal",
-                estimate_label=r"$(S+B)\times w_{\mathrm{remove}}$",
-                normalize=False,
-                shared_values=np.asarray(
-                    signal_features[signal_indices, feature_index]
-                ),
-                shared_covariance_weights=(
-                    closure_weights["signal"] ** 2
-                    * closure_outputs["signal"]["background_removal_weight"]
-                ),
-            )
-            report_metrics["purity_closure"][feature_name] = purity_metrics
+            if correction_mode:
+                combined_metrics = _draw_comparison(
+                    pdf,
+                    values_target=np.asarray(
+                        signal_features[signal_indices, feature_index]
+                    ),
+                    weights_target=closure_weights["signal"],
+                    values_estimate=np.asarray(
+                        background_features[background_indices, feature_index]
+                    ),
+                    weights_estimate=(
+                        closure_weights["background"]
+                        * closure_outputs["background"]["physical_ratio"]
+                    ),
+                    edges=edges,
+                    xlabel=FEATURE_LABELS[feature_name],
+                    title=f"Yield closure: MC corrected to data — {feature_name}",
+                    target_label="Data target",
+                    estimate_label=r"$(ZZ+ggH)\times C(x)$",
+                    normalize=False,
+                )
+                report_metrics["combined_reference_yield_closure"][
+                    feature_name
+                ] = combined_metrics
+                if closure_reference_is_zz is None:  # pragma: no cover - guarded above
+                    raise RuntimeError("missing Correction component mask")
+                requested_weights = closure_weights["background"] * np.where(
+                    closure_reference_is_zz,
+                    closure_outputs["background"]["physical_ratio"],
+                    1.0,
+                )
+                requested_metrics = _draw_comparison(
+                    pdf,
+                    values_target=np.asarray(
+                        signal_features[signal_indices, feature_index]
+                    ),
+                    weights_target=closure_weights["signal"],
+                    values_estimate=np.asarray(
+                        background_features[background_indices, feature_index]
+                    ),
+                    weights_estimate=requested_weights,
+                    edges=edges,
+                    xlabel=FEATURE_LABELS[feature_name],
+                    title=(
+                        "Requested-application closure: corrected ZZ + unchanged ggH "
+                        f"— {feature_name}"
+                    ),
+                    target_label="Data target",
+                    estimate_label=r"$ZZ\times C(x)+ggH$",
+                    normalize=False,
+                )
+                report_metrics["requested_application_closure"][
+                    feature_name
+                ] = requested_metrics
+            else:
+                mixture_values = np.concatenate(
+                    [
+                        np.asarray(signal_features[signal_indices, feature_index]),
+                        np.asarray(
+                            background_features[background_indices, feature_index]
+                        ),
+                    ]
+                )
+                mixture_weights = np.concatenate(
+                    [
+                        closure_weights["signal"]
+                        * closure_outputs["signal"]["target_purity"],
+                        closure_weights["background"]
+                        * closure_outputs["background"]["target_purity"],
+                    ]
+                )
+                purity_metrics = _draw_comparison(
+                    pdf,
+                    values_target=np.asarray(
+                        signal_features[signal_indices, feature_index]
+                    ),
+                    weights_target=closure_weights["signal"],
+                    values_estimate=mixture_values,
+                    weights_estimate=mixture_weights,
+                    edges=edges,
+                    xlabel=FEATURE_LABELS[feature_name],
+                    title=(
+                        "Yield closure: (signal + background) weighted to signal — "
+                        f"{feature_name}"
+                    ),
+                    target_label="True signal",
+                    estimate_label=r"$(S+B)\times w_{\mathrm{remove}}$",
+                    normalize=False,
+                    shared_values=np.asarray(
+                        signal_features[signal_indices, feature_index]
+                    ),
+                    shared_covariance_weights=(
+                        closure_weights["signal"] ** 2
+                        * closure_outputs["signal"]["target_purity"]
+                    ),
+                )
+                report_metrics["purity_closure"][feature_name] = purity_metrics
 
         figure = plt.figure(figsize=(8.3, 11.7))
         figure.suptitle("Closure summary", fontsize=18, y=0.97)
+        first_heading = "MC*r -> data shape" if correction_mode else "B*r -> S shape"
         summary_lines = [
             "Closure discrepancy metrics (chi2 / populated bins; diagnostic only)",
             "",
-            f"{'Variable':32s} {'B*r -> S shape':>18s} {'(S+B)*w -> S yield':>22s}",
         ]
-        for name in FEATURES:
-            shape = report_metrics["shape_closure"][name]
-            purity = report_metrics["purity_closure"][name]
+        if correction_mode:
             summary_lines.append(
-                f"{name:32s} {shape['chi2']:7.2f}/{shape['bins']:<7d} "
-                f"{purity['chi2']:9.2f}/{purity['bins']:<7d}"
+                f"{'Variable':29s} {first_heading:>18s} "
+                f"{'(ZZ+ggH)*C -> D':>20s} {'ZZ*C+ggH -> D':>19s}"
             )
+            for name in FEATURES:
+                shape = report_metrics["shape_closure"][name]
+                combined = report_metrics["combined_reference_yield_closure"][name]
+                requested = report_metrics["requested_application_closure"][name]
+                summary_lines.append(
+                    f"{name:29s} {shape['chi2']:7.2f}/{shape['bins']:<5d} "
+                    f"{combined['chi2']:8.2f}/{combined['bins']:<5d} "
+                    f"{requested['chi2']:8.2f}/{requested['bins']:<5d}"
+                )
+        else:
+            summary_lines.append(
+                f"{'Variable':32s} {first_heading:>20s} "
+                f"{'(S+B)*w -> S yield':>22s}"
+            )
+            for name in FEATURES:
+                shape = report_metrics["shape_closure"][name]
+                purity = report_metrics["purity_closure"][name]
+                summary_lines.append(
+                    f"{name:32s} {shape['chi2']:7.2f}/{shape['bins']:<7d} "
+                    f"{purity['chi2']:9.2f}/{purity['bins']:<7d}"
+                )
         signal_total = float(np.sum(closure_weights["signal"], dtype=np.float64))
-        estimate_total = float(
-            np.sum(
-                closure_weights["signal"]
-                * closure_outputs["signal"]["background_removal_weight"],
-                dtype=np.float64,
+        if correction_mode:
+            combined_estimate_total = float(
+                np.sum(
+                    closure_weights["background"]
+                    * closure_outputs["background"]["physical_ratio"],
+                    dtype=np.float64,
+                )
             )
-            + np.sum(
-                closure_weights["background"]
-                * closure_outputs["background"]["background_removal_weight"],
-                dtype=np.float64,
+            if closure_reference_is_zz is None:  # pragma: no cover - guarded above
+                raise RuntimeError("missing Correction component mask")
+            estimate_total = float(
+                np.sum(
+                    closure_weights["background"]
+                    * np.where(
+                        closure_reference_is_zz,
+                        closure_outputs["background"]["physical_ratio"],
+                        1.0,
+                    ),
+                    dtype=np.float64,
+                )
             )
-        )
+            yield_labels = (
+                f"Closure data yield: {signal_total:.9g}",
+                f"Combined-MC-times-C yield: {combined_estimate_total:.9g}",
+                f"Requested ZZ-times-C plus ggH yield: {estimate_total:.9g}",
+            )
+            relative_lines = (
+                "Combined-reference relative difference: "
+                f"{(combined_estimate_total / signal_total - 1.0):+.3%}",
+                "Requested-application relative difference: "
+                f"{(estimate_total / signal_total - 1.0):+.3%}",
+            )
+            interpretation = (
+                "Interpretation: the two yield tests expose the qqZZ-dominance "
+                "approximation; use outside the sideband also extrapolates in m4l."
+            )
+        else:
+            estimate_total = float(
+                np.sum(
+                    closure_weights["signal"]
+                    * closure_outputs["signal"]["target_purity"],
+                    dtype=np.float64,
+                )
+                + np.sum(
+                    closure_weights["background"]
+                    * closure_outputs["background"]["target_purity"],
+                    dtype=np.float64,
+                )
+            )
+            yield_labels = (
+                f"Closure signal yield: {signal_total:.9g}",
+                f"Purity-weighted mixture yield: {estimate_total:.9g}",
+            )
+            relative_lines = (
+                f"Relative yield difference: {(estimate_total / signal_total - 1.0):+.3%}",
+            )
+            interpretation = (
+                "Interpretation: this is reconstructed, fiducial ggH expressed "
+                "in reco variables."
+            )
         summary_lines.extend(
             [
                 "",
-                f"Closure signal yield: {signal_total:.9g}",
-                f"Purity-weighted mixture yield: {estimate_total:.9g}",
-                f"Relative yield difference: {(estimate_total / signal_total - 1.0):+.3%}",
+                *yield_labels,
+                *relative_lines,
                 "",
-                "Interpretation: this is reconstructed, fiducial ggH expressed in reco variables.",
+                interpretation,
                 "Detector-resolution/migration unfolding has not yet been applied.",
-                "The chi2 values include shared-signal covariance but omit model uncertainty.",
+                "The chi2 values omit learned-model uncertainty.",
                 "They are not p-values.",
             ]
         )
@@ -622,7 +817,11 @@ def make_diagnostics_pdf(
         )
         pdf.savefig(figure)
         plt.close(figure)
-        report_metrics["closure_signal_yield"] = signal_total
-        report_metrics["closure_weighted_mixture_yield"] = estimate_total
+        report_metrics["closure_target_yield"] = signal_total
+        report_metrics["closure_weighted_estimate_yield"] = estimate_total
+        if correction_mode:
+            report_metrics["closure_combined_reference_corrected_yield"] = (
+                combined_estimate_total
+            )
 
     return report_metrics

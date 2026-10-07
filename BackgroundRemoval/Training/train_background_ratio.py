@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
+import warnings
 from typing import Any, Iterator
 
 import numpy as np
@@ -19,21 +20,32 @@ from numpy.lib.format import open_memmap
 import uproot
 
 from BackgroundRemoval.common import (
+    ANALYSIS_MASS_WINDOW,
     ARTIFACT_FORMAT_VERSION,
     CLOSURE_SPLIT,
+    CORRECTION_MASS_WINDOW,
     FEATURES,
     FIT_SPLIT,
+    MASS_BRANCH,
+    MODEL_KIND_BACKGROUND_REMOVAL,
+    MODEL_KIND_DATA_MC_CORRECTION,
     MODEL_FEATURES,
     SPLIT_NAMES,
     TREE_NAME,
     VALIDATION_SPLIT,
+    ModelBundle,
+    assert_file_unchanged,
     build_toolkit_model,
+    capture_file_provenance,
     deterministic_split,
+    known_weight_measures_compatible,
     sha256_file,
     stable_logit,
     stable_sigmoid,
     toolkit_runtime_provenance,
     transformed_features,
+    validate_manifest_mass_window,
+    weight_measure_contract,
 )
 
 
@@ -144,6 +156,8 @@ def _selected_chunks(
     split_seed: int,
     expected_luminosity_fb: float,
     step_size: str,
+    correction_bundle: ModelBundle,
+    inference_batch_size: int,
 ) -> Iterator[SelectedChunk]:
     required = {
         *FEATURES,
@@ -151,6 +165,7 @@ def _selected_chunks(
         "fiducial",
         "reconstructed",
         "luminosity_fb",
+        MASS_BRANCH,
         weight_branch,
     }
     for source, path in (("gg_H", gg_h_path), ("ZZ", zz_path)):
@@ -187,6 +202,16 @@ def _selected_chunks(
                 raw = np.column_stack(
                     [np.asarray(arrays[name], dtype=np.float32) for name in FEATURES]
                 )
+                masses = np.asarray(arrays[MASS_BRANCH], dtype=np.float64)
+                if np.any(reconstructed & ~np.isfinite(masses)):
+                    raise ValueError(
+                        f"{path} contains reconstructed events with non-finite "
+                        f"{MASS_BRANCH}"
+                    )
+                low_mass, high_mass = ANALYSIS_MASS_WINDOW
+                in_analysis_window = (
+                    np.isfinite(masses) & (masses > low_mass) & (masses < high_mass)
+                )
                 splits = deterministic_split(
                     event_ids, source=source, seed=split_seed
                 )
@@ -194,15 +219,19 @@ def _selected_chunks(
                     (
                         "signal",
                         "gg_H_reconstructed_and_fiducial",
-                        reconstructed & fiducial,
+                        reconstructed & fiducial & in_analysis_window,
                     ),
                     (
                         "background",
                         "gg_H_reconstructed_not_fiducial",
-                        reconstructed & ~fiducial,
+                        reconstructed & ~fiducial & in_analysis_window,
                     ),
                 ) if source == "gg_H" else (
-                    ("background", "ZZ_reconstructed", reconstructed),
+                    (
+                        "background",
+                        "ZZ_reconstructed_correction_weighted",
+                        reconstructed & in_analysis_window,
+                    ),
                 )
                 for class_name, component_name, mask in masks:
                     selected_weights = all_weights[mask]
@@ -226,6 +255,20 @@ def _selected_chunks(
                             f"{component_name} contains {bad} selected events with non-finite "
                             "model inputs"
                         )
+                    if source == "ZZ" and selected_weights.size:
+                        correction = np.asarray(
+                            correction_bundle.predict(
+                                selected_raw,
+                                batch_size=inference_batch_size,
+                            )["physical_ratio"],
+                            dtype=np.float64,
+                        )
+                        if not np.all(np.isfinite(correction) & (correction > 0.0)):
+                            raise ValueError(
+                                "the data/MC Correction model produced a non-finite or "
+                                "non-positive ZZ event weight"
+                            )
+                        selected_weights = selected_weights * correction
                     positive = selected_weights > 0.0
                     yield SelectedChunk(
                         class_name=class_name,
@@ -245,11 +288,13 @@ def _scan_inputs(
     split_seed: int,
     expected_luminosity_fb: float,
     step_size: str,
+    correction_bundle: ModelBundle,
+    inference_batch_size: int,
 ) -> tuple[dict[str, WeightedStatistics], dict[str, WeightedStatistics], np.ndarray, np.ndarray]:
     components = {
         "gg_H_reconstructed_and_fiducial": WeightedStatistics(),
         "gg_H_reconstructed_not_fiducial": WeightedStatistics(),
-        "ZZ_reconstructed": WeightedStatistics(),
+        "ZZ_reconstructed_correction_weighted": WeightedStatistics(),
     }
     classes = {"signal": WeightedStatistics(), "background": WeightedStatistics()}
     moment_sum = {
@@ -266,6 +311,8 @@ def _scan_inputs(
         split_seed=split_seed,
         expected_luminosity_fb=expected_luminosity_fb,
         step_size=step_size,
+        correction_bundle=correction_bundle,
+        inference_batch_size=inference_batch_size,
     ):
         components[chunk.component_name].add(
             chunk.weights, chunk.splits, zero_count=chunk.zero_count
@@ -323,6 +370,8 @@ def _make_cache(
     split_seed: int,
     expected_luminosity_fb: float,
     step_size: str,
+    correction_bundle: ModelBundle,
+    inference_batch_size: int,
 ) -> dict[str, CachePaths]:
     paths: dict[str, CachePaths] = {}
     writers: dict[str, tuple[np.memmap, np.memmap, np.memmap]] = {}
@@ -362,6 +411,8 @@ def _make_cache(
         split_seed=split_seed,
         expected_luminosity_fb=expected_luminosity_fb,
         step_size=step_size,
+        correction_bundle=correction_bundle,
+        inference_batch_size=inference_batch_size,
     ):
         start = positions[chunk.class_name]
         stop = start + chunk.weights.size
@@ -824,14 +875,22 @@ def _normalization_bias(
     return normalized_bias, before
 
 
-def _install_artifact(temporary: Path, destination: Path, *, overwrite: bool) -> None:
+def _install_artifact(
+    temporary: Path,
+    destination: Path,
+    *,
+    overwrite: bool,
+    expected_model_kind: str,
+) -> None:
     destination = destination.resolve()
     if destination.exists() and not overwrite:
         raise FileExistsError(
             f"output directory exists: {destination}; pass --overwrite to replace it"
         )
     if destination.exists():
-        _validate_existing_artifact(destination)
+        _validate_existing_artifact(
+            destination, expected_model_kind=expected_model_kind
+        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     backup: Path | None = None
     if destination.exists():
@@ -849,10 +908,18 @@ def _install_artifact(temporary: Path, destination: Path, *, overwrite: bool) ->
             os.replace(backup, destination)
         raise
     if backup is not None and backup.exists():
-        shutil.rmtree(backup)
+        try:
+            shutil.rmtree(backup)
+        except OSError as error:
+            warnings.warn(
+                f"new artifact was published, but its old backup could not be "
+                f"removed: {backup}: {error}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
 
-def _validate_existing_artifact(path: Path) -> None:
+def _validate_existing_artifact(path: Path, *, expected_model_kind: str) -> None:
     """Restrict destructive replacement to a directory made by this workflow."""
 
     if not path.is_dir():
@@ -870,6 +937,11 @@ def _validate_existing_artifact(path: Path) -> None:
     if manifest.get("format_version") != ARTIFACT_FORMAT_VERSION:
         raise ValueError(
             f"refusing to overwrite model artifact with unsupported format: {path}"
+        )
+    if manifest.get("model_kind") != expected_model_kind:
+        raise ValueError(
+            "refusing to overwrite an artifact of a different model kind: "
+            f"{manifest.get('model_kind')!r} != {expected_model_kind!r}"
         )
 
 
@@ -920,6 +992,14 @@ def train(args: argparse.Namespace) -> Path:
         raise ValueError("inference batch size must be positive")
     if args.steps_per_epoch is not None and args.steps_per_epoch < 1:
         raise ValueError("steps per epoch must be positive when supplied")
+    input_provenance = {
+        "gg_H_pythia": capture_file_provenance(
+            gg_h_path, include_sha256=not args.skip_input_checksums
+        ),
+        "ZZ_pythia": capture_file_provenance(
+            zz_path, include_sha256=not args.skip_input_checksums
+        ),
+    }
     if args.device == "auto":
         device_name = "cuda" if torch.cuda.is_available() else "cpu"
     else:
@@ -933,17 +1013,94 @@ def train(args: argparse.Namespace) -> Path:
             flush=True,
         )
 
+    correction_bundle = ModelBundle.load(
+        args.correction_model_dir,
+        device_name=device_name,
+        expected_model_kind=MODEL_KIND_DATA_MC_CORRECTION,
+    )
+    validate_manifest_mass_window(
+        correction_bundle.manifest,
+        CORRECTION_MASS_WINDOW,
+        artifact_label="Correction artifact",
+    )
+    correction_luminosity = float(correction_bundle.manifest["luminosity_fb"])
+    if not np.isclose(
+        correction_luminosity,
+        args.expected_luminosity_fb,
+        rtol=0.0,
+        atol=1.0e-9,
+    ):
+        raise ValueError(
+            "Correction model luminosity does not match Training: "
+            f"{correction_luminosity:g} != {args.expected_luminosity_fb:g} fb^-1"
+        )
+    training_weight_contract = weight_measure_contract(
+        args.weight_branch, luminosity_fb=args.expected_luminosity_fb
+    )
+    correction_weight_branch = correction_bundle.manifest.get("weight_branch")
+    if not isinstance(correction_weight_branch, str) or not correction_weight_branch:
+        raise ValueError("Correction artifact has no valid weight-branch contract")
+    correction_weight_contract = weight_measure_contract(
+        correction_weight_branch, luminosity_fb=correction_luminosity
+    )
+    recorded_correction_contract = correction_bundle.manifest.get("weight_measure")
+    if not isinstance(recorded_correction_contract, dict) or (
+        recorded_correction_contract != correction_weight_contract
+    ):
+        raise ValueError("Correction artifact has an inconsistent weight-measure contract")
+    weight_measures_compatible = known_weight_measures_compatible(
+        training_weight_contract, correction_weight_contract
+    )
+    weight_measure_override = bool(
+        getattr(args, "allow_weight_measure_mismatch", False)
+    )
+    if not weight_measures_compatible and not weight_measure_override:
+        raise ValueError(
+            "Training and Correction use a custom or unknown weight-measure "
+            "combination. Use the known-compatible weight/weight_nominal_pb pair, "
+            "or pass --allow-weight-measure-mismatch after verifying the semantics."
+        )
+    correction_manifest_path = correction_bundle.root / "manifest.json"
+    correction_manifest_sha256 = sha256_file(correction_manifest_path)
+    correction_inputs = correction_bundle.manifest.get("inputs")
+    correction_input_matches: dict[str, bool] = {}
+    for name in ("gg_H_pythia", "ZZ_pythia"):
+        expected = (
+            correction_inputs.get(name, {}).get("sha256")
+            if isinstance(correction_inputs, dict)
+            and isinstance(correction_inputs.get(name), dict)
+            else None
+        )
+        observed = input_provenance[name]["sha256"]
+        if expected is not None and observed is not None and expected != observed:
+            raise ValueError(
+                f"{name} does not match the input used to derive the Correction model"
+            )
+        correction_input_matches[name] = bool(
+            expected is not None and observed is not None and expected == observed
+        )
+
     output_directory = args.output_dir.expanduser().resolve()
-    if output_directory == gg_h_path or output_directory == zz_path:
-        raise ValueError("model output directory cannot be a training input")
+    if output_directory in {gg_h_path, zz_path, correction_bundle.root}:
+        raise ValueError("model output directory cannot be a training input or model")
     if output_directory in gg_h_path.parents or output_directory in zz_path.parents:
         raise ValueError("model output directory cannot contain a training input")
+    if (
+        output_directory in correction_bundle.root.parents
+        or correction_bundle.root in output_directory.parents
+    ):
+        raise ValueError(
+            "Training output and Correction model directories cannot contain one another"
+        )
     if output_directory.exists() and not args.overwrite:
         raise FileExistsError(
             f"output directory exists: {output_directory}; pass --overwrite to replace it"
         )
     if output_directory.exists():
-        _validate_existing_artifact(output_directory)
+        _validate_existing_artifact(
+            output_directory,
+            expected_model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
+        )
     cache_parent = (
         args.cache_directory.expanduser().resolve()
         if args.cache_directory is not None
@@ -964,6 +1121,8 @@ def train(args: argparse.Namespace) -> Path:
         split_seed=args.split_seed,
         expected_luminosity_fb=args.expected_luminosity_fb,
         step_size=args.step_size,
+        correction_bundle=correction_bundle,
+        inference_batch_size=args.inference_batch_size,
     )
     signal_yield = classes["signal"].sum_weights
     background_yield = classes["background"].sum_weights
@@ -996,8 +1155,23 @@ def train(args: argparse.Namespace) -> Path:
                 split_seed=args.split_seed,
                 expected_luminosity_fb=args.expected_luminosity_fb,
                 step_size=args.step_size,
+                correction_bundle=correction_bundle,
+                inference_batch_size=args.inference_batch_size,
             )
+            assert_file_unchanged(gg_h_path, input_provenance["gg_H_pythia"])
+            assert_file_unchanged(zz_path, input_provenance["ZZ_pythia"])
             cache = _load_cache(cache_paths)
+            effective_steps_per_epoch = (
+                args.steps_per_epoch
+                if args.steps_per_epoch is not None
+                else math.ceil(
+                    max(
+                        np.count_nonzero(cache["signal"].splits == FIT_SPLIT),
+                        np.count_nonzero(cache["background"].splits == FIT_SPLIT),
+                    )
+                    / (args.batch_size // 2)
+                )
+            )
             architecture = {
                 "implementation": "nsbi_common_utils.lightning_tools.DensityRatioLightning",
                 "hidden_layers": args.hidden_layers,
@@ -1012,6 +1186,12 @@ def train(args: argparse.Namespace) -> Path:
                 "learning_rate_schedule": "ExponentialLR",
                 "learning_rate_decay": args.learning_rate_decay,
                 "batch_size": args.batch_size,
+                "steps_per_epoch": effective_steps_per_epoch,
+                "steps_per_epoch_policy": (
+                    "explicit_override"
+                    if args.steps_per_epoch is not None
+                    else "full_fit_split_coverage"
+                ),
                 "maximum_epochs": args.maximum_epochs,
                 "early_stopping_patience": args.patience,
             }
@@ -1134,17 +1314,9 @@ def train(args: argparse.Namespace) -> Path:
                     }
                 )
 
-            input_provenance = {}
-            for name, path in (("gg_H_pythia", gg_h_path), ("ZZ_pythia", zz_path)):
-                stat = path.stat()
-                input_provenance[name] = {
-                    "path": str(path),
-                    "size_bytes": stat.st_size,
-                    "mtime_ns": stat.st_mtime_ns,
-                    "sha256": None if args.skip_input_checksums else sha256_file(path),
-                }
             manifest: dict[str, Any] = {
                 "format_version": ARTIFACT_FORMAT_VERSION,
+                "model_kind": MODEL_KIND_BACKGROUND_REMOVAL,
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "tree_name": TREE_NAME,
                 "features": list(FEATURES),
@@ -1155,24 +1327,38 @@ def train(args: argparse.Namespace) -> Path:
                     "remaining_variables": "identity",
                 },
                 "selections": {
-                    "positive_label_1": "gg_H_pythia: reconstructed && fiducial",
+                    "mass_window_gev": {
+                        "branch": MASS_BRANCH,
+                        "low_exclusive": ANALYSIS_MASS_WINDOW[0],
+                        "high_exclusive": ANALYSIS_MASS_WINDOW[1],
+                    },
+                    "positive_label_1": (
+                        "gg_H_pythia: reconstructed && fiducial && "
+                        "115 < reco_m_ZZ < 130 GeV"
+                    ),
                     "negative_label_0": (
-                        "ZZ_pythia: reconstructed; plus gg_H_pythia: "
-                        "reconstructed && !fiducial"
+                        "Correction-weighted ZZ_pythia: reconstructed && "
+                        "115 < reco_m_ZZ < 130 GeV; plus gg_H_pythia: "
+                        "reconstructed && !fiducial && 115 < reco_m_ZZ < 130 GeV"
                     ),
                 },
                 "weight_branch": args.weight_branch,
+                "weight_measure": training_weight_contract,
                 "luminosity_fb": args.expected_luminosity_fb,
                 "yields": {
                     "signal": signal_yield,
                     "background": background_yield,
                     "signal_to_background": yield_ratio,
-                    "units": "pb" if args.weight_branch == "weight_nominal_pb" else "events",
+                    "target": signal_yield,
+                    "reference": background_yield,
+                    "target_to_reference": yield_ratio,
+                    "units": training_weight_contract["units"],
                 },
                 "ratio_convention": {
                     "shape": "p(signal)/p(background) = score/(1-score)",
                     "physical_odds": "(signal_yield/background_yield) * shape",
                     "background_removal_weight": "physical_odds/(1+physical_odds)",
+                    "orientation": "target_to_reference",
                 },
                 "split": {
                     "method": "splitmix64(source,event_id,seed)",
@@ -1228,6 +1414,26 @@ def train(args: argparse.Namespace) -> Path:
                         "DensityRatioLightning"
                     ),
                 },
+                "correction_model": {
+                    "path": str(correction_bundle.root),
+                    "manifest_sha256": correction_manifest_sha256,
+                    "created_utc": correction_bundle.manifest.get("created_utc"),
+                    "model_kind": correction_bundle.manifest.get("model_kind"),
+                    "weight_branch": correction_weight_branch,
+                    "weight_measure": correction_weight_contract,
+                    "weight_measures_known_compatible": weight_measures_compatible,
+                    "weight_measure_override": (
+                        weight_measure_override and not weight_measures_compatible
+                    ),
+                    "sideband_mass_window_gev": correction_bundle.manifest.get(
+                        "selections", {}
+                    ).get("mass_window_gev"),
+                    "applied_to": "ZZ_pythia only, using full yield-times-shape ratio",
+                    "input_checksum_matches": correction_input_matches,
+                    "all_input_checksums_verified": all(
+                        correction_input_matches.values()
+                    ),
+                },
                 "inputs": input_provenance,
             }
 
@@ -1247,7 +1453,10 @@ def train(args: argparse.Namespace) -> Path:
                 stream.write("\n")
 
         _install_artifact(
-            temporary_artifact, output_directory, overwrite=args.overwrite
+            temporary_artifact,
+            output_directory,
+            overwrite=args.overwrite,
+            expected_model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
         )
     except Exception:
         if temporary_artifact.exists():
@@ -1266,8 +1475,25 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--gg-h-root", type=Path, required=True)
     parser.add_argument("--zz-root", type=Path, required=True)
+    parser.add_argument(
+        "--correction-model-dir",
+        type=Path,
+        required=True,
+        help=(
+            "data/MC sideband Correction artifact; its full physical ratio is "
+            "multiplied into every selected ZZ event"
+        ),
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--weight-branch", default=DEFAULT_WEIGHT_BRANCH)
+    parser.add_argument(
+        "--allow-weight-measure-mismatch",
+        action="store_true",
+        help=(
+            "allow a custom/unknown Training and Correction weight-measure pair; "
+            "the standard weight and weight_nominal_pb pair needs no override"
+        ),
+    )
     parser.add_argument(
         "--expected-luminosity-fb", type=float, default=DEFAULT_LUMINOSITY_FB
     )
