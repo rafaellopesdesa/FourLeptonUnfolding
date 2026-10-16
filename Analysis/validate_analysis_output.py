@@ -43,6 +43,7 @@ REQUIRED_BRANCHES = {
 class ValidationSummary:
     entries: int
     sum_weights: float
+    sum_squared_weights: float
     cross_section_pb: float
 
 
@@ -75,6 +76,7 @@ def validate_analysis_output(
             )
 
         sum_weights = 0.0
+        sum_squared_weights = 0.0
         final_cross_section = float("nan")
         for arrays in tree.iterate(
             expressions=["weight", "cross_section_pb"],
@@ -89,17 +91,32 @@ def validate_analysis_output(
             if not np.all(np.isfinite(weights)):
                 raise ValueError(f"{path} contains non-finite event weights")
             sum_weights += float(np.sum(weights, dtype=np.float64))
+            sum_squared_weights += float(
+                np.sum(weights * weights, dtype=np.float64)
+            )
             valid_cross_sections = cross_sections[
                 np.isfinite(cross_sections) & (cross_sections > 0.0)
             ]
             if valid_cross_sections.size:
                 final_cross_section = float(valid_cross_sections[-1])
 
-    if not np.isfinite(sum_weights) or sum_weights <= 0.0:
-        raise ValueError(f"{path} has a non-positive total event weight")
+    # An individual NLO shard may legitimately have a zero or negative net
+    # sum even though the complete process sample has a positive cross
+    # section.  Reject only numerically invalid aggregates here; the merger
+    # performs the positive-net check at the point where it normalizes the
+    # complete sample.
+    if not np.isfinite(sum_weights):
+        raise ValueError(f"{path} has a non-finite total event weight")
+    if not np.isfinite(sum_squared_weights):
+        raise ValueError(f"{path} has a non-finite sum of squared event weights")
     if not np.isfinite(final_cross_section) or final_cross_section <= 0.0:
         raise ValueError(f"{path} has no finite positive cross section")
-    return ValidationSummary(entries, sum_weights, final_cross_section)
+    return ValidationSummary(
+        entries=entries,
+        sum_weights=sum_weights,
+        sum_squared_weights=sum_squared_weights,
+        cross_section_pb=final_cross_section,
+    )
 
 
 def main() -> None:
@@ -118,6 +135,7 @@ def main() -> None:
     print(
         f"validated {args.path}: entries={summary.entries}, "
         f"sum_weights={summary.sum_weights:.12g}, "
+        f"sum_squared_weights={summary.sum_squared_weights:.12g}, "
         f"cross_section_pb={summary.cross_section_pb:.12g}"
     )
 

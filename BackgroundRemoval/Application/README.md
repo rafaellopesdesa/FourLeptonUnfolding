@@ -49,8 +49,12 @@ trained background or Correction models.
 
 If a format-v2 `pseudo_data_manifest.json` is present, it is authoritative:
 the command validates its contiguous indices and exact file names, uses that
-file list, and copies the manifest unchanged to the decorated directory. If
-it is absent for a legacy campaign, the command falls back to numerically
+file list, verifies finite unit-magnitude signed weights and all recorded
+count/net/sumw2 statistics, checks each per-file SHA-256 when supplied, and
+copies the manifest unchanged to the decorated directory. Legacy v2 manifests
+without the newer sumw2 or checksum fields remain readable because those
+quantities are recomputed from the ROOT file. If the manifest is absent for a
+legacy campaign, the command falls back to numerically
 sorted names such as `data_0001.root`; indices are padded to at least four
 digits, so `data_10000.root` is also valid. Herwig component files and
 similarly named lookalikes are neither copied nor modified.

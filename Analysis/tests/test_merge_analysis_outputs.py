@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 import uproot
 
+import Analysis.merge_analysis_outputs as merge_module
 from Analysis.merge_analysis_outputs import (
     PseudoDataComponent,
     SignedExpectation,
@@ -211,6 +215,10 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                 float(np.sum(arrays["weight_nominal_pb"])), 0.01
             )
             self.assertAlmostEqual(float(np.sum(arrays["weight"])), 100.0)
+            self.assertAlmostEqual(
+                float(np.sum(arrays["weight"] ** 2)),
+                stats.sum_squared_weights,
+            )
             self.assertAlmostEqual(stats.sum_weights, 100.0)
             self.assertEqual(np.sign(arrays["weight"]).tolist(), [1.0, -1.0, 1.0])
             np.testing.assert_allclose(
@@ -221,6 +229,16 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                 metadata["weight_semantics"], "expected_events_at_luminosity"
             )
             self.assertEqual(metadata["weight_units"], "events")
+            self.assertAlmostEqual(metadata["input_sum_squared_weights"], 6.0)
+            self.assertEqual(len(metadata["input_sources"]), 1)
+            self.assertEqual(
+                metadata["input_sources"][0]["sha256"],
+                hashlib.sha256(source.read_bytes()).hexdigest(),
+            )
+            self.assertAlmostEqual(
+                metadata["output_sum_squared_weights"],
+                float(np.sum(arrays["weight"] ** 2)),
+            )
 
     def test_merged_luminosity_weights_require_a_cross_section(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -303,6 +321,12 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
             self.assertEqual(manifest["luminosity_fb"], 312.0)
             self.assertTrue((directory / "data.root").exists())
             self.assertTrue((directory / "data_0001.root").exists())
+            for entry in manifest["files"]:
+                pseudo_path = directory / entry["path"]
+                self.assertEqual(
+                    entry["sha256"],
+                    hashlib.sha256(pseudo_path.read_bytes()).hexdigest(),
+                )
 
             with uproot.open(directory / "data.root") as root_file:
                 tree = root_file["Analysis"]
@@ -395,6 +419,10 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
                 metadata["total_sum_abs_weights"],
             )
             self.assertEqual(
+                metadata["total_sum_squared_weights"],
+                int(np.sum(first_arrays["weight"] ** 2)),
+            )
+            self.assertEqual(
                 metadata["total_observed"],
                 int(np.sum(first_arrays["weight"])),
             )
@@ -482,6 +510,1127 @@ class MergeAnalysisOutputsTest(unittest.TestCase):
             self.assertTrue(
                 (directory / "allowed" / "pseudo_data_manifest.json").exists()
             )
+
+    def test_merge_rejects_same_schema_source_replacement_after_scan(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "source.root"
+            replacement = directory / "replacement.root"
+            output = directory / "merged.root"
+            write_sample(source, 0.01, event_start=10)
+            write_sample(
+                replacement,
+                0.01,
+                weights=np.array([4.0, -1.0, 2.0, 1.0]),
+                event_start=100,
+            )
+            real_tree_schema = merge_module._tree_schema
+            replaced = False
+
+            def replace_after_schema(*args, **kwargs):
+                nonlocal replaced
+                schema = real_tree_schema(*args, **kwargs)
+                if not replaced:
+                    os.replace(replacement, source)
+                    replaced = True
+                return schema
+
+            with patch.object(
+                merge_module, "_tree_schema", side_effect=replace_after_schema
+            ):
+                with self.assertRaisesRegex(RuntimeError, "source file changed"):
+                    merge_sample(
+                        [source],
+                        output,
+                        step_size="1 MB",
+                        cross_section_override_pb=None,
+                        luminosity_fb=10.0,
+                        overwrite=False,
+                    )
+            self.assertFalse(output.exists())
+
+    def test_merge_reads_snapshotted_target_if_input_symlink_is_retargeted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            original = directory / "original.root"
+            replacement = directory / "replacement.root"
+            source_link = directory / "source.root"
+            output = directory / "merged.root"
+            write_sample(original, 0.01, event_start=10)
+            write_sample(replacement, 0.01, event_start=100)
+            source_link.symlink_to(original)
+            real_tree_schema = merge_module._tree_schema
+            retargeted = False
+
+            def retarget_before_schema(*args, **kwargs):
+                nonlocal retargeted
+                if not retargeted:
+                    source_link.unlink()
+                    source_link.symlink_to(replacement)
+                    retargeted = True
+                return real_tree_schema(*args, **kwargs)
+
+            with patch.object(
+                merge_module, "_tree_schema", side_effect=retarget_before_schema
+            ):
+                merge_sample(
+                    [source_link],
+                    output,
+                    step_size="1 MB",
+                    cross_section_override_pb=None,
+                    luminosity_fb=10.0,
+                    overwrite=False,
+                )
+
+            with uproot.open(output) as root_file:
+                arrays = root_file["Analysis"].arrays(
+                    expressions=["event_number"], library="np"
+                )
+            self.assertEqual(arrays["event_number"].tolist(), [10, 11, 12, 13])
+
+    def test_pseudo_data_rejects_source_replacement_between_sampling_passes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            zz = directory / "ZZ.root"
+            higgs = directory / "gg_H.root"
+            replacement = directory / "ZZ_replacement.root"
+            output = directory / "data.root"
+            weights = np.tile(np.array([1.0, 1.0, 1.0, -1.0]), 10)
+            reconstructed = np.ones(weights.size, dtype=np.bool_)
+            write_sample(zz, 1.0e-4, weights=weights, reconstructed=reconstructed)
+            write_sample(
+                higgs,
+                1.0e-4,
+                weights=weights,
+                reconstructed=reconstructed,
+                event_start=1000,
+            )
+            write_sample(
+                replacement,
+                1.0e-4,
+                weights=np.roll(weights, 1),
+                reconstructed=reconstructed,
+                event_start=2000,
+            )
+            real_tree_schema = merge_module._tree_schema
+            replaced = False
+
+            def replace_after_schema(*args, **kwargs):
+                nonlocal replaced
+                schema = real_tree_schema(*args, **kwargs)
+                if not replaced:
+                    os.replace(replacement, zz)
+                    replaced = True
+                return schema
+
+            with patch.object(
+                merge_module, "_tree_schema", side_effect=replace_after_schema
+            ):
+                with self.assertRaisesRegex(RuntimeError, "source file changed"):
+                    build_pseudo_data(
+                        zz,
+                        higgs,
+                        output,
+                        luminosity_fb=100.0,
+                        seed=17,
+                        step_size="1 MB",
+                        overwrite=False,
+                    )
+            self.assertFalse(output.exists())
+
+    def test_pseudo_campaign_rechecks_sources_between_ensembles(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            zz = directory / "ZZ.root"
+            higgs = directory / "gg_H.root"
+            replacement = directory / "ZZ_replacement.root"
+            output_directory = directory / "campaign"
+            weights = np.tile(np.array([1.0, 1.0, 1.0, -1.0]), 10)
+            reconstructed = np.ones(weights.size, dtype=np.bool_)
+            write_sample(zz, 1.0e-4, weights=weights, reconstructed=reconstructed)
+            write_sample(
+                higgs,
+                1.0e-4,
+                weights=weights,
+                reconstructed=reconstructed,
+                event_start=1000,
+            )
+            write_sample(
+                replacement,
+                1.0e-4,
+                weights=np.roll(weights, 1),
+                reconstructed=reconstructed,
+                event_start=2000,
+            )
+            real_build = merge_module._build_pseudo_data_file
+            calls = 0
+
+            def replace_after_first_ensemble(*args, **kwargs):
+                nonlocal calls
+                result = real_build(*args, **kwargs)
+                calls += 1
+                if calls == 1:
+                    os.replace(replacement, zz)
+                return result
+
+            with patch.object(
+                merge_module,
+                "_build_pseudo_data_file",
+                side_effect=replace_after_first_ensemble,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "source file changed"):
+                    build_pseudo_data_ensembles(
+                        zz,
+                        higgs,
+                        output_directory,
+                        luminosity_fb=100.0,
+                        seed=4,
+                        ensemble_count=2,
+                        allow_ensemble_oversubscription=True,
+                        step_size="1 MB",
+                        overwrite=False,
+                    )
+            self.assertFalse((output_directory / "data.root").exists())
+            self.assertFalse((output_directory / "data_0001.root").exists())
+            self.assertFalse(
+                (output_directory / "pseudo_data_manifest.json").exists()
+            )
+
+    def test_failed_overwrite_campaign_preserves_existing_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            zz = directory / "ZZ.root"
+            higgs = directory / "gg_H.root"
+            replacement = directory / "ZZ_replacement.root"
+            output_directory = directory / "campaign"
+            output_directory.mkdir()
+            prior_files = {
+                "data.root": b"prior primary pseudo-data\n",
+                "data_0001.root": b"prior second pseudo-data\n",
+                "pseudo_data_manifest.json": b'{"prior": true}\n',
+            }
+            for name, contents in prior_files.items():
+                (output_directory / name).write_bytes(contents)
+
+            weights = np.tile(np.array([1.0, 1.0, 1.0, -1.0]), 10)
+            reconstructed = np.ones(weights.size, dtype=np.bool_)
+            write_sample(zz, 1.0e-4, weights=weights, reconstructed=reconstructed)
+            write_sample(
+                higgs,
+                1.0e-4,
+                weights=weights,
+                reconstructed=reconstructed,
+                event_start=1000,
+            )
+            write_sample(
+                replacement,
+                1.0e-4,
+                weights=np.roll(weights, 1),
+                reconstructed=reconstructed,
+                event_start=2000,
+            )
+            real_build = merge_module._build_pseudo_data_file
+            calls = 0
+
+            def replace_after_first_ensemble(*args, **kwargs):
+                nonlocal calls
+                result = real_build(*args, **kwargs)
+                calls += 1
+                if calls == 1:
+                    os.replace(replacement, zz)
+                return result
+
+            with patch.object(
+                merge_module,
+                "_build_pseudo_data_file",
+                side_effect=replace_after_first_ensemble,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "source file changed"):
+                    build_pseudo_data_ensembles(
+                        zz,
+                        higgs,
+                        output_directory,
+                        luminosity_fb=100.0,
+                        seed=4,
+                        ensemble_count=2,
+                        allow_ensemble_oversubscription=True,
+                        step_size="1 MB",
+                        overwrite=True,
+                    )
+            for name, contents in prior_files.items():
+                self.assertEqual((output_directory / name).read_bytes(), contents)
+
+    def test_campaign_publish_rolls_back_a_mid_publish_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_outputs = [staging / "data.root", staging / "data_0001.root"]
+            final_outputs = [directory / path.name for path in staged_outputs]
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            new_contents = [b"new data zero", b"new data one"]
+            old_contents = [b"old data zero", b"old data one"]
+            for staged, final, new, old in zip(
+                staged_outputs,
+                final_outputs,
+                new_contents,
+                old_contents,
+                strict=True,
+            ):
+                staged.write_bytes(new)
+                final.write_bytes(old)
+            staged_manifest.write_bytes(b"new manifest")
+            final_manifest.write_bytes(b"old manifest")
+            expected_sha256 = {
+                path: hashlib.sha256(contents).hexdigest()
+                for path, contents in zip(
+                    final_outputs, new_contents, strict=True
+                )
+            }
+            real_link = os.link
+            failed = False
+
+            def fail_second_publish(source, destination, **kwargs):
+                nonlocal failed
+                if (
+                    Path(source) == staged_outputs[1]
+                    and Path(destination) == final_outputs[1]
+                    and not failed
+                ):
+                    failed = True
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            with patch.object(
+                merge_module.os, "link", side_effect=fail_second_publish
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "retained safety copies",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        list(zip(staged_outputs, final_outputs, strict=True)),
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=True,
+                        expected_sha256=expected_sha256,
+                    )
+
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+            for final, old in zip(final_outputs, old_contents, strict=True):
+                self.assertEqual(final.read_bytes(), old)
+            self.assertEqual(final_manifest.read_bytes(), b"old manifest")
+
+    def test_no_clobber_rollback_preserves_a_concurrent_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_outputs = [staging / "data.root", staging / "data_0001.root"]
+            final_outputs = [directory / path.name for path in staged_outputs]
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            new_contents = [b"new data zero", b"new data one"]
+            for staged, contents in zip(
+                staged_outputs, new_contents, strict=True
+            ):
+                staged.write_bytes(contents)
+            staged_manifest.write_bytes(b"new manifest")
+            expected_sha256 = {
+                path: hashlib.sha256(contents).hexdigest()
+                for path, contents in zip(
+                    final_outputs, new_contents, strict=True
+                )
+            }
+            replacement_contents = b"concurrent data zero"
+            real_link = os.link
+            failed = False
+
+            def replace_first_then_fail(source, destination, **kwargs):
+                nonlocal failed
+                if (
+                    Path(source) == staged_outputs[1]
+                    and Path(destination) == final_outputs[1]
+                    and not failed
+                ):
+                    failed = True
+                    replacement = directory / "concurrent.tmp"
+                    replacement.write_bytes(replacement_contents)
+                    os.replace(replacement, final_outputs[0])
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            with patch.object(
+                merge_module.os, "link", side_effect=replace_first_then_fail
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "rollback detected concurrent changes.*concurrent replacement",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        list(zip(staged_outputs, final_outputs, strict=True)),
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=False,
+                        expected_sha256=expected_sha256,
+                    )
+
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+            self.assertEqual(final_outputs[0].read_bytes(), replacement_contents)
+            self.assertFalse(final_outputs[1].exists())
+            self.assertFalse(final_manifest.exists())
+
+    def test_rollback_claim_prevents_check_then_unlink_race(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_outputs = [staging / "data.root", staging / "data_0001.root"]
+            final_outputs = [directory / path.name for path in staged_outputs]
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            new_contents = [b"new data zero", b"new data one"]
+            for staged, contents in zip(
+                staged_outputs, new_contents, strict=True
+            ):
+                staged.write_bytes(contents)
+            staged_manifest.write_bytes(b"new manifest")
+            expected_sha256 = {
+                path: hashlib.sha256(contents).hexdigest()
+                for path, contents in zip(
+                    final_outputs, new_contents, strict=True
+                )
+            }
+            replacement_contents = b"replacement installed after identity check"
+            real_link = os.link
+            real_identity_check = merge_module._is_unchanged_published_path
+            publication_failed = False
+            replacement_installed = False
+
+            def fail_second_publish(source, destination, **kwargs):
+                nonlocal publication_failed
+                if (
+                    Path(source) == staged_outputs[1]
+                    and Path(destination) == final_outputs[1]
+                    and not publication_failed
+                ):
+                    publication_failed = True
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            def install_replacement_after_check(publication, path=None):
+                nonlocal replacement_installed
+                result = real_identity_check(publication, path)
+                if result and not replacement_installed:
+                    replacement_installed = True
+                    replacement = directory / "concurrent.tmp"
+                    replacement.write_bytes(replacement_contents)
+                    os.replace(replacement, publication.path)
+                return result
+
+            with (
+                patch.object(
+                    merge_module.os,
+                    "link",
+                    side_effect=fail_second_publish,
+                ),
+                patch.object(
+                    merge_module,
+                    "_is_unchanged_published_path",
+                    side_effect=install_replacement_after_check,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "rollback detected concurrent changes.*concurrent replacement preserved",
+                ):
+                    merge_module._publish_staged_campaign(
+                        list(zip(staged_outputs, final_outputs, strict=True)),
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=False,
+                        expected_sha256=expected_sha256,
+                    )
+
+            self.assertTrue(replacement_installed)
+            self.assertEqual(final_outputs[0].read_bytes(), replacement_contents)
+            self.assertFalse(final_outputs[1].exists())
+            self.assertFalse(final_manifest.exists())
+
+    def test_overwrite_rollback_preserves_replacement_and_old_backup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_outputs = [staging / "data.root", staging / "data_0001.root"]
+            final_outputs = [directory / path.name for path in staged_outputs]
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            new_contents = [b"new data zero", b"new data one"]
+            old_contents = [b"old data zero", b"old data one"]
+            for staged, final, new, old in zip(
+                staged_outputs,
+                final_outputs,
+                new_contents,
+                old_contents,
+                strict=True,
+            ):
+                staged.write_bytes(new)
+                final.write_bytes(old)
+            staged_manifest.write_bytes(b"new manifest")
+            final_manifest.write_bytes(b"old manifest")
+            expected_sha256 = {
+                path: hashlib.sha256(contents).hexdigest()
+                for path, contents in zip(
+                    final_outputs, new_contents, strict=True
+                )
+            }
+            replacement_contents = b"concurrent data zero"
+            real_link = os.link
+            failed = False
+
+            def replace_first_then_fail(source, destination, **kwargs):
+                nonlocal failed
+                if (
+                    Path(source) == staged_outputs[1]
+                    and Path(destination) == final_outputs[1]
+                    and not failed
+                ):
+                    failed = True
+                    replacement = directory / "concurrent.tmp"
+                    replacement.write_bytes(replacement_contents)
+                    os.replace(replacement, final_outputs[0])
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            with patch.object(
+                merge_module.os, "link", side_effect=replace_first_then_fail
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "pre-campaign output preserved at",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        list(zip(staged_outputs, final_outputs, strict=True)),
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=True,
+                        expected_sha256=expected_sha256,
+                    )
+
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+            self.assertEqual(final_outputs[0].read_bytes(), replacement_contents)
+            self.assertEqual(final_outputs[1].read_bytes(), old_contents[1])
+            self.assertEqual(final_manifest.read_bytes(), b"old manifest")
+            recovery_paths = list(
+                directory.glob(".data.root.pre-campaign-*.recovery")
+            )
+            self.assertEqual(len(recovery_paths), 1)
+            self.assertEqual(
+                (recovery_paths[0] / "data.root").read_bytes(),
+                old_contents[0],
+            )
+
+    def test_overwrite_claim_rejects_destination_swapped_after_snapshot(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_output = staging / "data.root"
+            final_output = directory / "data.root"
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            staged_output.write_bytes(b"new data")
+            final_output.write_bytes(b"old data")
+            staged_manifest.write_bytes(b"new manifest")
+            final_manifest.write_bytes(b"old manifest")
+            external_old = directory / "old retained by concurrent writer"
+            replacement_contents = b"concurrent replacement"
+            real_replace = os.replace
+            swapped = False
+
+            def swap_before_claim(source, destination):
+                nonlocal swapped
+                if Path(source) == final_output and not swapped:
+                    swapped = True
+                    real_replace(final_output, external_old)
+                    replacement = directory / "concurrent.tmp"
+                    replacement.write_bytes(replacement_contents)
+                    real_replace(replacement, final_output)
+                return real_replace(source, destination)
+
+            with patch.object(
+                merge_module.os,
+                "replace",
+                side_effect=swap_before_claim,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "retained safety copies",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        [(staged_output, final_output)],
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=True,
+                        expected_sha256={
+                            final_output: hashlib.sha256(b"new data").hexdigest()
+                        },
+                    )
+
+            self.assertTrue(swapped)
+            self.assertIsInstance(raised.exception.__cause__, RuntimeError)
+            self.assertIn(
+                "output changed while it was being claimed",
+                str(raised.exception.__cause__),
+            )
+            self.assertEqual(external_old.read_bytes(), b"old data")
+            self.assertEqual(final_output.read_bytes(), replacement_contents)
+            self.assertEqual(final_manifest.read_bytes(), b"old manifest")
+            recovery_directories = list(
+                directory.glob(".data.root.pre-campaign-*.recovery")
+            )
+            self.assertEqual(len(recovery_directories), 1)
+            self.assertEqual(
+                (recovery_directories[0] / "data.root").read_bytes(),
+                replacement_contents,
+            )
+
+    def test_backup_survives_replacement_immediately_after_restore_link(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_outputs = [staging / "data.root", staging / "data_0001.root"]
+            final_outputs = [directory / path.name for path in staged_outputs]
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            new_contents = [b"new data zero", b"new data one"]
+            old_contents = [b"old data zero", b"old data one"]
+            for staged, final, new, old in zip(
+                staged_outputs,
+                final_outputs,
+                new_contents,
+                old_contents,
+                strict=True,
+            ):
+                staged.write_bytes(new)
+                final.write_bytes(old)
+            staged_manifest.write_bytes(b"new manifest")
+            final_manifest.write_bytes(b"old manifest")
+            expected_sha256 = {
+                path: hashlib.sha256(contents).hexdigest()
+                for path, contents in zip(
+                    final_outputs, new_contents, strict=True
+                )
+            }
+            replacement_contents = b"replacement immediately after restore link"
+            real_link = os.link
+            publication_failed = False
+            replacement_installed = False
+
+            def fail_and_replace_after_restore(source, destination, **kwargs):
+                nonlocal publication_failed, replacement_installed
+                source_path = Path(source)
+                destination_path = Path(destination)
+                if (
+                    source_path == staged_outputs[1]
+                    and destination_path == final_outputs[1]
+                    and not publication_failed
+                ):
+                    publication_failed = True
+                    raise OSError("injected publication failure")
+                result = real_link(source, destination, **kwargs)
+                if (
+                    destination_path == final_outputs[0]
+                    and ".data.root.pre-campaign-" in source_path.parent.name
+                    and not replacement_installed
+                ):
+                    replacement_installed = True
+                    replacement = directory / "concurrent.tmp"
+                    replacement.write_bytes(replacement_contents)
+                    os.replace(replacement, final_outputs[0])
+                return result
+
+            with patch.object(
+                merge_module.os,
+                "link",
+                side_effect=fail_and_replace_after_restore,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "safety copy preserved",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        list(zip(staged_outputs, final_outputs, strict=True)),
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=True,
+                        expected_sha256=expected_sha256,
+                    )
+
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+            self.assertTrue(replacement_installed)
+            self.assertEqual(final_outputs[0].read_bytes(), replacement_contents)
+            self.assertEqual(final_outputs[1].read_bytes(), old_contents[1])
+            recovery_directories = list(
+                directory.glob(".data.root.pre-campaign-*.recovery")
+            )
+            self.assertEqual(len(recovery_directories), 1)
+            self.assertEqual(
+                (recovery_directories[0] / "data.root").read_bytes(),
+                old_contents[0],
+            )
+
+    def test_rollback_preserves_a_concurrent_directory_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_outputs = [staging / "data.root", staging / "data_0001.root"]
+            final_outputs = [directory / path.name for path in staged_outputs]
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            new_contents = [b"new data zero", b"new data one"]
+            for staged, contents in zip(
+                staged_outputs, new_contents, strict=True
+            ):
+                staged.write_bytes(contents)
+            staged_manifest.write_bytes(b"new manifest")
+            expected_sha256 = {
+                path: hashlib.sha256(contents).hexdigest()
+                for path, contents in zip(
+                    final_outputs, new_contents, strict=True
+                )
+            }
+            real_link = os.link
+            failed = False
+
+            def install_directory_then_fail(source, destination, **kwargs):
+                nonlocal failed
+                if (
+                    Path(source) == staged_outputs[1]
+                    and Path(destination) == final_outputs[1]
+                    and not failed
+                ):
+                    failed = True
+                    final_outputs[0].unlink()
+                    final_outputs[0].mkdir()
+                    (final_outputs[0] / "marker.txt").write_bytes(b"keep me")
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            with patch.object(
+                merge_module.os,
+                "link",
+                side_effect=install_directory_then_fail,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "concurrent replacement preserved",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        list(zip(staged_outputs, final_outputs, strict=True)),
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=False,
+                        expected_sha256=expected_sha256,
+                    )
+
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+            self.assertFalse(final_outputs[0].exists())
+            recovery_directories = list(
+                directory.glob(
+                    ".data.root.concurrent-replacement-*.recovery"
+                )
+            )
+            self.assertEqual(len(recovery_directories), 1)
+            recovered_directory = recovery_directories[0] / "data.root"
+            self.assertTrue(recovered_directory.is_dir())
+            self.assertEqual(
+                (recovered_directory / "marker.txt").read_bytes(),
+                b"keep me",
+            )
+
+    def test_interrupt_after_publish_link_rolls_back_registered_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_output = staging / "data.root"
+            final_output = directory / "data.root"
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            staged_output.write_bytes(b"new data")
+            staged_manifest.write_bytes(b"new manifest")
+            real_link = os.link
+            interrupted = False
+
+            def interrupt_after_link(source, destination, **kwargs):
+                nonlocal interrupted
+                result = real_link(source, destination, **kwargs)
+                if Path(source) == staged_output and not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt
+                return result
+
+            with patch.object(
+                merge_module.os,
+                "link",
+                side_effect=interrupt_after_link,
+            ):
+                with self.assertRaisesRegex(
+                    merge_module.CampaignPublicationError,
+                    "rollback completed without retained claims",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        [(staged_output, final_output)],
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=False,
+                        expected_sha256={
+                            final_output: hashlib.sha256(b"new data").hexdigest()
+                        },
+                    )
+
+            self.assertTrue(interrupted)
+            self.assertIsInstance(raised.exception.__cause__, KeyboardInterrupt)
+            self.assertFalse(final_output.exists())
+            self.assertFalse(final_manifest.exists())
+
+    def test_interrupt_after_backup_claim_preserves_registered_backup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_output = staging / "data.root"
+            final_output = directory / "data.root"
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            staged_output.write_bytes(b"new data")
+            final_output.write_bytes(b"old data")
+            staged_manifest.write_bytes(b"new manifest")
+            final_manifest.write_bytes(b"old manifest")
+            real_replace = os.replace
+            interrupted = False
+
+            def interrupt_after_claim(source, destination):
+                nonlocal interrupted
+                result = real_replace(source, destination)
+                if Path(source) == final_output and not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt
+                return result
+
+            with patch.object(
+                merge_module.os,
+                "replace",
+                side_effect=interrupt_after_claim,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "safety copy preserved",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        [(staged_output, final_output)],
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=True,
+                        expected_sha256={
+                            final_output: hashlib.sha256(b"new data").hexdigest()
+                        },
+                    )
+
+            self.assertTrue(interrupted)
+            self.assertIsInstance(raised.exception.__cause__, KeyboardInterrupt)
+            self.assertEqual(final_output.read_bytes(), b"old data")
+            self.assertEqual(final_manifest.read_bytes(), b"old manifest")
+            recovery_directories = list(
+                directory.glob(".data.root.pre-campaign-*.recovery")
+            )
+            self.assertEqual(len(recovery_directories), 1)
+            self.assertEqual(
+                (recovery_directories[0] / "data.root").read_bytes(),
+                b"old data",
+            )
+
+    def test_failed_durable_recovery_retains_staging_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            retained_staging = None
+            real_link = os.link
+            publication_failed = False
+
+            def fail_second_publish(source, destination, **kwargs):
+                nonlocal publication_failed
+                source_path = Path(source)
+                if source_path.name == "data_0001.root" and not publication_failed:
+                    publication_failed = True
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            with self.assertRaisesRegex(
+                merge_module.CampaignPublicationError,
+                "automatic cleanup disabled",
+            ) as raised:
+                with merge_module._campaign_staging_directory(
+                    directory
+                ) as staging:
+                    retained_staging = staging
+                    staged_outputs = [
+                        staging / "data.root",
+                        staging / "data_0001.root",
+                    ]
+                    final_outputs = [directory / path.name for path in staged_outputs]
+                    staged_manifest = staging / "pseudo_data_manifest.json"
+                    final_manifest = directory / staged_manifest.name
+                    new_contents = [b"new data zero", b"new data one"]
+                    old_contents = [b"old data zero", b"old data one"]
+                    for staged, final, new, old in zip(
+                        staged_outputs,
+                        final_outputs,
+                        new_contents,
+                        old_contents,
+                        strict=True,
+                    ):
+                        staged.write_bytes(new)
+                        final.write_bytes(old)
+                    staged_manifest.write_bytes(b"new manifest")
+                    final_manifest.write_bytes(b"old manifest")
+                    expected_sha256 = {
+                        path: hashlib.sha256(contents).hexdigest()
+                        for path, contents in zip(
+                            final_outputs, new_contents, strict=True
+                        )
+                    }
+
+                    with (
+                        patch.object(
+                            merge_module.os,
+                            "link",
+                            side_effect=fail_second_publish,
+                        ),
+                        patch.object(
+                            merge_module,
+                            "_preserve_rollback_path",
+                            side_effect=OSError("injected recovery failure"),
+                        ),
+                    ):
+                        merge_module._publish_staged_campaign(
+                            list(zip(staged_outputs, final_outputs, strict=True)),
+                            staged_manifest,
+                            final_manifest,
+                            staging_directory=staging,
+                            overwrite=True,
+                            expected_sha256=expected_sha256,
+                        )
+
+            self.assertIsNotNone(retained_staging)
+            self.assertEqual(
+                raised.exception.retained_staging_directory,
+                retained_staging,
+            )
+            self.assertTrue(retained_staging.is_dir())
+            self.assertEqual(
+                (retained_staging / "backups" / "0000-data.root").read_bytes(),
+                b"old data zero",
+            )
+            self.assertEqual(
+                (
+                    retained_staging / "backups" / "0001-data_0001.root"
+                ).read_bytes(),
+                b"old data one",
+            )
+
+    def test_manifest_publish_is_followed_by_output_verification(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_output = staging / "data.root"
+            final_output = directory / "data.root"
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            staged_output.write_bytes(b"new data")
+            staged_manifest.write_bytes(b"new manifest")
+            replacement_contents = b"replacement during manifest publication"
+            real_link = os.link
+            replacement_installed = False
+
+            def replace_during_manifest_link(source, destination, **kwargs):
+                nonlocal replacement_installed
+                result = real_link(source, destination, **kwargs)
+                if Path(source) == staged_manifest and not replacement_installed:
+                    replacement_installed = True
+                    replacement = directory / "concurrent.tmp"
+                    replacement.write_bytes(replacement_contents)
+                    os.replace(replacement, final_output)
+                return result
+
+            with patch.object(
+                merge_module.os,
+                "link",
+                side_effect=replace_during_manifest_link,
+            ):
+                with self.assertRaisesRegex(
+                    merge_module.CampaignPublicationError,
+                    "concurrent replacement",
+                ) as raised:
+                    merge_module._publish_staged_campaign(
+                        [(staged_output, final_output)],
+                        staged_manifest,
+                        final_manifest,
+                        staging_directory=staging,
+                        overwrite=False,
+                        expected_sha256={
+                            final_output: hashlib.sha256(b"new data").hexdigest()
+                        },
+                    )
+
+            self.assertTrue(replacement_installed)
+            self.assertIsInstance(raised.exception.__cause__, RuntimeError)
+            self.assertEqual(final_output.read_bytes(), replacement_contents)
+            self.assertFalse(final_manifest.exists())
+
+    def test_interrupted_rollback_retains_publication_staging(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            retained_staging = None
+            real_link = os.link
+            real_identity_check = merge_module._is_unchanged_published_path
+            publication_failed = False
+            rollback_interrupted = False
+
+            def fail_second_publish(source, destination, **kwargs):
+                nonlocal publication_failed
+                if Path(source).name == "data_0001.root" and not publication_failed:
+                    publication_failed = True
+                    raise OSError("injected publication failure")
+                return real_link(source, destination, **kwargs)
+
+            def interrupt_after_rollback_claim(publication, path=None):
+                nonlocal rollback_interrupted
+                if (
+                    path is not None
+                    and Path(path).name.startswith("rollback-")
+                    and not rollback_interrupted
+                ):
+                    rollback_interrupted = True
+                    raise KeyboardInterrupt
+                return real_identity_check(publication, path)
+
+            with self.assertRaisesRegex(
+                merge_module.CampaignPublicationError,
+                "rollback was interrupted",
+            ) as raised:
+                with merge_module._campaign_staging_directory(
+                    directory
+                ) as staging:
+                    retained_staging = staging
+                    staged_outputs = [
+                        staging / "data.root",
+                        staging / "data_0001.root",
+                    ]
+                    final_outputs = [directory / path.name for path in staged_outputs]
+                    staged_manifest = staging / "pseudo_data_manifest.json"
+                    final_manifest = directory / staged_manifest.name
+                    new_contents = [b"new data zero", b"new data one"]
+                    old_contents = [b"old data zero", b"old data one"]
+                    for staged, final, new, old in zip(
+                        staged_outputs,
+                        final_outputs,
+                        new_contents,
+                        old_contents,
+                        strict=True,
+                    ):
+                        staged.write_bytes(new)
+                        final.write_bytes(old)
+                    staged_manifest.write_bytes(b"new manifest")
+                    final_manifest.write_bytes(b"old manifest")
+                    expected_sha256 = {
+                        path: hashlib.sha256(contents).hexdigest()
+                        for path, contents in zip(
+                            final_outputs, new_contents, strict=True
+                        )
+                    }
+
+                    with (
+                        patch.object(
+                            merge_module.os,
+                            "link",
+                            side_effect=fail_second_publish,
+                        ),
+                        patch.object(
+                            merge_module,
+                            "_is_unchanged_published_path",
+                            side_effect=interrupt_after_rollback_claim,
+                        ),
+                    ):
+                        merge_module._publish_staged_campaign(
+                            list(zip(staged_outputs, final_outputs, strict=True)),
+                            staged_manifest,
+                            final_manifest,
+                            staging_directory=staging,
+                            overwrite=True,
+                            expected_sha256=expected_sha256,
+                        )
+
+            self.assertTrue(publication_failed)
+            self.assertTrue(rollback_interrupted)
+            self.assertIsInstance(raised.exception.__cause__, KeyboardInterrupt)
+            self.assertEqual(
+                raised.exception.retained_staging_directory,
+                retained_staging,
+            )
+            self.assertTrue(retained_staging.is_dir())
+            self.assertEqual(
+                (retained_staging / "backups" / "0000-data.root").read_bytes(),
+                b"old data zero",
+            )
+            self.assertEqual(
+                (
+                    retained_staging / "backups" / "0001-data_0001.root"
+                ).read_bytes(),
+                b"old data one",
+            )
+
+    def test_campaign_publish_successfully_replaces_existing_campaign(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            staging = directory / "staging"
+            staging.mkdir()
+            staged_output = staging / "data.root"
+            final_output = directory / "data.root"
+            staged_manifest = staging / "pseudo_data_manifest.json"
+            final_manifest = directory / staged_manifest.name
+            staged_output.write_bytes(b"new data")
+            final_output.write_bytes(b"old data")
+            staged_manifest.write_bytes(b"new manifest")
+            final_manifest.write_bytes(b"old manifest")
+
+            merge_module._publish_staged_campaign(
+                [(staged_output, final_output)],
+                staged_manifest,
+                final_manifest,
+                staging_directory=staging,
+                overwrite=True,
+                expected_sha256={
+                    final_output: hashlib.sha256(b"new data").hexdigest()
+                },
+            )
+
+            self.assertEqual(final_output.read_bytes(), b"new data")
+            self.assertEqual(final_manifest.read_bytes(), b"new manifest")
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ from BackgroundRemoval.common import (
     MODEL_KIND_DATA_MC_CORRECTION,
     MODEL_FEATURES,
     SPLIT_NAMES,
+    SUPPORTED_ARTIFACT_FORMAT_VERSIONS,
     TREE_NAME,
     VALIDATION_SPLIT,
     ModelBundle,
@@ -58,7 +59,9 @@ DEFAULT_LUMINOSITY_FB = 312.0
 class WeightedStatistics:
     entries: int = 0
     zero_weight_entries: int = 0
+    negative_weight_entries: int = 0
     sum_weights: float = 0.0
+    sum_absolute_weights: float = 0.0
     sum_squared_weights: float = 0.0
     split_entries: dict[str, int] = field(
         default_factory=lambda: {name: 0 for name in SPLIT_NAMES.values()}
@@ -66,21 +69,37 @@ class WeightedStatistics:
     split_sum_weights: dict[str, float] = field(
         default_factory=lambda: {name: 0.0 for name in SPLIT_NAMES.values()}
     )
+    split_sum_absolute_weights: dict[str, float] = field(
+        default_factory=lambda: {name: 0.0 for name in SPLIT_NAMES.values()}
+    )
     split_sum_squared_weights: dict[str, float] = field(
         default_factory=lambda: {name: 0.0 for name in SPLIT_NAMES.values()}
+    )
+    split_negative_weight_entries: dict[str, int] = field(
+        default_factory=lambda: {name: 0 for name in SPLIT_NAMES.values()}
     )
 
     def add(self, weights: np.ndarray, splits: np.ndarray, *, zero_count: int) -> None:
         self.zero_weight_entries += int(zero_count)
         self.entries += int(weights.size)
+        self.negative_weight_entries += int(np.count_nonzero(weights < 0.0))
         self.sum_weights += float(np.sum(weights, dtype=np.float64))
+        self.sum_absolute_weights += float(
+            np.sum(np.abs(weights), dtype=np.float64)
+        )
         self.sum_squared_weights += float(np.sum(weights * weights, dtype=np.float64))
         for code, name in SPLIT_NAMES.items():
             selected = splits == code
             selected_weights = weights[selected]
             self.split_entries[name] += int(selected_weights.size)
+            self.split_negative_weight_entries[name] += int(
+                np.count_nonzero(selected_weights < 0.0)
+            )
             self.split_sum_weights[name] += float(
                 np.sum(selected_weights, dtype=np.float64)
+            )
+            self.split_sum_absolute_weights[name] += float(
+                np.sum(np.abs(selected_weights), dtype=np.float64)
             )
             self.split_sum_squared_weights[name] += float(
                 np.sum(selected_weights * selected_weights, dtype=np.float64)
@@ -94,6 +113,11 @@ class WeightedStatistics:
     def serializable(self) -> dict[str, Any]:
         result = asdict(self)
         result["effective_entries"] = self.effective_entries()
+        result["net_to_absolute_weight_ratio"] = (
+            self.sum_weights / self.sum_absolute_weights
+            if self.sum_absolute_weights > 0.0
+            else 0.0
+        )
         return result
 
 
@@ -241,14 +265,6 @@ def _selected_chunks(
                         raise ValueError(
                             f"{component_name} contains non-finite {weight_branch} values"
                         )
-                    negative_count = int(np.count_nonzero(selected_weights < 0.0))
-                    if negative_count:
-                        raise ValueError(
-                            f"{component_name} contains {negative_count} selected negative "
-                            f"{weight_branch} values. A signed weighted BCE is not a density "
-                            "ratio and can be unbounded; this training intentionally stops "
-                            "instead of taking absolute values or dropping negative events."
-                        )
                     if not np.all(np.isfinite(selected_raw)):
                         bad = int(np.count_nonzero(~np.all(np.isfinite(selected_raw), axis=1)))
                         raise ValueError(
@@ -266,16 +282,16 @@ def _selected_chunks(
                         if not np.all(np.isfinite(correction) & (correction > 0.0)):
                             raise ValueError(
                                 "the data/MC Correction model produced a non-finite or "
-                                "non-positive ZZ event weight"
+                                "non-positive multiplicative correction factor"
                             )
                         selected_weights = selected_weights * correction
-                    positive = selected_weights > 0.0
+                    nonzero = selected_weights != 0.0
                     yield SelectedChunk(
                         class_name=class_name,
                         component_name=component_name,
-                        raw_features=selected_raw[positive],
-                        weights=selected_weights[positive],
-                        splits=selected_splits[positive],
+                        raw_features=selected_raw[nonzero],
+                        weights=selected_weights[nonzero],
+                        splits=selected_splits[nonzero],
                         zero_count=int(np.count_nonzero(selected_weights == 0.0)),
                     )
 
@@ -325,7 +341,11 @@ def _scan_inputs(
             transformed = transformed_features(chunk.raw_features[fit]).astype(
                 np.float64, copy=False
             )
-            weights = chunk.weights[fit]
+            # The scaler is only a numerical preconditioner.  Absolute weights
+            # give it a positive measure even when generator events carry a
+            # sign; the signed weights themselves are retained everywhere in
+            # the physics loss, yields, calibration, and diagnostics.
+            weights = np.abs(chunk.weights[fit])
             moment_sum[chunk.class_name] += np.sum(
                 transformed * weights[:, np.newaxis], axis=0, dtype=np.float64
             )
@@ -336,20 +356,27 @@ def _scan_inputs(
             )
 
     for class_name, statistics in classes.items():
-        if statistics.entries == 0 or statistics.sum_weights <= 0.0:
+        if statistics.entries == 0:
             raise ValueError(f"the selected {class_name} class is empty")
+        if not np.isfinite(statistics.sum_weights) or statistics.sum_weights <= 0.0:
+            raise ValueError(
+                f"the selected {class_name} class has non-positive net signed yield"
+            )
         for split_name in SPLIT_NAMES.values():
             if statistics.split_entries[split_name] == 0:
                 raise ValueError(f"the {class_name} {split_name} split is empty")
-            if statistics.split_sum_weights[split_name] <= 0.0:
+            if (
+                not np.isfinite(statistics.split_sum_weights[split_name])
+                or statistics.split_sum_weights[split_name] <= 0.0
+            ):
                 raise ValueError(
-                    f"the {class_name} {split_name} split has non-positive total weight"
+                    f"the {class_name} {split_name} split has non-positive net signed yield"
                 )
 
     class_means: list[np.ndarray] = []
     class_seconds: list[np.ndarray] = []
     for class_name in ("signal", "background"):
-        fit_sum = classes[class_name].split_sum_weights["fit"]
+        fit_sum = classes[class_name].split_sum_absolute_weights["fit"]
         class_means.append(moment_sum[class_name] / fit_sum)
         class_seconds.append(moment_square_sum[class_name] / fit_sum)
     mean = 0.5 * (class_means[0] + class_means[1])
@@ -463,6 +490,7 @@ def _evaluate_member(
     scale: np.ndarray,
     device: Any,
     inference_batch_size: int,
+    logit_clip: float,
 ) -> tuple[float, float, float, float]:
     import torch
     import torch.nn.functional as functional
@@ -486,7 +514,11 @@ def _evaluate_member(
                 raw = np.asarray(arrays.features[start:stop][selected])
                 weights = np.asarray(arrays.weights[start:stop][selected], dtype=np.float64)
                 tensor = _scaled_tensor(raw, mean, scale, device)
-                logits = model(tensor).reshape(-1)
+                logits = torch.clamp(
+                    model(tensor).reshape(-1),
+                    min=-abs(logit_clip),
+                    max=abs(logit_clip),
+                )
                 labels = torch.full_like(logits, label)
                 losses = functional.binary_cross_entropy_with_logits(
                     logits, labels, reduction="none"
@@ -499,7 +531,9 @@ def _evaluate_member(
                 score_count += scores.size
                 saturated += int(np.count_nonzero((scores < 1.0e-6) | (scores > 1.0 - 1.0e-6)))
             if total_weight <= 0.0:
-                raise RuntimeError(f"empty {class_name} evaluation split")
+                raise RuntimeError(
+                    f"{class_name} evaluation split has non-positive net signed yield"
+                )
             class_losses.append(weighted_loss / total_weight)
     mean_score = score_sum / score_count
     variance = max(score_square_sum / score_count - mean_score * mean_score, 0.0)
@@ -509,6 +543,54 @@ def _evaluate_member(
         math.sqrt(variance),
         saturated / score_count,
     )
+
+
+def _absolute_weight_sampling_plan(
+    weights: np.ndarray,
+    indices: np.ndarray,
+    *,
+    class_name: str,
+) -> tuple[np.ndarray, float]:
+    """Build an |w|-importance sampler and its signed-risk coefficient.
+
+    Drawing event ``i`` with probability ``|w_i| / sum_j |w_j|`` and using
+    ``sign(w_i) * sum_j|w_j| / sum_j w_j`` in the minibatch gives an unbiased
+    estimator of ``sum_i w_i loss_i / sum_i w_i``.  This avoids letting a few
+    large-magnitude signed events dominate the variance of uniform sampling,
+    while never replacing the signed physics measure by an absolute one.
+    """
+
+    selected = np.asarray(weights[indices], dtype=np.float64)
+    absolute = np.abs(selected)
+    cumulative = np.cumsum(absolute, dtype=np.float64)
+    absolute_sum = float(cumulative[-1]) if cumulative.size else 0.0
+    net_sum = float(np.sum(selected, dtype=np.float64))
+    if not np.isfinite(absolute_sum) or absolute_sum <= 0.0:
+        raise RuntimeError(f"{class_name} fit split has no finite nonzero weights")
+    if not np.isfinite(net_sum) or net_sum <= 0.0:
+        raise RuntimeError(
+            f"{class_name} fit split has non-positive net signed yield"
+        )
+    return cumulative, absolute_sum / net_sum
+
+
+def _draw_absolute_weighted(
+    rng: np.random.Generator,
+    indices: np.ndarray,
+    cumulative_absolute_weights: np.ndarray,
+    *,
+    size: int,
+) -> np.ndarray:
+    """Sample cached event indices with replacement in proportion to |w|."""
+
+    draws = rng.random(size) * cumulative_absolute_weights[-1]
+    positions = np.searchsorted(
+        cumulative_absolute_weights, draws, side="right"
+    )
+    # rng.random is specified on [0, 1), but guard the final lookup against a
+    # platform-level rounding to the cumulative endpoint.
+    np.minimum(positions, indices.size - 1, out=positions)
+    return indices[positions]
 
 
 def _train_member(
@@ -537,6 +619,7 @@ def _train_member(
         torch.cuda.manual_seed_all(seed)
 
     model = build_toolkit_model(architecture).to(device)
+    loss_logit_clip = float(architecture["loss_logit_clip"])
     optimizer = torch.optim.NAdam(
         model.parameters(),
         lr=float(architecture["learning_rate"]),
@@ -555,13 +638,17 @@ def _train_member(
         )
     else:
         epoch_steps = steps_per_epoch
-    signal_mean_weight = float(
-        np.sum(cache["signal"].weights[signal_indices], dtype=np.float64)
-        / signal_indices.size
+    signal_cumulative, signal_coefficient_scale = _absolute_weight_sampling_plan(
+        cache["signal"].weights,
+        signal_indices,
+        class_name="signal",
     )
-    background_mean_weight = float(
-        np.sum(cache["background"].weights[background_indices], dtype=np.float64)
-        / background_indices.size
+    background_cumulative, background_coefficient_scale = (
+        _absolute_weight_sampling_plan(
+            cache["background"].weights,
+            background_indices,
+            class_name="background",
+        )
     )
 
     history = {"training_loss": [], "validation_loss": [], "learning_rate": []}
@@ -572,12 +659,18 @@ def _train_member(
         model.train()
         accumulated = 0.0
         for _ in range(epoch_steps):
-            signal_draw = signal_indices[
-                rng.integers(0, signal_indices.size, size=half_batch)
-            ]
-            background_draw = background_indices[
-                rng.integers(0, background_indices.size, size=half_batch)
-            ]
+            signal_draw = _draw_absolute_weighted(
+                rng,
+                signal_indices,
+                signal_cumulative,
+                size=half_batch,
+            )
+            background_draw = _draw_absolute_weighted(
+                rng,
+                background_indices,
+                background_cumulative,
+                size=half_batch,
+            )
             # Sorted indices turn random memmap access into mostly sequential reads.
             signal_draw.sort()
             background_draw.sort()
@@ -589,20 +682,34 @@ def _train_member(
             )
             signal_coefficients = torch.from_numpy(
                 np.asarray(
-                    cache["signal"].weights[signal_draw] / signal_mean_weight,
+                    np.sign(cache["signal"].weights[signal_draw])
+                    * signal_coefficient_scale,
                     dtype=np.float32,
                 )
             ).to(device)
             background_coefficients = torch.from_numpy(
                 np.asarray(
-                    cache["background"].weights[background_draw]
-                    / background_mean_weight,
+                    np.sign(cache["background"].weights[background_draw])
+                    * background_coefficient_scale,
                     dtype=np.float32,
                 )
             ).to(device)
             optimizer.zero_grad(set_to_none=True)
-            signal_logits = model(signal_tensor).reshape(-1)
-            background_logits = model(background_tensor).reshape(-1)
+            # A finite logit domain is essential for a signed empirical BCE:
+            # without it, a negative-weight event can drive its contribution
+            # to minus infinity.  Clipping bounds the objective without
+            # changing, dropping, or taking the absolute value of any event
+            # weight.  The same bound is used for validation and inference.
+            signal_logits = torch.clamp(
+                model(signal_tensor).reshape(-1),
+                min=-loss_logit_clip,
+                max=loss_logit_clip,
+            )
+            background_logits = torch.clamp(
+                model(background_tensor).reshape(-1),
+                min=-loss_logit_clip,
+                max=loss_logit_clip,
+            )
             signal_loss = functional.binary_cross_entropy_with_logits(
                 signal_logits, torch.ones_like(signal_logits), reduction="none"
             )
@@ -627,6 +734,7 @@ def _train_member(
             scale=scale,
             device=device,
             inference_batch_size=inference_batch_size,
+            logit_clip=loss_logit_clip,
         )
         history["training_loss"].append(accumulated / epoch_steps)
         history["validation_loss"].append(validation_loss)
@@ -662,6 +770,7 @@ def _train_member(
         scale=scale,
         device=device,
         inference_batch_size=inference_batch_size,
+        logit_clip=loss_logit_clip,
     )
     return MemberResult(
         slot=slot,
@@ -680,11 +789,18 @@ def _bad_members(results: list[MemberResult]) -> list[int]:
     losses = np.asarray([item.validation_loss for item in results], dtype=np.float64)
     median = float(np.median(losses))
     mad = float(np.median(np.abs(losses - median)))
+    # Signed BCE values can legitimately be negative.  Either tail can signal
+    # a discrepant member: in particular, an anomalously *low* signed loss can
+    # indicate that subtractive events have driven the member to the bounded
+    # logit edge.  Use a two-sided additive deviation from the robust centre.
+    degradation = np.abs(losses - median)
+    relative_threshold = 0.05 * max(abs(median), 1.0e-8)
+    mad_threshold = 5.0 * max(mad, 1.0e-8)
     bad: list[int] = []
     for index, item in enumerate(results):
         invalid = not np.isfinite(item.validation_loss)
-        relative_outlier = item.validation_loss > 1.05 * median
-        mad_outlier = item.validation_loss > median + 5.0 * max(mad, 1.0e-8)
+        relative_outlier = degradation[index] > relative_threshold
+        mad_outlier = degradation[index] > mad_threshold
         if invalid or (relative_outlier and mad_outlier):
             bad.append(index)
     return bad
@@ -722,8 +838,13 @@ def _predict_split(
                     np.asarray(arrays.features[selected]), mean, scale, device
                 )
                 for member_index, model in enumerate(models):
+                    logits = torch.clamp(
+                        model(tensor).reshape(-1),
+                        min=-float(architecture["loss_logit_clip"]),
+                        max=float(architecture["loss_logit_clip"]),
+                    )
                     predictions[start:stop, member_index] = (
-                        torch.sigmoid(model(tensor).reshape(-1))
+                        torch.sigmoid(logits)
                         .detach()
                         .cpu()
                         .numpy()
@@ -743,10 +864,16 @@ def _balanced_calibration_arrays(
     background_weights = np.asarray(
         cache["background"].weights[background.indices], dtype=np.float64
     )
+    signal_sum = float(np.sum(signal_weights, dtype=np.float64))
+    background_sum = float(np.sum(background_weights, dtype=np.float64))
+    if not np.isfinite(signal_sum) or signal_sum <= 0.0:
+        raise ValueError("signal calibration split has non-positive net signed yield")
+    if not np.isfinite(background_sum) or background_sum <= 0.0:
+        raise ValueError("background calibration split has non-positive net signed yield")
     weights = np.concatenate(
         [
-            0.5 * signal_weights / np.sum(signal_weights, dtype=np.float64),
-            0.5 * background_weights / np.sum(background_weights, dtype=np.float64),
+            0.5 * signal_weights / signal_sum,
+            0.5 * background_weights / background_sum,
         ]
     )
     scores = np.concatenate([signal.ensemble_score, background.ensemble_score])
@@ -764,23 +891,50 @@ def fit_logit_calibrator(
     logit_clip: float,
     minimum_scale: float = 0.1,
     maximum_scale: float = 5.0,
-    maximum_iterations: int = 100,
+    maximum_iterations: int = 1000,
 ) -> tuple[float, float]:
-    """Fit a two-parameter affine logit calibrator with weighted BCE."""
+    """Fit a bounded affine-logit calibrator with signed weighted BCE.
+
+    With signed weights the BCE Hessian need not be positive semidefinite, so
+    the Newton solve appropriate for nonnegative weights is not reliable.  We
+    instead use an absolute-weight Fisher matrix only as a local
+    preconditioner, with projected Armijo steps evaluated against the actual
+    signed objective.  A deterministic box-spanning multistart is used for
+    signed samples because their objective can have saddles and distinct local
+    minima.  This retains every weight sign while avoiding both saddle-point
+    acceptance and the very slow global step size that broad classifier logits
+    would otherwise impose.
+    """
 
     logits = stable_logit(scores, logit_clip=logit_clip)
     labels = np.asarray(labels, dtype=np.float64)
     weights = np.asarray(weights, dtype=np.float64)
     if logits.shape != labels.shape or labels.shape != weights.shape:
         raise ValueError("calibration arrays must have identical shapes")
+    if logits.size == 0:
+        raise ValueError("calibration arrays cannot be empty")
+    if not (
+        np.all(np.isfinite(logits))
+        and np.all(np.isfinite(labels))
+        and np.all(np.isfinite(weights))
+    ):
+        raise ValueError("calibration arrays must be finite")
+    if not np.all((labels == 0.0) | (labels == 1.0)):
+        raise ValueError("calibration labels must be zero or one")
+    if float(np.sum(weights, dtype=np.float64)) <= 0.0:
+        raise ValueError("calibration weights must have positive net signed sum")
     if not (0.0 < minimum_scale <= 1.0 <= maximum_scale):
         raise ValueError("calibration scale bounds must be positive and contain one")
+    if maximum_iterations < 1:
+        raise ValueError("maximum calibration iterations must be positive")
     design = np.column_stack([logits, np.ones_like(logits)])
-    parameters = np.array([1.0, 0.0], dtype=np.float64)
+    lower_bounds = np.array([minimum_scale, -logit_clip], dtype=np.float64)
+    upper_bounds = np.array([maximum_scale, logit_clip], dtype=np.float64)
+    gradient_tolerance = 1.0e-7
 
-    def objective(candidate: np.ndarray) -> float:
+    def objective_and_gradient(candidate: np.ndarray) -> tuple[float, np.ndarray]:
         prediction = design @ candidate
-        return float(
+        objective = float(
             np.sum(
                 weights
                 * (
@@ -791,43 +945,116 @@ def fit_logit_calibrator(
                 dtype=np.float64,
             )
         )
-
-    for _ in range(maximum_iterations):
-        prediction = design @ parameters
         probability = stable_sigmoid(prediction)
         gradient = design.T @ (weights * (probability - labels))
-        curvature = weights * probability * (1.0 - probability)
-        hessian = design.T @ (design * curvature[:, np.newaxis])
-        try:
-            step = np.linalg.solve(hessian, gradient)
-        except np.linalg.LinAlgError:
-            # Perfectly separated validation samples have no finite logistic
-            # MLE.  A pseudoinverse gives the last identifiable Newton step;
-            # clipping below supplies the documented finite ratio boundary.
-            step = np.linalg.pinv(hessian, rcond=1.0e-12) @ gradient
-            if not np.all(np.isfinite(step)) or float(np.max(np.abs(step))) == 0.0:
+        return objective, gradient
+
+    def optimize_from(initial: np.ndarray) -> tuple[np.ndarray, float, float]:
+        parameters = np.clip(
+            np.asarray(initial, dtype=np.float64), lower_bounds, upper_bounds
+        )
+        for _ in range(maximum_iterations):
+            prediction = design @ parameters
+            probability = stable_sigmoid(prediction)
+            old_objective, gradient = objective_and_gradient(parameters)
+
+            # This projected-gradient mapping is the KKT stationarity measure
+            # for the box and remains well behaved near a bound.  It avoids
+            # relying on a brittle exact-distance active-set test.
+            projected_gradient = parameters - np.clip(
+                parameters - gradient, lower_bounds, upper_bounds
+            )
+            free = np.abs(projected_gradient) > gradient_tolerance
+            if not np.any(free):
                 break
-        if float(np.max(np.abs(step))) < 1.0e-8:
-            break
-        old_objective = objective(parameters)
-        fraction = 1.0
-        accepted = False
-        while fraction >= 1.0e-8:
-            candidate = parameters - fraction * step
-            candidate[0] = np.clip(candidate[0], minimum_scale, maximum_scale)
-            candidate[1] = np.clip(candidate[1], -logit_clip, logit_clip)
-            if objective(candidate) <= old_objective:
-                unchanged = np.allclose(candidate, parameters, rtol=0.0, atol=1.0e-12)
-                parameters = candidate
-                accepted = True
+
+            # Positive absolute-weight curvature is deliberately *not* the
+            # objective Hessian; it is a well-conditioned metric for a descent
+            # direction of the signed gradient.
+            curvature = np.abs(weights) * probability * (1.0 - probability)
+            fisher = design.T @ (design * curvature[:, np.newaxis])
+            ridge = 1.0e-10 * max(float(np.trace(fisher)), 1.0)
+            fisher.flat[::3] += ridge
+            direction = np.zeros_like(parameters)
+            try:
+                direction[free] = -np.linalg.solve(
+                    fisher[np.ix_(free, free)], gradient[free]
+                )
+            except np.linalg.LinAlgError:
+                direction[free] = -gradient[free]
+
+            # Check the local direction itself, not only a fully projected
+            # unit step: clipping can make a unit step look descending even
+            # when every sufficiently small step is ascending.
+            if float(gradient @ direction) >= 0.0:
+                diagonal = np.maximum(np.diag(fisher), ridge)
+                direction.fill(0.0)
+                direction[free] = -gradient[free] / diagonal[free]
+
+            fraction = 1.0
+            accepted = False
+            while fraction >= 1.0e-12:
+                candidate = np.clip(
+                    parameters + fraction * direction,
+                    lower_bounds,
+                    upper_bounds,
+                )
+                displacement = candidate - parameters
+                if float(np.max(np.abs(displacement))) < 1.0e-12:
+                    break
+                # Armijo descent remains valid for a non-convex signed
+                # objective.
+                candidate_objective, _ = objective_and_gradient(candidate)
+                if candidate_objective <= old_objective + 1.0e-4 * float(
+                    gradient @ displacement
+                ) + 1.0e-14 * max(1.0, abs(old_objective)):
+                    parameters = candidate
+                    accepted = True
+                    break
+                fraction *= 0.5
+            if not accepted:
                 break
-            fraction *= 0.5
-        if not accepted:
-            break
-        if unchanged:
-            break
-    if not np.all(np.isfinite(parameters)) or parameters[0] <= 0.0:
-        raise RuntimeError("calibration produced an invalid affine transform")
+
+        if not np.all(np.isfinite(parameters)) or parameters[0] <= 0.0:
+            return parameters, math.inf, math.inf
+        final_objective, final_gradient = objective_and_gradient(parameters)
+        final_projected_gradient = parameters - np.clip(
+            parameters - final_gradient, lower_bounds, upper_bounds
+        )
+        maximum_projected_gradient = float(
+            np.max(np.abs(final_projected_gradient))
+        )
+        return parameters, final_objective, maximum_projected_gradient
+
+    # A nonnegative-weight logistic objective is convex, so the identity start
+    # is sufficient.  Signed BCE is a difference of convex functions: a point
+    # with zero gradient can be a saddle, and different starts can reach
+    # distinct local minima.  Cover the signed parameter box deterministically
+    # and retain the converged solution with the lowest *signed* objective.
+    starts = [np.array([1.0, 0.0], dtype=np.float64)]
+    if np.any(weights < 0.0):
+        middle_scale = 0.5 * (minimum_scale + maximum_scale)
+        for start_scale in (minimum_scale, middle_scale, maximum_scale):
+            for start_bias in (-logit_clip, 0.0, logit_clip):
+                candidate = np.array([start_scale, start_bias], dtype=np.float64)
+                if not any(np.array_equal(candidate, start) for start in starts):
+                    starts.append(candidate)
+
+    solutions = [optimize_from(start) for start in starts]
+    converged = [
+        solution
+        for solution in solutions
+        if np.isfinite(solution[1])
+        and solution[2] <= gradient_tolerance
+    ]
+    if not converged:
+        best_projected_gradient = min(solution[2] for solution in solutions)
+        raise RuntimeError(
+            "signed affine-logit calibration did not converge from any "
+            "deterministic start; minimum maximum projected gradient="
+            f"{best_projected_gradient:.6g}"
+        )
+    parameters, _, _ = min(converged, key=lambda solution: solution[1])
     return float(parameters[0]), float(parameters[1])
 
 
@@ -839,35 +1066,86 @@ def _normalization_bias(
     initial_bias: float,
     logit_clip: float,
 ) -> tuple[float, float]:
+    if not np.isfinite(scale) or scale <= 0.0:
+        raise ValueError("normalization scale must be finite and positive")
+    if not np.isfinite(initial_bias):
+        raise ValueError("normalization initial bias must be finite")
+    if not np.isfinite(logit_clip) or not (0.0 < logit_clip <= 100.0):
+        raise ValueError("normalization logit clip must be finite and lie in (0, 100]")
     logits = stable_logit(background_scores, logit_clip=logit_clip)
     scaled_logits = scale * logits
     if not np.all(np.isfinite(scaled_logits)):
         raise RuntimeError("calibration logits overflow during ratio normalization")
 
-    def mean_ratio(bias: float) -> float:
-        ratios = np.exp(np.clip(scale * logits + bias, -logit_clip, logit_clip))
-        return float(
-            np.sum(background_weights * ratios, dtype=np.float64)
-            / np.sum(background_weights, dtype=np.float64)
+    background_weights = np.asarray(background_weights, dtype=np.float64)
+    if background_weights.shape != logits.shape:
+        raise ValueError("normalization scores and weights must have identical shapes")
+    if not np.all(np.isfinite(background_weights)):
+        raise ValueError("normalization weights must be finite")
+    absolute_sum = float(np.sum(np.abs(background_weights), dtype=np.float64))
+    if not np.isfinite(absolute_sum) or absolute_sum <= 0.0:
+        raise ValueError("normalization weights contain no nonzero measure")
+    normalized_weights = background_weights / absolute_sum
+    net_fraction = float(np.sum(normalized_weights, dtype=np.float64))
+    if not np.isfinite(net_fraction) or net_fraction <= 0.0:
+        raise ValueError("normalization weights have non-positive net signed yield")
+
+    # A density-ratio normalization is one common positive multiplier.  Work
+    # in a shifted exponential basis so that signed cancellation is evaluated
+    # without overflow.  If the signed moment is non-positive, no such
+    # multiplier exists; finding a crossing by clipping different events at
+    # different bounds would manufacture a shape-changing "normalization".
+    maximum_logit = float(np.max(scaled_logits))
+    shifted_ratios = np.exp(scaled_logits - maximum_logit)
+    signed_shifted_moment = float(
+        np.sum(normalized_weights * shifted_ratios, dtype=np.float64)
+    )
+    absolute_shifted_moment = float(
+        np.sum(np.abs(normalized_weights) * shifted_ratios, dtype=np.float64)
+    )
+    if not np.isfinite(absolute_shifted_moment) or absolute_shifted_moment <= 0.0:
+        raise RuntimeError("ratio normalization has no finite weighted measure")
+    cancellation_ratio = signed_shifted_moment / absolute_shifted_moment
+    if not np.isfinite(cancellation_ratio) or cancellation_ratio <= 1.0e-12:
+        raise RuntimeError(
+            "the signed reference ratio moment is non-positive or numerically "
+            "cancelled; no stable positive density normalization exists"
         )
 
-    before = mean_ratio(initial_bias)
-    # At -max(t), every t+b is <= 0 and the mean ratio is <= 1.  At
-    # -min(t), every t+b is >= 0 and the mean is >= 1.  This is a guaranteed
-    # bracket even when an affine calibrator reaches its scale bound.
-    low = -float(np.max(scaled_logits))
-    high = -float(np.min(scaled_logits))
-    if high == low:
-        return low, before
-    for _ in range(120):
-        middle = 0.5 * (low + high)
-        if mean_ratio(middle) > 1.0:
-            high = middle
-        else:
-            low = middle
-    normalized_bias = 0.5 * (low + high)
-    normalized_mean = mean_ratio(normalized_bias)
-    if not np.isclose(normalized_mean, 1.0, rtol=1.0e-10, atol=1.0e-12):
+    log_mean_ratio = (
+        maximum_logit
+        + math.log(signed_shifted_moment)
+        - math.log(net_fraction)
+    )
+    normalized_bias = -log_mean_ratio
+    before_log = log_mean_ratio + initial_bias
+    try:
+        before = math.exp(before_log)
+    except OverflowError as error:
+        raise RuntimeError(
+            "the pre-normalization signed ratio moment overflows"
+        ) from error
+    if not np.isfinite(before) or before <= 0.0:
+        raise RuntimeError("the pre-normalization signed ratio moment is invalid")
+
+    normalized_logits = scaled_logits + normalized_bias
+    clip_tolerance = 1.0e-12 * max(1.0, abs(logit_clip))
+    if np.any(normalized_logits < -logit_clip - clip_tolerance) or np.any(
+        normalized_logits > logit_clip + clip_tolerance
+    ):
+        raise RuntimeError(
+            "density normalization would require clipping calibrated ratios and "
+            "therefore change their shape; increase --logit-clip or inspect the "
+            "signed-weight cancellation"
+        )
+    normalized_ratios = np.exp(
+        np.clip(normalized_logits, -logit_clip, logit_clip)
+    )
+    normalized_mean = float(
+        np.sum(normalized_weights * normalized_ratios, dtype=np.float64)
+        / net_fraction
+    )
+    if not np.isclose(normalized_mean, 1.0, rtol=1.0e-9, atol=1.0e-11):
         raise RuntimeError(
             "failed to normalize the calibrated density ratio: "
             f"E_B[r]={normalized_mean:.12g}"
@@ -934,7 +1212,7 @@ def _validate_existing_artifact(path: Path, *, expected_model_kind: str) -> None
             manifest = json.load(stream)
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"refusing to overwrite invalid model artifact: {path}") from error
-    if manifest.get("format_version") != ARTIFACT_FORMAT_VERSION:
+    if manifest.get("format_version") not in SUPPORTED_ARTIFACT_FORMAT_VERSIONS:
         raise ValueError(
             f"refusing to overwrite model artifact with unsupported format: {path}"
         )
@@ -1178,7 +1456,11 @@ def train(args: argparse.Namespace) -> Path:
                 "neurons": args.neurons,
                 "activation": "SiLU",
                 "output": "logit",
-                "loss": "balanced weighted BCEWithLogitsLoss",
+                "loss": "balanced signed-weight logit-clipped BCEWithLogitsLoss",
+                "loss_logit_clip": args.logit_clip,
+                "class_risk": "sum(w * BCE) / sum(w)",
+                "sampling": "with_replacement_proportional_to_absolute_weight",
+                "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
                 "dropout": 0.0,
                 "weight_decay": 0.0,
                 "optimizer": "NAdam",
@@ -1344,6 +1626,13 @@ def train(args: argparse.Namespace) -> Path:
                 },
                 "weight_branch": args.weight_branch,
                 "weight_measure": training_weight_contract,
+                "signed_weight_policy": {
+                    "event_weights": "finite nonzero weights retain their sign",
+                    "class_normalization": "net signed sum",
+                    "yield_central_values": "sum(w)",
+                    "statistical_variances": "sum(w^2)",
+                    "zero_weight_events": "omitted from cache and counted",
+                },
                 "luminosity_fb": args.expected_luminosity_fb,
                 "yields": {
                     "signal": signal_yield,
@@ -1376,8 +1665,11 @@ def train(args: argparse.Namespace) -> Path:
                     for name, statistics in classes.items()
                 },
                 "scaler": {
-                    "type": "balanced_weighted_standard",
+                    "type": "balanced_absolute_weight_standard",
                     "fit_split_only": True,
+                    "weight_semantics": (
+                        "absolute weights are used only for numerical preprocessing"
+                    ),
                     "mean": scaler_mean.tolist(),
                     "scale": scaler_scale.tolist(),
                 },
@@ -1387,15 +1679,19 @@ def train(args: argparse.Namespace) -> Path:
                     "size": len(results),
                     "minimum_size": 4,
                     "outlier_rule": (
-                        "validation loss is nonfinite, or worse than the median by "
+                        "validation loss is nonfinite, or differs from the median by "
                         "both >5% and >5 MAD"
                     ),
                     "maximum_retries_per_slot": args.max_retries,
                 },
                 "members": member_entries,
                 "calibration": {
-                    "method": "affine_logit_then_density_normalization",
+                    "method": (
+                        "bounded_multistart_fisher_preconditioned_affine_logit_then_"
+                        "shape_preserving_signed_density_normalization"
+                    ),
                     "fit_split": "validation",
+                    "weight_semantics": "signed class-balanced weights",
                     "scale": calibration_scale,
                     "scale_bounds": [
                         args.calibration_scale_min,
@@ -1404,6 +1700,9 @@ def train(args: argparse.Namespace) -> Path:
                     "bias_before_normalization": calibration_bias,
                     "normalization_before": normalization_before,
                     "bias_after_normalization": normalized_bias,
+                    "normalization_condition": (
+                        "signed E_background[r_shape] = 1"
+                    ),
                     "logit_clip": args.logit_clip,
                 },
                 "toolkit": {

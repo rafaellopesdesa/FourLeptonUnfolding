@@ -42,7 +42,9 @@ def _fake_torch() -> types.ModuleType:
     return module
 
 
-def _write_artifact(path: Path, *, model_kind: str) -> dict:
+def _write_artifact(
+    path: Path, *, model_kind: str, format_version: int = ARTIFACT_FORMAT_VERSION
+) -> dict:
     path.mkdir()
     members = []
     for slot in range(4):
@@ -57,13 +59,15 @@ def _write_artifact(path: Path, *, model_kind: str) -> dict:
             }
         )
     manifest = {
-        "format_version": ARTIFACT_FORMAT_VERSION,
+        "format_version": format_version,
         "model_kind": model_kind,
         "features": list(FEATURES),
         "model_features": list(MODEL_FEATURES),
         "toolkit": {"pinned_commit": TOOLKIT_COMMIT},
         "ratio_convention": {"orientation": "target_to_reference"},
-        "architecture": {},
+        "architecture": (
+            {"loss_logit_clip": 30.0} if format_version >= 3 else {}
+        ),
         "ensemble": {"size": 4},
         "members": members,
     }
@@ -148,6 +152,35 @@ class ArtifactContractTest(unittest.TestCase):
                     expected_model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
                 )
 
+    def test_loader_retains_legacy_v2_artifact_support(self):
+        with tempfile.TemporaryDirectory() as directory_name:
+            root = Path(directory_name) / "artifact"
+            _write_artifact(
+                root,
+                model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
+                format_version=2,
+            )
+            bundle = self._load(
+                root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL
+            )
+            self.assertEqual(bundle.manifest["format_version"], 2)
+            self.assertNotIn(
+                "loss_logit_clip", bundle.manifest["architecture"]
+            )
+
+    def test_v3_loader_requires_versioned_inference_logit_bound(self):
+        with tempfile.TemporaryDirectory() as directory_name:
+            root = Path(directory_name) / "artifact"
+            manifest = _write_artifact(
+                root, model_kind=MODEL_KIND_BACKGROUND_REMOVAL
+            )
+            manifest["architecture"].pop("loss_logit_clip")
+            (root / "manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "inference logit bound"):
+                self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+
 
 def _write_replacement_manifest(root: Path) -> dict:
     """Restore a valid manifest without replacing the already-written members."""
@@ -170,7 +203,7 @@ def _write_replacement_manifest(root: Path) -> dict:
         "model_features": list(MODEL_FEATURES),
         "toolkit": {"pinned_commit": TOOLKIT_COMMIT},
         "ratio_convention": {"orientation": "target_to_reference"},
-        "architecture": {},
+        "architecture": {"loss_logit_clip": 30.0},
         "ensemble": {"size": 4},
         "members": members,
     }

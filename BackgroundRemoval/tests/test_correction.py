@@ -3,18 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 import uproot
 
-from BackgroundRemoval.common import FEATURES
+from BackgroundRemoval.common import FEATURES, transformed_features
 from BackgroundRemoval.Correction.train_data_mc_correction import (
     _COMPONENT_DATA,
     _COMPONENT_GGH,
     _COMPONENT_ZZ,
     _parser,
+    _scan_inputs,
     _selected_chunks,
 )
+from BackgroundRemoval.Training.train_background_ratio import SelectedChunk
 
 
 def _write_sample(
@@ -42,6 +45,63 @@ def _write_sample(
 
 
 class CorrectionDataTest(unittest.TestCase):
+    def test_scan_uses_absolute_weights_only_for_scaler_moments(self):
+        raw_target = np.arange(6 * len(FEATURES), dtype=np.float32).reshape(
+            6, len(FEATURES)
+        ) / 20.0
+        raw_reference = raw_target + np.float32(0.3)
+        weights = np.array([2.0, -1.0, 2.0, -1.0, 2.0, -1.0])
+        splits = np.array([0, 0, 1, 1, 2, 2], dtype=np.uint8)
+        chunks = [
+            SelectedChunk(
+                class_name="signal",
+                component_name=_COMPONENT_DATA,
+                raw_features=raw_target,
+                weights=weights,
+                splits=splits,
+                zero_count=0,
+            ),
+            SelectedChunk(
+                class_name="background",
+                component_name=_COMPONENT_GGH,
+                raw_features=raw_reference,
+                weights=weights,
+                splits=splits,
+                zero_count=0,
+            ),
+        ]
+        with patch(
+            "BackgroundRemoval.Correction.train_data_mc_correction._selected_chunks",
+            return_value=iter(chunks),
+        ):
+            _, classes, mean, scale = _scan_inputs(
+                Path("data.root"),
+                Path("gg.root"),
+                Path("zz.root"),
+                weight_branch="weight",
+                split_seed=1,
+                expected_luminosity_fb=312.0,
+                step_size="1 MB",
+            )
+
+        transformed_target = transformed_features(raw_target[:2]).astype(np.float64)
+        transformed_reference = transformed_features(raw_reference[:2]).astype(
+            np.float64
+        )
+        absolute_fit_weights = np.array([2.0, 1.0])
+        target_mean = np.sum(
+            transformed_target * absolute_fit_weights[:, np.newaxis], axis=0
+        ) / 3.0
+        reference_mean = np.sum(
+            transformed_reference * absolute_fit_weights[:, np.newaxis], axis=0
+        ) / 3.0
+        np.testing.assert_allclose(mean, 0.5 * (target_mean + reference_mean))
+        self.assertTrue(np.all(np.isfinite(scale)))
+        self.assertTrue(np.all(scale > 0.0))
+        self.assertAlmostEqual(classes["signal"].sum_weights, 3.0)
+        self.assertAlmostEqual(classes["signal"].sum_absolute_weights, 9.0)
+        self.assertEqual(classes["signal"].negative_weight_entries, 3)
+
     def test_strict_sideband_and_physical_reference_mixture(self):
         with tempfile.TemporaryDirectory() as directory_name:
             directory = Path(directory_name)
@@ -86,7 +146,7 @@ class CorrectionDataTest(unittest.TestCase):
             )
             self.assertEqual(reference_yield, 36.0)
 
-    def test_selected_negative_reference_weight_is_rejected(self):
+    def test_selected_negative_reference_weight_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory_name:
             directory = Path(directory_name)
             data = directory / "data.root"
@@ -107,20 +167,23 @@ class CorrectionDataTest(unittest.TestCase):
                 masses=np.array([140.0]),
                 weights=np.array([-1.0]),
             )
-            with self.assertRaisesRegex(ValueError, "signed weighted BCE"):
-                list(
-                    _selected_chunks(
-                        data,
-                        gg_h,
-                        zz,
-                        weight_branch="weight",
-                        split_seed=17,
-                        expected_luminosity_fb=312.0,
-                        step_size="1 MB",
-                    )
+            chunks = list(
+                _selected_chunks(
+                    data,
+                    gg_h,
+                    zz,
+                    weight_branch="weight",
+                    split_seed=17,
+                    expected_luminosity_fb=312.0,
+                    step_size="1 MB",
                 )
+            )
+            by_component = {chunk.component_name: chunk for chunk in chunks}
+            self.assertEqual(by_component[_COMPONENT_DATA].weights.tolist(), [1.0])
+            self.assertEqual(by_component[_COMPONENT_GGH].weights.tolist(), [1.0])
+            self.assertEqual(by_component[_COMPONENT_ZZ].weights.tolist(), [-1.0])
 
-    def test_selected_negative_data_weight_is_rejected(self):
+    def test_selected_negative_data_weight_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory_name:
             directory = Path(directory_name)
             data = directory / "data.root"
@@ -141,20 +204,19 @@ class CorrectionDataTest(unittest.TestCase):
                 masses=np.array([140.0]),
                 weights=np.array([1.0]),
             )
-            with self.assertRaisesRegex(
-                ValueError, "data_reconstructed_correction_sideband.*selected negative"
-            ):
-                list(
-                    _selected_chunks(
-                        data,
-                        gg_h,
-                        zz,
-                        weight_branch="weight",
-                        split_seed=17,
-                        expected_luminosity_fb=312.0,
-                        step_size="1 MB",
-                    )
+            chunks = list(
+                _selected_chunks(
+                    data,
+                    gg_h,
+                    zz,
+                    weight_branch="weight",
+                    split_seed=17,
+                    expected_luminosity_fb=312.0,
+                    step_size="1 MB",
                 )
+            )
+            by_component = {chunk.component_name: chunk for chunk in chunks}
+            self.assertEqual(by_component[_COMPONENT_DATA].weights.tolist(), [-1.0])
 
     def test_training_defaults_match_ensemble_prescription(self):
         parser = _parser()

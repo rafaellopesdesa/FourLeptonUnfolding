@@ -19,7 +19,8 @@ import numpy as np
 
 
 TREE_NAME = "Analysis"
-ARTIFACT_FORMAT_VERSION = 2
+ARTIFACT_FORMAT_VERSION = 3
+SUPPORTED_ARTIFACT_FORMAT_VERSIONS = frozenset({2, ARTIFACT_FORMAT_VERSION})
 TOOLKIT_COMMIT = "fc09848fc6540fd32310faebbe9db6eea7ecd17b"
 
 MASS_BRANCH = "reco_m_ZZ"
@@ -461,10 +462,15 @@ class ModelBundle:
             raise FileNotFoundError(f"model manifest does not exist: {manifest_path}")
         with manifest_path.open(encoding="utf-8") as stream:
             manifest = json.load(stream)
-        if manifest.get("format_version") != ARTIFACT_FORMAT_VERSION:
+        format_version = manifest.get("format_version")
+        if (
+            isinstance(format_version, bool)
+            or not isinstance(format_version, int)
+            or format_version not in SUPPORTED_ARTIFACT_FORMAT_VERSIONS
+        ):
             raise ValueError(
-                f"unsupported model format {manifest.get('format_version')!r}; "
-                f"expected {ARTIFACT_FORMAT_VERSION}"
+                f"unsupported model format {format_version!r}; expected one of "
+                f"{sorted(SUPPORTED_ARTIFACT_FORMAT_VERSIONS)}"
             )
         model_kind = manifest.get("model_kind")
         if model_kind not in {
@@ -481,6 +487,20 @@ class ModelBundle:
             raise ValueError("model feature order is incompatible with this application")
         if tuple(manifest.get("model_features", ())) != MODEL_FEATURES:
             raise ValueError("model preprocessing schema is incompatible with this application")
+        architecture = manifest.get("architecture")
+        if not isinstance(architecture, Mapping):
+            raise ValueError("model artifact has no valid architecture contract")
+        if format_version >= 3:
+            loss_logit_clip = architecture.get("loss_logit_clip")
+            if (
+                isinstance(loss_logit_clip, bool)
+                or not isinstance(loss_logit_clip, (int, float))
+                or not np.isfinite(loss_logit_clip)
+                or not (0.0 < float(loss_logit_clip) <= 100.0)
+            ):
+                raise ValueError(
+                    "format-v3 model artifact has no valid inference logit bound"
+                )
         if manifest.get("toolkit", {}).get("pinned_commit") != TOOLKIT_COMMIT:
             raise ValueError("model toolkit revision is incompatible with this application")
         ratio_convention = manifest.get("ratio_convention")
@@ -568,6 +588,19 @@ class ModelBundle:
         if batch_size < 1:
             raise ValueError("inference batch size must be positive")
         standardized = (transformed - mean) / scale
+        # The member-logit bound became part of the serialized inference
+        # contract in format v3.  A legacy v2 artifact must retain its original
+        # unbounded inference semantics even if its free-form architecture
+        # mapping happens to contain a similarly named field.
+        loss_logit_clip = (
+            self.manifest["architecture"].get("loss_logit_clip")
+            if self.manifest["format_version"] >= 3
+            else None
+        )
+        if loss_logit_clip is not None:
+            loss_logit_clip = float(loss_logit_clip)
+            if not np.isfinite(loss_logit_clip) or loss_logit_clip <= 0.0:
+                raise ValueError("model loss-logit clip must be finite and positive")
         predictions = np.empty(
             (standardized.shape[0], len(self.models)), dtype=np.float64
         )
@@ -577,6 +610,12 @@ class ModelBundle:
                 tensor = torch.from_numpy(standardized[start:stop]).to(self.device)
                 for member_index, model in enumerate(self.models):
                     logits = model(tensor).reshape(-1)
+                    if loss_logit_clip is not None:
+                        logits = torch.clamp(
+                            logits,
+                            min=-loss_logit_clip,
+                            max=loss_logit_clip,
+                        )
                     predictions[start:stop, member_index] = (
                         torch.sigmoid(logits).detach().cpu().numpy()
                     )

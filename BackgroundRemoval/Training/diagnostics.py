@@ -69,6 +69,37 @@ def _histogram(
     return regular, regular_variance
 
 
+def _normalize_histogram_statistics(
+    contents: np.ndarray,
+    covariance: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Normalize a histogram and propagate its full covariance matrix.
+
+    The normalization denominator is formed from the same random bin contents,
+    so simply dividing each raw variance by the squared observed total misses
+    both denominator terms and the resulting cross-bin correlations.  Return
+    the Jacobian as well so target/estimate cross-covariances can be propagated
+    consistently.
+    """
+
+    contents = np.asarray(contents, dtype=np.float64)
+    covariance = np.asarray(covariance, dtype=np.float64)
+    if contents.ndim != 1 or covariance.shape != (contents.size, contents.size):
+        raise ValueError("histogram contents and covariance have incompatible shapes")
+    total = float(np.sum(contents, dtype=np.float64))
+    if not np.isfinite(total) or total <= 0.0:
+        raise ValueError("shape diagnostics require positive net signed histogram yields")
+    normalized = contents / total
+    jacobian = (
+        np.eye(contents.size, dtype=np.float64) - normalized[:, np.newaxis]
+    ) / total
+    normalized_covariance = jacobian @ covariance @ jacobian.T
+    normalized_covariance = 0.5 * (
+        normalized_covariance + normalized_covariance.T
+    )
+    return normalized, normalized_covariance, jacobian
+
+
 def _model_outputs(predictions: Any, manifest: dict[str, Any]) -> dict[str, np.ndarray]:
     calibration = manifest["calibration"]
     yields = manifest["yields"]
@@ -96,17 +127,22 @@ def _reliability(
     labels = np.concatenate(
         [np.ones(signal_scores.size), np.zeros(background_scores.size)]
     )
+    signal_sum = float(np.sum(signal_weights, dtype=np.float64))
+    background_sum = float(np.sum(background_weights, dtype=np.float64))
+    if signal_sum <= 0.0 or background_sum <= 0.0:
+        raise ValueError("reliability classes require positive net signed yields")
     weights = np.concatenate(
         [
-            0.5 * signal_weights / np.sum(signal_weights, dtype=np.float64),
-            0.5 * background_weights / np.sum(background_weights, dtype=np.float64),
+            0.5 * signal_weights / signal_sum,
+            0.5 * background_weights / background_sum,
         ]
     )
     edges = np.linspace(0.0, 1.0, bins + 1)
     centers = np.full(bins, np.nan)
     fractions = np.full(bins, np.nan)
     errors = np.full(bins, np.nan)
-    ece = 0.0
+    ece_numerator = 0.0
+    ece_mass = 0.0
     for index in range(bins):
         selected = (scores >= edges[index]) & (
             (scores < edges[index + 1]) if index + 1 < bins else (scores <= 1.0)
@@ -115,19 +151,46 @@ def _reliability(
             continue
         selected_weights = weights[selected]
         weight_sum = float(np.sum(selected_weights, dtype=np.float64))
+        absolute_sum = float(np.sum(np.abs(selected_weights), dtype=np.float64))
+        # A conditional signed fraction is undefined when cancellations leave
+        # a non-positive (or numerically zero) bin measure.  The histogram is
+        # still shown elsewhere with its signed content and sumw2 uncertainty.
+        if weight_sum <= np.finfo(np.float64).eps * max(absolute_sum, 1.0):
+            continue
         centers[index] = float(
             np.sum(selected_weights * scores[selected], dtype=np.float64) / weight_sum
         )
         fractions[index] = float(
             np.sum(selected_weights * labels[selected], dtype=np.float64) / weight_sum
         )
-        effective = weight_sum * weight_sum / float(
-            np.sum(selected_weights * selected_weights, dtype=np.float64)
+        signal_selected = labels[selected] == 1.0
+        signal_variance = float(
+            np.sum(
+                selected_weights[signal_selected] ** 2,
+                dtype=np.float64,
+            )
+        )
+        background_variance = float(
+            np.sum(
+                selected_weights[~signal_selected] ** 2,
+                dtype=np.float64,
+            )
         )
         errors[index] = math.sqrt(
-            max(fractions[index] * (1.0 - fractions[index]) / effective, 0.0)
+            max(
+                (
+                    (1.0 - fractions[index]) ** 2 * signal_variance
+                    + fractions[index] ** 2 * background_variance
+                )
+                / (weight_sum * weight_sum),
+                0.0,
+            )
         )
-        ece += weight_sum * abs(fractions[index] - centers[index])
+        # For positive weights this is the usual ECE.  With signed weights,
+        # |net bin mass| provides a nonnegative diagnostic aggregation while
+        # the bin centers/fractions themselves remain signed estimates.
+        ece_numerator += abs(weight_sum) * abs(fractions[index] - centers[index])
+        ece_mass += abs(weight_sum)
     clipped = np.clip(scores, 1.0e-12, 1.0 - 1.0e-12)
     nll = float(
         np.sum(
@@ -136,6 +199,7 @@ def _reliability(
         )
     )
     brier = float(np.sum(weights * (scores - labels) ** 2, dtype=np.float64))
+    ece = ece_numerator / ece_mass if ece_mass > 0.0 else math.nan
     return centers, fractions, errors, nll, brier, ece
 
 
@@ -166,17 +230,23 @@ def _draw_comparison(
         covariance, _ = _histogram(
             shared_values, shared_covariance_weights, edges
         )
+    target_covariance = np.diag(target_variance)
+    estimate_covariance = np.diag(estimate_variance)
+    cross_covariance = np.diag(covariance)
     if normalize:
-        target_scale = float(np.sum(target, dtype=np.float64))
-        estimate_scale = float(np.sum(estimate, dtype=np.float64))
-        if target_scale > 0.0:
-            target /= target_scale
-            target_variance /= target_scale * target_scale
-        if estimate_scale > 0.0:
-            estimate /= estimate_scale
-            estimate_variance /= estimate_scale * estimate_scale
-        if target_scale > 0.0 and estimate_scale > 0.0:
-            covariance /= target_scale * estimate_scale
+        target, target_covariance, target_jacobian = (
+            _normalize_histogram_statistics(target, target_covariance)
+        )
+        estimate, estimate_covariance, estimate_jacobian = (
+            _normalize_histogram_statistics(estimate, estimate_covariance)
+        )
+        cross_covariance = (
+            target_jacobian @ cross_covariance @ estimate_jacobian.T
+        )
+
+    target_variance = np.diag(target_covariance)
+    estimate_variance = np.diag(estimate_covariance)
+    covariance = np.diag(cross_covariance)
 
     centers = 0.5 * (edges[:-1] + edges[1:])
     widths = np.diff(edges)
@@ -237,29 +307,48 @@ def _draw_comparison(
         lower = min(0.8, float(np.min(ratio[finite_ratio] - ratio_error[finite_ratio])))
         upper = max(1.2, float(np.max(ratio[finite_ratio] + ratio_error[finite_ratio])))
         padding = 0.08 * max(upper - lower, 0.1)
-        ratio_axis.set_ylim(max(0.0, lower - padding), upper + padding)
+        ratio_axis.set_ylim(lower - padding, upper + padding)
     ratio_axis.set_ylabel("Estimate / target")
     ratio_axis.set_xlabel(xlabel)
     figure.subplots_adjust(left=0.12, right=0.97, bottom=0.11, top=0.92)
     pdf.savefig(figure)
     plt.close(figure)
 
-    combined_variance = np.maximum(
-        target_variance + estimate_variance - 2.0 * covariance, 0.0
+    combined_covariance = (
+        target_covariance
+        + estimate_covariance
+        - cross_covariance
+        - cross_covariance.T
     )
-    # Estimate-only support bins must contribute to the discrepancy even
-    # though a target ratio cannot be drawn there.
-    chi2_mask = combined_variance > 0.0
+    combined_covariance = 0.5 * (combined_covariance + combined_covariance.T)
+    eigenvalues, eigenvectors = np.linalg.eigh(combined_covariance)
+    eigenvalue_scale = max(
+        float(np.max(np.abs(eigenvalues), initial=0.0)),
+        np.finfo(np.float64).tiny,
+    )
+    eigenvalue_tolerance = (
+        np.finfo(np.float64).eps * max(combined_covariance.shape) * eigenvalue_scale
+    )
+    if np.any(eigenvalues < -100.0 * eigenvalue_tolerance):
+        raise ValueError("target/estimate covariance is not positive semidefinite")
+    positive_modes = eigenvalues > eigenvalue_tolerance
+    difference = estimate - target
+    projections = eigenvectors.T @ difference
     chi2 = float(
         np.sum(
-            (estimate[chi2_mask] - target[chi2_mask]) ** 2
-            / combined_variance[chi2_mask],
+            projections[positive_modes] ** 2 / eigenvalues[positive_modes],
             dtype=np.float64,
         )
     )
+    # Estimate-only support bins still count as populated even though a target
+    # ratio cannot be drawn there.  The covariance rank is reported separately
+    # because normalized histograms have an exact unit-sum null mode.
+    combined_variance = np.diag(combined_covariance)
+    chi2_mask = combined_variance > eigenvalue_tolerance
     return {
         "chi2": chi2,
         "bins": int(np.count_nonzero(chi2_mask)),
+        "covariance_rank": int(np.count_nonzero(positive_modes)),
         "target_integral": float(np.sum(target, dtype=np.float64)),
         "estimate_integral": float(np.sum(estimate, dtype=np.float64)),
     }
@@ -357,7 +446,8 @@ def make_diagnostics_pdf(
                 "The validation split sets early stopping and calibration.",
                 "Learned-shape plots use the untouched 25% closure split.",
                 "The scalar yield ratio uses the full selected totals by definition.",
-                "Selected negative training weights are rejected, never abs-weighted.",
+                "Signed weights enter BCE/calibration/yields with their original sign.",
+                "Absolute weights are used only for scaler moments and sampling.",
                 "",
                 f"Toolkit pin: {manifest['toolkit']['pinned_commit']}",
                 f"Ensemble: {manifest['ensemble']['size']} arithmetic-mean members",
@@ -402,6 +492,7 @@ def make_diagnostics_pdf(
 
         figure, axes = plt.subplots(1, 2, figsize=(12.0, 5.0))
         bins = np.linspace(0.0, 1.0, 51)
+        score_histograms: list[np.ndarray] = []
         for split_name, predictions, outputs, linestyle in (
             ("validation", validation, validation_outputs, "--"),
             ("closure", closure, closure_outputs, "-"),
@@ -420,11 +511,17 @@ def make_diagnostics_pdf(
                     if split_name == "validation"
                     else closure_weights[class_name]
                 )
-                axes[0].hist(
-                    values,
-                    bins=bins,
-                    weights=weights / np.sum(weights),
-                    histtype="step",
+                net_sum = float(np.sum(weights, dtype=np.float64))
+                if net_sum <= 0.0:
+                    raise ValueError(
+                        f"{split_name} {class_name} has non-positive net signed yield"
+                    )
+                contents, _ = np.histogram(values, bins=bins, weights=weights)
+                contents = np.asarray(contents, dtype=np.float64) / net_sum
+                score_histograms.append(contents)
+                axes[0].stairs(
+                    contents,
+                    bins,
                     linewidth=1.5,
                     linestyle=linestyle,
                     color=color,
@@ -432,11 +529,18 @@ def make_diagnostics_pdf(
                 )
         axes[0].set_xlabel("Calibrated balanced-prior score")
         axes[0].set_ylabel("Normalized entries")
-        axes[0].set_yscale("log")
+        all_score_bins = np.concatenate(score_histograms)
+        if np.any(all_score_bins < 0.0):
+            maximum = max(float(np.max(np.abs(all_score_bins))), 1.0e-12)
+            axes[0].set_yscale("symlog", linthresh=maximum * 1.0e-4)
+        else:
+            axes[0].set_yscale("log")
         axes[0].legend(fontsize=8)
         axes[0].set_title("Score stability")
 
         calibration_summary = {}
+        plotted_centers: list[float] = []
+        plotted_fractions: list[float] = []
         raw_centers, raw_fractions, raw_errors, raw_nll, raw_brier, raw_ece = (
             _reliability(
                 closure["signal"].ensemble_score,
@@ -446,6 +550,8 @@ def make_diagnostics_pdf(
             )
         )
         raw_valid = np.isfinite(raw_centers) & np.isfinite(raw_fractions)
+        plotted_centers.extend(raw_centers[raw_valid].tolist())
+        plotted_fractions.extend(raw_fractions[raw_valid].tolist())
         axes[1].errorbar(
             raw_centers[raw_valid],
             raw_fractions[raw_valid],
@@ -473,6 +579,8 @@ def make_diagnostics_pdf(
                 weights["background"],
             )
             valid = np.isfinite(centers) & np.isfinite(fractions)
+            plotted_centers.extend(centers[valid].tolist())
+            plotted_fractions.extend(fractions[valid].tolist())
             axes[1].errorbar(
                 centers[valid],
                 fractions[valid],
@@ -483,9 +591,21 @@ def make_diagnostics_pdf(
                 label=f"{label}: NLL={nll:.3f}, ECE={ece:.3f}",
             )
             calibration_summary[label] = {"nll": nll, "brier": brier, "ece": ece}
-        axes[1].plot([0.0, 1.0], [0.0, 1.0], "--", color="black", linewidth=1.0)
-        axes[1].set_xlim(0.0, 1.0)
-        axes[1].set_ylim(0.0, 1.0)
+        # Signed conditional estimates can fluctuate outside [0, 1] in bins
+        # with strong cancellation.  Show those fluctuations rather than
+        # clipping them out of the calibration evidence.
+        lower = min([0.0, *plotted_centers, *plotted_fractions])
+        upper = max([1.0, *plotted_centers, *plotted_fractions])
+        padding = 0.05 * max(upper - lower, 1.0)
+        axes[1].plot(
+            [lower - padding, upper + padding],
+            [lower - padding, upper + padding],
+            "--",
+            color="black",
+            linewidth=1.0,
+        )
+        axes[1].set_xlim(lower - padding, upper + padding)
+        axes[1].set_ylim(lower - padding, upper + padding)
         axes[1].set_xlabel("Mean predicted score")
         axes[1].set_ylabel(
             "Weighted target fraction" if correction_mode else "Weighted signal fraction"
@@ -705,7 +825,7 @@ def make_diagnostics_pdf(
         figure.suptitle("Closure summary", fontsize=18, y=0.97)
         first_heading = "MC*r -> data shape" if correction_mode else "B*r -> S shape"
         summary_lines = [
-            "Closure discrepancy metrics (chi2 / populated bins; diagnostic only)",
+            "Closure discrepancy metrics (chi2 / covariance rank; diagnostic only)",
             "",
         ]
         if correction_mode:
@@ -718,9 +838,9 @@ def make_diagnostics_pdf(
                 combined = report_metrics["combined_reference_yield_closure"][name]
                 requested = report_metrics["requested_application_closure"][name]
                 summary_lines.append(
-                    f"{name:29s} {shape['chi2']:7.2f}/{shape['bins']:<5d} "
-                    f"{combined['chi2']:8.2f}/{combined['bins']:<5d} "
-                    f"{requested['chi2']:8.2f}/{requested['bins']:<5d}"
+                    f"{name:29s} {shape['chi2']:7.2f}/{shape['covariance_rank']:<5d} "
+                    f"{combined['chi2']:8.2f}/{combined['covariance_rank']:<5d} "
+                    f"{requested['chi2']:8.2f}/{requested['covariance_rank']:<5d}"
                 )
         else:
             summary_lines.append(
@@ -731,8 +851,8 @@ def make_diagnostics_pdf(
                 shape = report_metrics["shape_closure"][name]
                 purity = report_metrics["purity_closure"][name]
                 summary_lines.append(
-                    f"{name:32s} {shape['chi2']:7.2f}/{shape['bins']:<7d} "
-                    f"{purity['chi2']:9.2f}/{purity['bins']:<7d}"
+                    f"{name:32s} {shape['chi2']:7.2f}/{shape['covariance_rank']:<7d} "
+                    f"{purity['chi2']:9.2f}/{purity['covariance_rank']:<7d}"
                 )
         signal_total = float(np.sum(closure_weights["signal"], dtype=np.float64))
         if correction_mode:

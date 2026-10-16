@@ -325,7 +325,14 @@ def _read_signal_region_histogram(
 
             values = np.asarray(arrays[value_branch], dtype=np.float64)
             effective_weights = base_weights * removal_weights
-            selected &= np.isfinite(values)
+            if np.any(np.isinf(values[selected])):
+                raise ValueError(
+                    f"{path} contains infinite selected values in {value_branch}"
+                )
+            # Undefined decay angles are represented by NaN in Analysis.
+            # They are absent only from their own histogram, not from the
+            # sample or any other observable.
+            selected &= ~np.isnan(values)
             pieces.append(
                 _weighted_histogram(
                     values[selected], effective_weights[selected], edges

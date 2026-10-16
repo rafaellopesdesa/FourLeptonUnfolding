@@ -4,14 +4,18 @@ from pathlib import Path
 import re
 import tempfile
 import unittest
+from unittest.mock import Mock
 
 import numpy as np
 import uproot
 
 from Plotting.plot_data_mc import (
+    HistogramValues,
     KINEMATIC_FIELDS,
     OBSERVABLES,
+    _draw_stack,
     _read_histogram,
+    _ratio_quantities,
     _weighted_histogram,
     create_comparison_pdf,
 )
@@ -80,6 +84,54 @@ class PlotDataMCTest(unittest.TestCase):
         np.testing.assert_allclose(result.variances, [7.0, 4.0])
         np.testing.assert_allclose(result.errors, [np.sqrt(7.0), 2.0])
 
+    def test_ratio_keeps_negative_denominators_and_uses_positive_errors(self):
+        reference = HistogramValues(
+            values=np.array([3.0, -2.0, 1.0]),
+            variances=np.array([9.0, 4.0, 1.0]),
+        )
+        denominator = HistogramValues(
+            values=np.array([-2.0, 4.0, 0.0]),
+            variances=np.array([1.0, 16.0, 25.0]),
+        )
+
+        ratio, ratio_error, relative_error = _ratio_quantities(
+            reference, denominator
+        )
+
+        np.testing.assert_allclose(ratio[:2], [-1.5, -0.5])
+        np.testing.assert_allclose(ratio_error[:2], [1.5, 0.5])
+        np.testing.assert_allclose(relative_error[:2], [0.5, 1.0])
+        self.assertTrue(np.isnan(ratio[2]))
+        self.assertTrue(np.isnan(ratio_error[2]))
+        self.assertTrue(np.isnan(relative_error[2]))
+
+    def test_stack_adds_signed_contents_and_sumw2_variances(self):
+        total = _draw_stack(
+            Mock(),
+            np.array([0.0, 1.0, 2.0]),
+            [
+                (
+                    "first",
+                    "blue",
+                    HistogramValues(
+                        values=np.array([3.0, -1.0]),
+                        variances=np.array([5.0, 1.0]),
+                    ),
+                ),
+                (
+                    "second",
+                    "orange",
+                    HistogramValues(
+                        values=np.array([-2.0, 4.0]),
+                        variances=np.array([4.0, 10.0]),
+                    ),
+                ),
+            ],
+        )
+
+        np.testing.assert_allclose(total.values, [1.0, 3.0])
+        np.testing.assert_allclose(total.variances, [9.0, 11.0])
+
     def test_rejects_a_luminosity_mismatch(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "sample.root"
@@ -93,6 +145,85 @@ class PlotDataMCTest(unittest.TestCase):
                     expected_lumi_pb_inverse=312_000.0,
                     step_size="1 MB",
                 )
+
+    def test_handles_undefined_values_without_accepting_invalid_weights(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            edges = np.array([105.0, 130.0, 160.0])
+
+            bad_weight = directory / "bad_weight.root"
+            with uproot.recreate(bad_weight) as root_file:
+                root_file["Analysis"] = {
+                    "reco_m_ZZ": np.array([120.0, 121.0, np.nan]),
+                    "reconstructed": np.array([True, True, False]),
+                    "weight": np.array([1.0, np.nan, np.nan]),
+                    "lumi": np.full(3, 312_000.0),
+                }
+            with self.assertRaisesRegex(ValueError, "selected event weights"):
+                _read_histogram(
+                    bad_weight,
+                    value_branch="reco_m_ZZ",
+                    selection_branch="reconstructed",
+                    edges=edges,
+                    expected_lumi_pb_inverse=312_000.0,
+                    step_size="1 MB",
+                )
+
+            bad_value = directory / "bad_value.root"
+            with uproot.recreate(bad_value) as root_file:
+                root_file["Analysis"] = {
+                    "reco_m_ZZ": np.array([120.0, np.nan, np.nan]),
+                    "reconstructed": np.array([True, True, False]),
+                    "weight": np.array([1.0, 1.0, np.nan]),
+                    "lumi": np.full(3, 312_000.0),
+                }
+            histogram = _read_histogram(
+                bad_value,
+                value_branch="reco_m_ZZ",
+                selection_branch="reconstructed",
+                edges=edges,
+                expected_lumi_pb_inverse=312_000.0,
+                step_size="1 MB",
+            )
+            np.testing.assert_allclose(histogram.values, [1.0, 0.0])
+            np.testing.assert_allclose(histogram.variances, [1.0, 0.0])
+
+            infinite_value = directory / "infinite_value.root"
+            with uproot.recreate(infinite_value) as root_file:
+                root_file["Analysis"] = {
+                    "reco_m_ZZ": np.array([120.0, np.inf]),
+                    "reconstructed": np.array([True, True]),
+                    "weight": np.array([1.0, 1.0]),
+                    "lumi": np.full(2, 312_000.0),
+                }
+            with self.assertRaisesRegex(ValueError, "infinite selected values"):
+                _read_histogram(
+                    infinite_value,
+                    value_branch="reco_m_ZZ",
+                    selection_branch="reconstructed",
+                    edges=edges,
+                    expected_lumi_pb_inverse=312_000.0,
+                    step_size="1 MB",
+                )
+
+            sentinel = directory / "sentinel.root"
+            with uproot.recreate(sentinel) as root_file:
+                root_file["Analysis"] = {
+                    "reco_m_ZZ": np.array([120.0, np.nan]),
+                    "reconstructed": np.array([True, False]),
+                    "weight": np.array([-1.0, np.nan]),
+                    "lumi": np.full(2, 312_000.0),
+                }
+            histogram = _read_histogram(
+                sentinel,
+                value_branch="reco_m_ZZ",
+                selection_branch="reconstructed",
+                edges=edges,
+                expected_lumi_pb_inverse=312_000.0,
+                step_size="1 MB",
+            )
+            np.testing.assert_allclose(histogram.values, [-1.0, 0.0])
+            np.testing.assert_allclose(histogram.variances, [1.0, 0.0])
 
     def test_creates_all_reco_and_fiducial_pages(self):
         with tempfile.TemporaryDirectory() as temporary:

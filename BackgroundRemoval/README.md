@@ -170,29 +170,70 @@ Both stages use the same defaults:
 - four independent ensemble members by default (configurable with
   `--ensemble-size`, with a minimum of four);
 - four hidden layers with 1024 SiLU cells per layer;
-- BCE with logits, NAdam, and exponential learning-rate decay;
+- signed BCE with logits bounded to `[-logit-clip, +logit-clip]`, NAdam, and
+  exponential learning-rate decay;
 - no dropout, weight decay, or other explicit regularization;
 - deterministic 60% fit, 15% validation/calibration, and 25% untouched
   closure splits;
 - arithmetic-mean probability aggregation;
-- affine-logit calibration followed by validation-split normalization of the
-  shape ratio, `E_reference[r_shape] = 1`;
-- robust retry of a member whose common validation loss is an outlier;
+- bounded affine-logit calibration followed by validation-split normalization
+  of the shape ratio, `E_reference[r_shape] = 1`; signed samples use a
+  deterministic box-spanning multistart because their BCE can be non-convex;
+- robust retry of a member whose common validation loss is an outlier in
+  either direction;
 - validation of the 312 fb$^{-1}$ input metadata.
 
 Training is chunked through a temporary memory-mapped cache. Use
 `--cache-directory` to place it on node-local scratch; it is removed after the
 run.
 
-Ordinary BCE density-ratio estimation requires a nonnegative measure. Either
-training stage therefore **stops if any selected event has a negative
-training weight**. It never takes absolute values, drops negative events, or
-passes signed weights to BCE. Zero-weight events make no contribution. This
-training restriction does not alter application: signed event weights in an
-input ROOT file are preserved exactly. In particular, the merger can produce
-negative unit-weight pseudo-data, so Correction training has an explicit
-positive-weight-sideband precondition and will hard-fail if such an event is
-selected.
+Both stages support signed event weights. For class `c`, define its net
+selected yield and squared-weight sum as
+
+```text
+W_c = sum_i(w_i)
+Q_c = sum_i(w_i^2)
+```
+
+Class balancing uses the **net** yield `W_c`, and the optimized signed BCE is
+
+```text
+L = 0.5 * [sum_signal(w_i * BCE_i) / W_signal
+         + sum_background(w_i * BCE_i) / W_background].
+```
+
+Thus a negative-weight event subtracts its BCE contribution. Its sign is
+never replaced by an absolute value, and the event is not discarded. The
+network logit—not the event weight—is bounded by `--logit-clip`; this is
+necessary because a finite-sample signed BCE would otherwise be unbounded
+below at a negative-weight atom. Zero-weight events make no contribution and
+may be omitted from the training cache. A finite positive net yield is still
+required for each class and split because it is the normalization denominator;
+that is a condition on the aggregate measure, not a veto on individual
+negative events.
+
+For a numerically efficient unbiased minibatch estimate, fit events are drawn
+with probability proportional to `abs(w_i)` and receive the coefficient
+`sign(w_i) * sum(abs(w)) / sum(w)` in the loss. The expectation of that
+estimator is exactly `sum(w_i * BCE_i) / sum(w_i)`; the absolute value controls
+only the proposal distribution and never changes the signed objective.
+Feature centering and scaling similarly use class-balanced `abs(w)` moments,
+because preprocessing variances must be nonnegative. The physical loss,
+calibration, ratios, yields, and closures continue to use signed weights.
+
+Shape normalization is a single positive multiplier. Training requires the
+signed reference moment of the calibrated positive ratio to be positive and
+not cancellation-dominated. It also refuses a normalization that would need
+per-event output clipping, because that would distort the learned shape rather
+than merely normalize it. These are aggregate validity conditions; individual
+negative events remain accepted.
+
+All weighted yields and histogram contents in the artifacts and diagnostics
+are signed sums. Statistical variances use `Q_c = sum(w_i^2)`, so negative
+weights increase the uncertainty even when they cancel the central value;
+the corresponding effective count is `W_c^2 / Q_c`. Application preserves
+the original signed event weights exactly. This convention is particularly
+important for the signed unit-weight pseudo-data emitted by the merger.
 
 Each model directory contains `manifest.json`, one checksummed state file per
 ensemble member (four by default), and `diagnostics.pdf`. The PDF reports
@@ -203,6 +244,12 @@ are evaluated on the untouched 25% closure split. The scalar yield ratio is,
 intentionally, computed from the full selected sample, so absolute-yield
 closure is not independent of that one scalar. The binned chi-square values
 are discrepancy summaries, not p-values.
+
+Newly trained model artifacts use format version 3, which makes the bounded
+member-logit inference rule part of the serialized contract. This revision
+still reads legacy format-v2 artifacts with their original unbounded
+member-score behavior. Older repository revisions must not be used to apply a
+format-v3 artifact.
 
 For Correction, the report shows both `(ZZ+ggH)*C` (the density ratio that was
 learned) and `ZZ*C+ggH` (the prescription that is actually applied). This

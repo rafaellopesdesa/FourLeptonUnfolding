@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import dataclass
+import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import stat
+import tempfile
 from typing import Any, Iterable
 
 import numpy as np
@@ -23,6 +28,7 @@ SAMPLE_PATTERNS = {
 }
 ESSENTIAL_BRANCHES = {"event_id", "weight", "reconstructed"}
 DEFAULT_LUMINOSITY_FB = 312.0
+PUBLICATION_MARKER = ".publication-in-progress"
 
 
 @dataclass(frozen=True)
@@ -54,11 +60,145 @@ class SignedExpectation:
 
 
 @dataclass(frozen=True)
+class SourceSnapshot:
+    """Stable identity and content digest for a source used in multiple passes."""
+
+    path: Path
+    device: int
+    inode: int
+    size_bytes: int
+    mtime_ns: int
+    ctime_ns: int
+    sha256: str
+
+    def as_metadata(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path),
+            "device": self.device,
+            "inode": self.inode,
+            "size_bytes": self.size_bytes,
+            "mtime_ns": self.mtime_ns,
+            "ctime_ns": self.ctime_ns,
+            "sha256": self.sha256,
+        }
+
+
+@dataclass(frozen=True)
+class PublishedPath:
+    """Identity of a file installed by one campaign publication attempt."""
+
+    path: Path
+    device: int
+    inode: int
+    size_bytes: int
+    mtime_ns: int
+    mode: int
+    sha256: str
+
+
+class CampaignPublicationError(RuntimeError):
+    """Publication failure, optionally retaining staging for manual recovery."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retained_staging_directory: Path | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.retained_staging_directory = retained_staging_directory
+
+
+@dataclass(frozen=True)
 class PseudoDataComponent:
     name: str
     path: Path
     stats: SampleStats
     expectation: SignedExpectation
+    source_snapshot: SourceSnapshot | None = None
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _stat_identity(path: Path) -> tuple[int, int, int, int, int]:
+    stat = path.stat()
+    return (
+        int(stat.st_dev),
+        int(stat.st_ino),
+        int(stat.st_size),
+        int(stat.st_mtime_ns),
+        int(stat.st_ctime_ns),
+    )
+
+
+def _snapshot_source(path: Path) -> SourceSnapshot:
+    resolved = path.expanduser().resolve(strict=True)
+    before = _stat_identity(resolved)
+    sha256 = _sha256_file(resolved)
+    after = _stat_identity(resolved)
+    if after != before:
+        raise RuntimeError(
+            f"source file changed while its fingerprint was being recorded: {resolved}"
+        )
+    return SourceSnapshot(resolved, *before, sha256)
+
+
+def _assert_source_unchanged(
+    snapshot: SourceSnapshot,
+    *,
+    context: str,
+    verify_sha256: bool = True,
+) -> None:
+    try:
+        identity = _stat_identity(snapshot.path)
+    except FileNotFoundError as error:
+        raise RuntimeError(
+            f"source file disappeared {context}: {snapshot.path}"
+        ) from error
+    expected_identity = (
+        snapshot.device,
+        snapshot.inode,
+        snapshot.size_bytes,
+        snapshot.mtime_ns,
+        snapshot.ctime_ns,
+    )
+    if identity != expected_identity:
+        raise RuntimeError(
+            f"source file changed {context}: {snapshot.path}; refusing to combine "
+            "statistics and events from different file versions"
+        )
+    if verify_sha256:
+        sha256 = _sha256_file(snapshot.path)
+        if _stat_identity(snapshot.path) != expected_identity:
+            raise RuntimeError(
+                f"source file changed {context}: {snapshot.path}; refusing to combine "
+                "statistics and events from different file versions"
+            )
+        if sha256 != snapshot.sha256:
+            raise RuntimeError(
+                f"source file content changed {context}: {snapshot.path}; refusing to "
+                "combine statistics and events from different file versions"
+            )
+
+
+def _assert_sources_unchanged(
+    snapshots: Iterable[SourceSnapshot],
+    *,
+    context: str,
+    verify_sha256: bool = True,
+) -> None:
+    for snapshot in snapshots:
+        _assert_source_unchanged(
+            snapshot,
+            context=context,
+            verify_sha256=verify_sha256,
+        )
 
 
 def _draw_signed_counts(
@@ -142,7 +282,16 @@ def scan_files(
     *,
     step_size: str,
     cross_section_override_pb: float | None = None,
+    source_snapshots: Iterable[SourceSnapshot] | None = None,
 ) -> tuple[SampleStats, set[str]]:
+    file_list = list(files)
+    snapshots = (
+        list(source_snapshots)
+        if source_snapshots is not None
+        else [_snapshot_source(path) for path in file_list]
+    )
+    if len(snapshots) != len(file_list):
+        raise ValueError("the source snapshot count does not match the input file count")
     entries = 0
     sum_weights = 0.0
     sum_squared_weights = 0.0
@@ -159,8 +308,14 @@ def scan_files(
     cross_sections: list[tuple[float, int]] = []
     expected_branches: set[str] | None = None
 
-    for path in files:
-        branches = _validate_tree(path, expected_branches)
+    for path, snapshot in zip(file_list, snapshots, strict=True):
+        _assert_source_unchanged(
+            snapshot,
+            context="before the statistics scan",
+            verify_sha256=False,
+        )
+        read_path = snapshot.path
+        branches = _validate_tree(read_path, expected_branches)
         if expected_branches is None:
             expected_branches = branches
         expressions = ["weight", "reconstructed"]
@@ -169,7 +324,7 @@ def scan_files(
             expressions.append("cross_section_pb")
         file_entries = 0
         file_cross_sections: list[np.ndarray] = []
-        with uproot.open(path) as root_file:
+        with uproot.open(read_path) as root_file:
             tree = root_file[TREE_NAME]
             for arrays in tree.iterate(
                 expressions=expressions,
@@ -180,7 +335,7 @@ def scan_files(
                 weights = np.asarray(arrays["weight"], dtype=np.float64)
                 reconstructed = np.asarray(arrays["reconstructed"], dtype=np.bool_)
                 if not np.all(np.isfinite(weights)):
-                    raise ValueError(f"{path} contains non-finite event weights")
+                    raise ValueError(f"{read_path} contains non-finite event weights")
                 file_entries += weights.size
                 entries += weights.size
                 sum_weights += float(np.sum(weights, dtype=np.float64))
@@ -217,11 +372,15 @@ def scan_files(
                         np.asarray(arrays["cross_section_pb"], dtype=np.float64)
                     )
         if file_entries == 0:
-            raise ValueError(f"{path} contains no events")
+            raise ValueError(f"{read_path} contains no events")
         if has_cross_section:
             cross_sections.append(
                 (_cross_section_from_values(file_cross_sections), file_entries)
             )
+        _assert_source_unchanged(
+            snapshot,
+            context="during the statistics scan",
+        )
 
     if expected_branches is None or entries == 0:
         raise ValueError("sample contains no events")
@@ -306,6 +465,73 @@ def _prepare_output(path: Path, overwrite: bool) -> Path:
     return temporary
 
 
+def _assert_close(label: str, observed: float, expected: float) -> None:
+    if not np.isclose(observed, expected, rtol=1.0e-10, atol=1.0e-12):
+        raise RuntimeError(
+            f"{label} changed between merge passes: observed {observed:.17g}, "
+            f"expected {expected:.17g}"
+        )
+
+
+def _validate_merged_output(
+    path: Path,
+    *,
+    entries: int,
+    sum_weight_shape: float,
+    sum_weight_nominal_pb: float,
+    sum_weights: float,
+    sum_squared_weights: float,
+    step_size: str,
+) -> None:
+    totals = {
+        "weight_shape": 0.0,
+        "weight_nominal_pb": 0.0,
+        "weight": 0.0,
+        "weight_squared": 0.0,
+    }
+    counted_entries = 0
+    with uproot.open(path) as root_file:
+        tree = root_file[TREE_NAME]
+        if int(tree.num_entries) != entries:
+            raise RuntimeError(
+                f"merged output has {tree.num_entries} entries, expected {entries}"
+            )
+        for arrays in tree.iterate(
+            expressions=["weight_shape", "weight_nominal_pb", "weight"],
+            step_size=step_size,
+            library="np",
+            how=dict,
+        ):
+            weights = np.asarray(arrays["weight"], dtype=np.float64)
+            counted_entries += weights.size
+            totals["weight_shape"] += float(
+                np.sum(arrays["weight_shape"], dtype=np.float64)
+            )
+            totals["weight_nominal_pb"] += float(
+                np.sum(arrays["weight_nominal_pb"], dtype=np.float64)
+            )
+            totals["weight"] += float(np.sum(weights, dtype=np.float64))
+            totals["weight_squared"] += float(
+                np.sum(weights * weights, dtype=np.float64)
+            )
+    if counted_entries != entries:
+        raise RuntimeError(
+            f"merged output iteration found {counted_entries} entries, expected {entries}"
+        )
+    _assert_close("merged shape-weight sum", totals["weight_shape"], sum_weight_shape)
+    _assert_close(
+        "merged nominal-pb weight sum",
+        totals["weight_nominal_pb"],
+        sum_weight_nominal_pb,
+    )
+    _assert_close("merged event-weight sum", totals["weight"], sum_weights)
+    _assert_close(
+        "merged event-weight squared sum",
+        totals["weight_squared"],
+        sum_squared_weights,
+    )
+
+
 def merge_sample(
     files: list[Path],
     output_path: Path,
@@ -315,10 +541,12 @@ def merge_sample(
     luminosity_fb: float = DEFAULT_LUMINOSITY_FB,
     overwrite: bool,
 ) -> SampleStats:
+    source_snapshots = [_snapshot_source(path) for path in files]
     stats, branches = scan_files(
         files,
         step_size=step_size,
         cross_section_override_pb=cross_section_override_pb,
+        source_snapshots=source_snapshots,
     )
     if not np.isfinite(luminosity_fb) or luminosity_fb <= 0.0:
         raise ValueError("merged-sample luminosity must be finite and positive")
@@ -332,15 +560,32 @@ def merge_sample(
     shape_scale = stats.entries / stats.sum_weights
     nominal_pb_scale = stats.cross_section_pb / stats.sum_weights
     yield_scale = nominal_pb_scale * luminosity_pb_inverse
-    schema = _tree_schema(files[0], branches, include_merged_weights=True)
+    first_snapshot = source_snapshots[0]
+    schema = _tree_schema(
+        first_snapshot.path,
+        branches,
+        include_merged_weights=True,
+    )
+    _assert_sources_unchanged(
+        source_snapshots,
+        context="between the statistics and schema passes",
+        verify_sha256=False,
+    )
     temporary = _prepare_output(output_path, overwrite)
     next_event_id = 0
+    written_input_sum_weights = 0.0
+    written_input_sum_squared_weights = 0.0
     try:
         with uproot.recreate(temporary) as output_file:
             output_file.mktree(TREE_NAME, schema, title="Merged compact four-lepton sample")
             output_tree = output_file[TREE_NAME]
-            for path in files:
-                with uproot.open(path) as input_file:
+            for snapshot in source_snapshots:
+                _assert_source_unchanged(
+                    snapshot,
+                    context="before the merge write pass",
+                    verify_sha256=False,
+                )
+                with uproot.open(snapshot.path) as input_file:
                     for arrays in input_file[TREE_NAME].iterate(
                         step_size=step_size,
                         library="np",
@@ -352,6 +597,12 @@ def merge_sample(
                         )
                         input_weight = np.asarray(
                             arrays["weight"], dtype=np.float64
+                        )
+                        written_input_sum_weights += float(
+                            np.sum(input_weight, dtype=np.float64)
+                        )
+                        written_input_sum_squared_weights += float(
+                            np.sum(input_weight * input_weight, dtype=np.float64)
                         )
                         arrays["weight_shape"] = input_weight * shape_scale
                         arrays["weight_nominal_pb"] = (
@@ -371,18 +622,53 @@ def merge_sample(
                         )
                         output_tree.extend(arrays)
                         next_event_id += size
+                _assert_source_unchanged(
+                    snapshot,
+                    context="during the merge write pass",
+                    verify_sha256=False,
+                )
+            if next_event_id != stats.entries:
+                raise RuntimeError(
+                    f"merge write pass found {next_event_id} entries, but the statistics "
+                    f"pass found {stats.entries}"
+                )
+            _assert_close(
+                "input event-weight sum",
+                written_input_sum_weights,
+                stats.sum_weights,
+            )
+            _assert_close(
+                "input event-weight squared sum",
+                written_input_sum_squared_weights,
+                stats.sum_squared_weights,
+            )
             output_file["merge_metadata"] = json.dumps(
                 {
                     "format_version": 2,
                     "weight_semantics": "expected_events_at_luminosity",
                     "weight_units": "events",
                     "inputs": [str(path) for path in files],
+                    "input_sources": [
+                        snapshot.as_metadata() for snapshot in source_snapshots
+                    ],
                     "entries": stats.entries,
                     "input_sum_weights": stats.sum_weights,
+                    "input_sum_squared_weights": stats.sum_squared_weights,
                     "output_sum_weight_shape": float(stats.entries),
+                    "output_sum_squared_weight_shape": (
+                        stats.sum_squared_weights * shape_scale * shape_scale
+                    ),
                     "output_sum_weight_nominal_pb": stats.cross_section_pb,
+                    "output_sum_squared_weight_nominal_pb": (
+                        stats.sum_squared_weights
+                        * nominal_pb_scale
+                        * nominal_pb_scale
+                    ),
                     "output_sum_weights": (
                         stats.cross_section_pb * luminosity_pb_inverse
+                    ),
+                    "output_sum_squared_weights": (
+                        stats.sum_squared_weights * yield_scale * yield_scale
                     ),
                     "shape_weight_scale": shape_scale,
                     "weight_nominal_pb_scale": nominal_pb_scale,
@@ -416,6 +702,21 @@ def merge_sample(
                 },
                 sort_keys=True,
             )
+        _assert_sources_unchanged(
+            source_snapshots,
+            context="before finalizing the merged output",
+        )
+        _validate_merged_output(
+            temporary,
+            entries=stats.entries,
+            sum_weight_shape=float(stats.entries),
+            sum_weight_nominal_pb=stats.cross_section_pb,
+            sum_weights=stats.cross_section_pb * luminosity_pb_inverse,
+            sum_squared_weights=(
+                stats.sum_squared_weights * yield_scale * yield_scale
+            ),
+            step_size=step_size,
+        )
         os.replace(temporary, output_path)
     except Exception:
         if temporary.exists():
@@ -508,11 +809,15 @@ def _net_effective_luminosity_fb(stats: SampleStats) -> float | None:
 
 def _component_diagnostics(component: PseudoDataComponent) -> dict[str, Any]:
     stats = component.stats
-    return {
+    diagnostics = {
         "source": str(component.path),
         "cross_section_pb": stats.cross_section_pb,
         "inclusive_sum_weights": stats.sum_weights,
+        "inclusive_sum_squared_weights": stats.sum_squared_weights,
         "reconstructed_sum_weights": stats.reconstructed_sum_weights,
+        "reconstructed_sum_squared_weights": (
+            stats.reconstructed_sum_squared_weights
+        ),
         "reconstructed_positive_entries": stats.reconstructed_positive_entries,
         "reconstructed_negative_entries": stats.reconstructed_negative_entries,
         "reconstructed_positive_sum_weights": (
@@ -520,6 +825,12 @@ def _component_diagnostics(component: PseudoDataComponent) -> dict[str, Any]:
         ),
         "reconstructed_negative_sum_abs_weights": (
             stats.reconstructed_negative_sum_abs_weights
+        ),
+        "reconstructed_positive_sum_squared_weights": (
+            stats.reconstructed_positive_sum_squared_weights
+        ),
+        "reconstructed_negative_sum_squared_weights": (
+            stats.reconstructed_negative_sum_squared_weights
         ),
         "reconstructed_positive_effective_entries": (
             _reconstructed_effective_entries(stats, +1)
@@ -544,6 +855,9 @@ def _component_diagnostics(component: PseudoDataComponent) -> dict[str, Any]:
         "expected_negative": component.expectation.negative,
         "expected_net": component.expectation.net,
     }
+    if component.source_snapshot is not None:
+        diagnostics["source_snapshot"] = component.source_snapshot.as_metadata()
+    return diagnostics
 
 
 def _empty_arrays(schema: dict[str, np.dtype]) -> dict[str, np.ndarray]:
@@ -558,14 +872,31 @@ def _sample_reconstructed(
     total_abs_weight: float,
     rng: np.random.Generator,
     step_size: str,
+    source_snapshot: SourceSnapshot | None = None,
 ) -> dict[str, np.ndarray]:
     if sign not in (-1, +1):
         raise ValueError("the sampling sign must be +1 or -1")
-    with uproot.open(path) as root_file:
+    snapshot = source_snapshot or _snapshot_source(path)
+    _assert_source_unchanged(
+        snapshot,
+        context="before pseudo-data sampling",
+        verify_sha256=False,
+    )
+    with uproot.open(snapshot.path) as root_file:
         tree = root_file[TREE_NAME]
         branches = _branch_names(tree)
-        schema = _tree_schema(path, branches)
+        schema = _tree_schema(snapshot.path, branches)
+        _assert_source_unchanged(
+            snapshot,
+            context="during pseudo-data schema discovery",
+            verify_sha256=False,
+        )
         if count == 0:
+            _assert_source_unchanged(
+                snapshot,
+                context="during zero-count pseudo-data sampling",
+                verify_sha256=source_snapshot is None,
+            )
             return _empty_arrays(schema)
         if not np.isfinite(total_abs_weight) or total_abs_weight <= 0.0:
             raise ValueError(
@@ -619,6 +950,11 @@ def _sample_reconstructed(
                 f"failed to map all {count} sign {sign:+d} bootstrap draws from {path}; "
                 "the stored signed-weight statistics are inconsistent with the tree"
             )
+        _assert_source_unchanged(
+            snapshot,
+            context="between pseudo-data selection and materialization passes",
+            verify_sha256=False,
+        )
 
         pieces: dict[str, list[np.ndarray]] = {name: [] for name in schema}
         entry_offset = 0
@@ -635,6 +971,11 @@ def _sample_reconstructed(
             entry_offset = upper
         if selected_start != count:
             raise RuntimeError(f"failed to sample all requested events from {path}")
+    _assert_source_unchanged(
+        snapshot,
+        context="during pseudo-data sampling",
+        verify_sha256=source_snapshot is None,
+    )
     return {
         name: np.concatenate(values) if values else np.empty(0, dtype=schema[name])
         for name, values in pieces.items()
@@ -650,16 +991,80 @@ def _pseudo_data_components(
 ) -> list[PseudoDataComponent]:
     components: list[PseudoDataComponent] = []
     for name, path in (("ZZ", zz_path), ("gg_H", higgs_path)):
-        stats, _ = scan_files([path], step_size=step_size)
+        snapshot = _snapshot_source(path)
+        stats, _ = scan_files(
+            [path],
+            step_size=step_size,
+            source_snapshots=[snapshot],
+        )
         components.append(
             PseudoDataComponent(
                 name=name,
                 path=path,
                 stats=stats,
                 expectation=_signed_expectation(stats, luminosity_fb),
+                source_snapshot=snapshot,
             )
         )
     return components
+
+
+def _validate_pseudo_data_output(
+    path: Path,
+    *,
+    entries: int,
+    observed_positive: int,
+    observed_negative: int,
+    step_size: str,
+) -> None:
+    counted_entries = 0
+    counted_positive = 0
+    counted_negative = 0
+    sum_weights = 0.0
+    sum_squared_weights = 0.0
+    with uproot.open(path) as root_file:
+        tree = root_file[TREE_NAME]
+        if int(tree.num_entries) != entries:
+            raise RuntimeError(
+                f"pseudo-data output has {tree.num_entries} entries, expected {entries}"
+            )
+        for arrays in tree.iterate(
+            expressions=["weight"],
+            step_size=step_size,
+            library="np",
+            how=dict,
+        ):
+            weights = np.asarray(arrays["weight"], dtype=np.float64)
+            if np.any((weights != 1.0) & (weights != -1.0)):
+                raise RuntimeError("pseudo-data output contains a non-unit signed weight")
+            counted_entries += weights.size
+            counted_positive += int(np.count_nonzero(weights > 0.0))
+            counted_negative += int(np.count_nonzero(weights < 0.0))
+            sum_weights += float(np.sum(weights, dtype=np.float64))
+            sum_squared_weights += float(
+                np.sum(weights * weights, dtype=np.float64)
+            )
+    if counted_entries != entries:
+        raise RuntimeError(
+            f"pseudo-data output iteration found {counted_entries} entries, "
+            f"expected {entries}"
+        )
+    if counted_positive != observed_positive or counted_negative != observed_negative:
+        raise RuntimeError(
+            "pseudo-data output sign counts do not match the Poisson draws: "
+            f"observed (+{counted_positive}, -{counted_negative}), expected "
+            f"(+{observed_positive}, -{observed_negative})"
+        )
+    _assert_close(
+        "pseudo-data signed-weight sum",
+        sum_weights,
+        float(observed_positive - observed_negative),
+    )
+    _assert_close(
+        "pseudo-data squared-weight sum",
+        sum_squared_weights,
+        float(observed_positive + observed_negative),
+    )
 
 
 def _build_pseudo_data_file(
@@ -673,13 +1078,25 @@ def _build_pseudo_data_file(
     seed_sequence: np.random.SeedSequence,
     step_size: str,
     overwrite: bool,
+    verify_source_hashes: bool = True,
 ) -> dict[str, Any]:
     luminosity_pb_inverse = luminosity_fb * 1000.0
+    source_snapshots = [
+        component.source_snapshot or _snapshot_source(component.path)
+        for component in components
+    ]
+    _assert_sources_unchanged(
+        source_snapshots,
+        context="before building a pseudo-data file",
+        verify_sha256=False,
+    )
     child_sequences = seed_sequence.spawn(4 * len(components) + 1)
     sampled: list[dict[str, np.ndarray]] = []
     process_metadata: dict[str, dict[str, Any]] = {}
 
-    for component_index, component in enumerate(components):
+    for component_index, (component, source_snapshot) in enumerate(
+        zip(components, source_snapshots, strict=True)
+    ):
         stats = component.stats
         expectation = component.expectation
         offset = 4 * component_index
@@ -704,6 +1121,7 @@ def _build_pseudo_data_file(
                 total_abs_weight=_reconstructed_sign_sum_weights(stats, sign),
                 rng=sample_rng,
                 step_size=step_size,
+                source_snapshot=source_snapshot,
             )
             arrays["weight"] = np.full(observed, sign, dtype=np.float64)
             arrays["weight_shape"] = np.full(
@@ -721,15 +1139,25 @@ def _build_pseudo_data_file(
             sampled.append(arrays)
 
         details = _component_diagnostics(component)
+        details["source_snapshot"] = source_snapshot.as_metadata()
         details.update(
             {
                 "observed_positive": observed_positive,
                 "observed_negative": observed_negative,
                 "observed_net": observed_positive - observed_negative,
                 "observed_entries": observed_positive + observed_negative,
+                "observed_sum_squared_weights": (
+                    observed_positive + observed_negative
+                ),
             }
         )
         process_metadata[component.name] = details
+
+    _assert_sources_unchanged(
+        source_snapshots,
+        context="after pseudo-data sampling",
+        verify_sha256=verify_source_hashes,
+    )
 
     branch_names = set(sampled[0])
     if any(set(component) != branch_names for component in sampled[1:]):
@@ -792,6 +1220,12 @@ def _build_pseudo_data_file(
         "total_sum_abs_weights": int(
             sum(details["observed_entries"] for details in process_metadata.values())
         ),
+        "total_sum_squared_weights": int(
+            sum(
+                details["observed_sum_squared_weights"]
+                for details in process_metadata.values()
+            )
+        ),
     }
     try:
         with uproot.recreate(temporary) as output_file:
@@ -802,6 +1236,18 @@ def _build_pseudo_data_file(
             )
             output_file[TREE_NAME].extend(combined)
             output_file["merge_metadata"] = json.dumps(metadata, sort_keys=True)
+        _assert_sources_unchanged(
+            source_snapshots,
+            context="before finalizing the pseudo-data output",
+            verify_sha256=False,
+        )
+        _validate_pseudo_data_output(
+            temporary,
+            entries=total,
+            observed_positive=total_observed_positive,
+            observed_negative=total_observed_negative,
+            step_size=step_size,
+        )
         os.replace(temporary, output_path)
     except Exception:
         if temporary.exists():
@@ -899,6 +1345,407 @@ def _write_json(path: Path, payload: dict[str, Any], overwrite: bool) -> None:
         raise
 
 
+def _path_exists_without_following_symlinks(path: Path) -> bool:
+    return os.path.lexists(path)
+
+
+def _published_path(
+    staged_path: Path,
+    final_path: Path,
+    *,
+    expected_sha256: str,
+) -> PublishedPath:
+    """Record the staged inode that is about to be linked into place."""
+
+    stat = staged_path.lstat()
+    return PublishedPath(
+        path=final_path,
+        device=int(stat.st_dev),
+        inode=int(stat.st_ino),
+        size_bytes=int(stat.st_size),
+        mtime_ns=int(stat.st_mtime_ns),
+        mode=int(stat.st_mode),
+        sha256=expected_sha256,
+    )
+
+
+def _snapshot_publication_target(path: Path) -> PublishedPath:
+    """Fingerprint an existing regular-file destination before publication."""
+
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode):
+        if stat.S_ISDIR(before.st_mode):
+            raise IsADirectoryError(path)
+        raise OSError(f"output is not a regular file: {path}")
+    sha256 = _sha256_file(path)
+    after = path.lstat()
+    before_identity = (
+        int(before.st_dev),
+        int(before.st_ino),
+        int(before.st_size),
+        int(before.st_mtime_ns),
+        int(before.st_mode),
+    )
+    after_identity = (
+        int(after.st_dev),
+        int(after.st_ino),
+        int(after.st_size),
+        int(after.st_mtime_ns),
+        int(after.st_mode),
+    )
+    if after_identity != before_identity:
+        raise RuntimeError(
+            f"output changed while its publication snapshot was recorded: {path}"
+        )
+    return PublishedPath(
+        path=path,
+        device=before_identity[0],
+        inode=before_identity[1],
+        size_bytes=before_identity[2],
+        mtime_ns=before_identity[3],
+        mode=before_identity[4],
+        sha256=sha256,
+    )
+
+
+def _is_unchanged_published_path(
+    publication: PublishedPath,
+    path: Path | None = None,
+) -> bool:
+    """Return whether ``path`` is still the exact file we published."""
+
+    candidate = publication.path if path is None else path
+    try:
+        before = candidate.lstat()
+    except FileNotFoundError:
+        return False
+    observed = (
+        int(before.st_dev),
+        int(before.st_ino),
+        int(before.st_size),
+        int(before.st_mtime_ns),
+        int(before.st_mode),
+    )
+    expected = (
+        publication.device,
+        publication.inode,
+        publication.size_bytes,
+        publication.mtime_ns,
+        publication.mode,
+    )
+    if observed != expected:
+        return False
+    try:
+        sha256 = _sha256_file(candidate)
+        after = candidate.lstat()
+    except OSError:
+        return False
+    after_identity = (
+        int(after.st_dev),
+        int(after.st_ino),
+        int(after.st_size),
+        int(after.st_mtime_ns),
+        int(after.st_mode),
+    )
+    return after_identity == expected and sha256 == publication.sha256
+
+
+def _preserve_rollback_path(
+    source_path: Path,
+    final_path: Path,
+    *,
+    label: str,
+) -> Path:
+    """Move a blocked rollback file outside the ephemeral staging tree."""
+
+    recovery_directory = Path(
+        tempfile.mkdtemp(
+            prefix=f".{final_path.name}.{label}-",
+            suffix=".recovery",
+            dir=final_path.parent,
+        )
+    )
+    recovery_path = recovery_directory / final_path.name
+    try:
+        os.replace(source_path, recovery_path)
+    except Exception:
+        recovery_directory.rmdir()
+        raise
+    return recovery_path
+
+
+@contextmanager
+def _campaign_staging_directory(output_directory: Path) -> Iterable[Path]:
+    """Clean staging unless publication reports an unrecovered object in it."""
+
+    staging_directory = Path(
+        tempfile.mkdtemp(
+            prefix=".pseudo_data_campaign.",
+            dir=output_directory,
+        )
+    )
+    retain = False
+    try:
+        yield staging_directory
+    except CampaignPublicationError as error:
+        retain = error.retained_staging_directory is not None
+        raise
+    except BaseException as error:
+        if (staging_directory / PUBLICATION_MARKER).exists():
+            retain = True
+            raise CampaignPublicationError(
+                "campaign rollback was interrupted; automatic cleanup disabled "
+                f"and staging retained at {staging_directory}",
+                retained_staging_directory=staging_directory,
+            ) from error
+        raise
+    finally:
+        if not retain and staging_directory.exists():
+            shutil.rmtree(staging_directory)
+
+
+def _publish_staged_campaign(
+    staged_output_paths: list[tuple[Path, Path]],
+    staged_manifest_path: Path,
+    manifest_path: Path,
+    *,
+    staging_directory: Path,
+    overwrite: bool,
+    expected_sha256: dict[Path, str],
+) -> None:
+    """Publish a staged campaign and safely restore prior files on an error."""
+
+    backup_directory = staging_directory / "backups"
+    backups: dict[Path, Path] = {}
+    published: list[PublishedPath] = []
+    destinations = [
+        *(final_path for _, final_path in staged_output_paths),
+        manifest_path,
+    ]
+    if len(set(destinations)) != len(destinations):
+        raise ValueError("campaign publication destinations must be unique")
+    initial_destinations: dict[Path, PublishedPath] = {}
+    for destination in destinations:
+        if not _path_exists_without_following_symlinks(destination):
+            continue
+        if not overwrite:
+            raise FileExistsError(
+                f"output appeared while the campaign was being built: {destination}"
+            )
+        initial_destinations[destination] = _snapshot_publication_target(
+            destination
+        )
+    publication_marker = staging_directory / PUBLICATION_MARKER
+    publication_marker.touch(exist_ok=False)
+
+    def publish_one(staged_path: Path, final_path: Path, index: int) -> None:
+        initial_destination = initial_destinations.get(final_path)
+        if initial_destination is not None:
+            backup_directory.mkdir(parents=True, exist_ok=True)
+            backup_path = backup_directory / f"{index:04d}-{final_path.name}"
+            # Register the claim before the atomic move so an asynchronous
+            # interruption immediately after the syscall cannot orphan it.
+            backups[final_path] = backup_path
+            try:
+                # Claim the destination first, then validate the claimed inode.
+                # If the pathname was swapped after the initial snapshot, that
+                # replacement becomes a tracked backup and is never discarded.
+                os.replace(final_path, backup_path)
+            except FileNotFoundError as error:
+                raise RuntimeError(
+                    f"output disappeared before it could be published: {final_path}"
+                ) from error
+            if not _is_unchanged_published_path(
+                initial_destination,
+                backup_path,
+            ):
+                raise RuntimeError(
+                    f"output changed while it was being claimed for publication: "
+                    f"{final_path}"
+                )
+        elif _path_exists_without_following_symlinks(final_path):
+            raise FileExistsError(
+                f"output appeared while the campaign was being built: {final_path}"
+            )
+        expected_digest = expected_sha256.get(final_path)
+        if expected_digest is None:
+            expected_digest = _sha256_file(staged_path)
+        publication = _published_path(
+            staged_path,
+            final_path,
+            expected_sha256=expected_digest,
+        )
+        # Staging lives in the output directory. A hard link is therefore an
+        # atomic no-clobber install in both modes, including the interval after
+        # an overwrite target has been moved to its private backup.
+        # Pre-register for the same interruption-safety reason as the backup.
+        published.append(publication)
+        os.link(staged_path, final_path, follow_symlinks=False)
+        staged_path.unlink()
+
+    try:
+        for index, (staged_path, final_path) in enumerate(staged_output_paths):
+            publish_one(staged_path, final_path, index)
+
+        final_snapshots: list[SourceSnapshot] = []
+        for _, final_path in staged_output_paths:
+            snapshot = _snapshot_source(final_path)
+            if snapshot.sha256 != expected_sha256[final_path]:
+                raise RuntimeError(
+                    f"published pseudo-data digest does not match its manifest: "
+                    f"{final_path}"
+                )
+            final_snapshots.append(snapshot)
+        _assert_sources_unchanged(
+            final_snapshots,
+            context="before publishing the pseudo-data campaign manifest",
+            verify_sha256=False,
+        )
+        publish_one(
+            staged_manifest_path,
+            manifest_path,
+            len(staged_output_paths),
+        )
+        _assert_sources_unchanged(
+            final_snapshots,
+            context="after publishing the pseudo-data campaign manifest",
+        )
+    except BaseException as publication_error:
+        conflicts: list[str] = []
+        unpreserved_claims: list[Path] = []
+        backup_directory.mkdir(parents=True, exist_ok=True)
+        for rollback_index, publication in enumerate(reversed(published)):
+            final_path = publication.path
+            if not _path_exists_without_following_symlinks(final_path):
+                conflicts.append(f"published path disappeared: {final_path}")
+                continue
+            rollback_path = (
+                backup_directory
+                / f"rollback-{rollback_index:04d}-{final_path.name}"
+            )
+            try:
+                # Claim the current directory entry before inspecting it. This
+                # avoids the check-then-unlink race that could otherwise remove
+                # a replacement installed immediately after an identity check.
+                os.replace(final_path, rollback_path)
+            except FileNotFoundError:
+                conflicts.append(f"published path disappeared: {final_path}")
+                continue
+            if _is_unchanged_published_path(publication, rollback_path):
+                rollback_path.unlink()
+                if _path_exists_without_following_symlinks(final_path):
+                    conflicts.append(
+                        f"concurrent replacement preserved at {final_path}"
+                    )
+                continue
+
+            try:
+                recovery_path = _preserve_rollback_path(
+                    rollback_path,
+                    final_path,
+                    label="concurrent-replacement",
+                )
+            except BaseException as error:
+                unpreserved_claims.append(rollback_path)
+                conflicts.append(
+                    f"concurrent replacement remains at {rollback_path} after a "
+                    f"failed recovery move: {error}"
+                )
+            else:
+                restored_to_final = False
+                if not _path_exists_without_following_symlinks(final_path):
+                    try:
+                        os.link(
+                            recovery_path,
+                            final_path,
+                            follow_symlinks=False,
+                        )
+                        restored_to_final = True
+                    except FileExistsError:
+                        pass
+                    except OSError as error:
+                        conflicts.append(
+                            f"could not restore concurrent replacement to "
+                            f"{final_path}: {error}"
+                        )
+                if restored_to_final:
+                    conflicts.append(
+                        f"concurrent replacement restored at {final_path} with "
+                        f"a safety copy preserved at {recovery_path}"
+                    )
+                else:
+                    conflicts.append(
+                        f"concurrent replacement preserved at {recovery_path} "
+                        f"because {final_path} was occupied"
+                    )
+
+        for final_path, backup_path in backups.items():
+            if not _path_exists_without_following_symlinks(backup_path):
+                continue
+            try:
+                recovery_path = _preserve_rollback_path(
+                    backup_path,
+                    final_path,
+                    label="pre-campaign",
+                )
+            except BaseException as error:
+                unpreserved_claims.append(backup_path)
+                conflicts.append(
+                    f"pre-campaign output remains at {backup_path} after a failed "
+                    f"recovery move: {error}"
+                )
+            else:
+                restored_to_final = False
+                if not _path_exists_without_following_symlinks(final_path):
+                    try:
+                        # The recovery path remains as a safety copy even when
+                        # this no-clobber install succeeds. Thus a replacement
+                        # immediately after link cannot destroy the last copy.
+                        os.link(
+                            recovery_path,
+                            final_path,
+                            follow_symlinks=False,
+                        )
+                        restored_to_final = True
+                    except FileExistsError:
+                        pass
+                    except OSError as error:
+                        conflicts.append(
+                            f"could not restore pre-campaign output {final_path}: "
+                            f"{error}"
+                        )
+                if restored_to_final:
+                    conflicts.append(
+                        f"pre-campaign output restored at {final_path} with a "
+                        f"safety copy preserved at {recovery_path}"
+                    )
+                else:
+                    conflicts.append(
+                        f"pre-campaign output preserved at {recovery_path} because "
+                        f"{final_path} was occupied"
+                    )
+
+        if conflicts:
+            retained_staging_directory = (
+                staging_directory if unpreserved_claims else None
+            )
+            details = "; ".join(conflicts)
+            if retained_staging_directory is not None:
+                details += (
+                    "; automatic cleanup disabled because unrecovered objects remain "
+                    f"in {retained_staging_directory}"
+                )
+            raise CampaignPublicationError(
+                "campaign publication failed and rollback detected concurrent "
+                f"changes or retained safety copies; {details}",
+                retained_staging_directory=retained_staging_directory,
+            ) from publication_error
+        raise CampaignPublicationError(
+            "campaign publication failed; rollback completed without retained "
+            "claims",
+        ) from publication_error
+
+
 def build_pseudo_data_ensembles(
     zz_path: Path,
     higgs_path: Path,
@@ -951,55 +1798,103 @@ def build_pseudo_data_ensembles(
                 f"output already exists: {existing[0]}; pass --overwrite to replace it"
             )
 
+    output_directory.mkdir(parents=True, exist_ok=True)
     seed_sequences = np.random.SeedSequence(seed).spawn(generated_count)
-    files: list[dict[str, Any]] = []
-    for index, (path, seed_sequence) in enumerate(
-        zip(output_paths, seed_sequences, strict=True)
-    ):
-        metadata = _build_pseudo_data_file(
-            components,
-            path,
-            luminosity_fb=luminosity_fb,
-            base_seed=seed,
-            ensemble_index=index,
-            ensemble_count=generated_count,
-            seed_sequence=seed_sequence,
-            step_size=step_size,
-            overwrite=overwrite,
+    with _campaign_staging_directory(output_directory) as staging_directory:
+        staged_output_paths = [
+            staging_directory / path.name for path in output_paths
+        ]
+        staged_manifest_path = staging_directory / manifest_path.name
+        files: list[dict[str, Any]] = []
+        output_snapshots: list[SourceSnapshot] = []
+        for index, (staged_path, final_path, seed_sequence) in enumerate(
+            zip(
+                staged_output_paths,
+                output_paths,
+                seed_sequences,
+                strict=True,
+            )
+        ):
+            metadata = _build_pseudo_data_file(
+                components,
+                staged_path,
+                luminosity_fb=luminosity_fb,
+                base_seed=seed,
+                ensemble_index=index,
+                ensemble_count=generated_count,
+                seed_sequence=seed_sequence,
+                step_size=step_size,
+                overwrite=False,
+                verify_source_hashes=False,
+            )
+            output_snapshot = _snapshot_source(staged_path)
+            output_snapshots.append(output_snapshot)
+            files.append(
+                {
+                    "ensemble_index": index,
+                    "path": final_path.name,
+                    "sha256": output_snapshot.sha256,
+                    "total_entries": metadata["total_entries"],
+                    "total_observed_positive": metadata[
+                        "total_observed_positive"
+                    ],
+                    "total_observed_negative": metadata[
+                        "total_observed_negative"
+                    ],
+                    "total_observed": metadata["total_observed"],
+                    "total_sum_squared_weights": metadata[
+                        "total_sum_squared_weights"
+                    ],
+                    "seed_spawn_key": metadata["seed_spawn_key"],
+                }
+            )
+
+        _assert_sources_unchanged(
+            (
+                component.source_snapshot
+                for component in components
+                if component.source_snapshot is not None
+            ),
+            context="before finalizing the pseudo-data campaign manifest",
         )
-        files.append(
-            {
-                "ensemble_index": index,
-                "path": path.name,
-                "total_entries": metadata["total_entries"],
-                "total_observed_positive": metadata["total_observed_positive"],
-                "total_observed_negative": metadata["total_observed_negative"],
-                "total_observed": metadata["total_observed"],
-                "seed_spawn_key": metadata["seed_spawn_key"],
-            }
+        _assert_sources_unchanged(
+            output_snapshots,
+            context="before finalizing the pseudo-data campaign manifest",
+            verify_sha256=False,
         )
 
-    manifest: dict[str, Any] = {
-        "format_version": 2,
-        "statistical_model": "signed_poisson_bootstrap_with_replacement",
-        "sampling_with_replacement": True,
-        "signed_weights": any(
-            component.expectation.negative > 0.0 for component in components
-        ),
-        "luminosity_fb": luminosity_fb,
-        "seed": seed,
-        "ensemble_request": "auto" if auto else generated_count,
-        "recommended_ensemble_count": recommended_count,
-        "generated_ensemble_count": generated_count,
-        "allow_ensemble_oversubscription": allow_ensemble_oversubscription,
-        "limiting_effective_luminosity_fb": limiting_luminosity_fb,
-        "components": {
-            component.name: _component_diagnostics(component)
-            for component in components
-        },
-        "files": files,
-    }
-    _write_json(manifest_path, manifest, overwrite)
+        manifest: dict[str, Any] = {
+            "format_version": 2,
+            "statistical_model": "signed_poisson_bootstrap_with_replacement",
+            "sampling_with_replacement": True,
+            "signed_weights": any(
+                component.expectation.negative > 0.0 for component in components
+            ),
+            "luminosity_fb": luminosity_fb,
+            "seed": seed,
+            "ensemble_request": "auto" if auto else generated_count,
+            "recommended_ensemble_count": recommended_count,
+            "generated_ensemble_count": generated_count,
+            "allow_ensemble_oversubscription": allow_ensemble_oversubscription,
+            "limiting_effective_luminosity_fb": limiting_luminosity_fb,
+            "components": {
+                component.name: _component_diagnostics(component)
+                for component in components
+            },
+            "files": files,
+        }
+        _write_json(staged_manifest_path, manifest, overwrite=False)
+        _publish_staged_campaign(
+            list(zip(staged_output_paths, output_paths, strict=True)),
+            staged_manifest_path,
+            manifest_path,
+            staging_directory=staging_directory,
+            overwrite=overwrite,
+            expected_sha256={
+                path: entry["sha256"]
+                for path, entry in zip(output_paths, files, strict=True)
+            },
+        )
     return manifest
 
 

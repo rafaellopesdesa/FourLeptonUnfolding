@@ -136,6 +136,13 @@ would overcount by the sample size. This assumes compatible POWHEG weight
 conventions across jobs; the merger cannot repair inconsistently normalized
 inputs.
 
+The shard validator requires individual event weights and their accumulated
+statistics to be finite, but it does not require every shard to have a
+positive net `sum(weight)`: a small signed-weight shard may legitimately have
+zero or negative net weight. The physical normalization check is made only
+after all shards for a sample have been aggregated, where the total `S` in the
+formula above must be finite and positive.
+
 The same command creates an ensemble of pseudo-data files from the
 reconstructed-and-selected events in the two merged Herwig samples. Signed
 POWHEG weights are handled without discarding negative events or changing
@@ -161,7 +168,30 @@ The first file is named `data.root`; additional files are
 derived reproducibly from `--seed`, conditional on the shared Herwig template.
 Each ROOT file contains detailed
 positive, negative, net, and effective-statistics metadata. The campaign
-summary is written to `pseudo_data_manifest.json`.
+summary is written to `pseudo_data_manifest.json`. Because merging and
+pseudo-data resampling require multiple streaming passes, the tool records and
+rechecks each source's device, inode, size, nanosecond timestamps, and SHA-256
+digest before finalizing an output. It aborts if an input is replaced or
+modified between passes. The campaign manifest also stores the SHA-256 digest
+of every completed `data*.root` file so downstream stages can verify that they
+are using the exact pseudo-experiments described by the manifest. A complete
+campaign is built in a private staging directory and published only after all
+files and the manifest pass these checks; a failed rebuild therefore leaves no
+partial new campaign and does not replace an existing campaign. With
+`--overwrite`, keep enough free space for the existing campaign and one newly
+staged campaign until publication succeeds. Publication and rollback use
+no-clobber installs and verify the exact inode and digest before removing a
+published file. If another process replaces an output during rollback, that
+replacement is preserved and the command reports a conflict. When it cannot
+restore a displaced pre-campaign file at its original name without clobbering
+the concurrent file, it retains the old object in a type-safe recovery
+directory beside the outputs as `.NAME.pre-campaign-*.recovery/NAME` and
+reports that recovery path. Recovery copies are also retained after a failed
+overwrite even when restoration succeeds, so a replacement arriving directly
+after the no-clobber restore cannot destroy the last copy. If even that durable
+recovery move fails (for example because of an I/O or permission error), the
+tool disables automatic cleanup of the private `.pseudo_data_campaign.*`
+staging directory and reports its path for manual recovery.
 
 By default, the number of files is selected automatically from a conservative
 finite-Monte-Carlo information budget. With
@@ -231,6 +261,14 @@ shapes. A genuinely positive fake-data sample requires a separate local
 positive-resampling model; see the
 [Positive Resampler](https://arxiv.org/abs/2005.09375) and
 [unbiased cell-resampling](https://arxiv.org/abs/2109.07851) approaches.
+
+The repository's `BackgroundRemoval` trainers consume these files directly
+with a signed weighted BCE on a finite, configured logit interval: central
+values use net sums `sum(w)` and uncertainties use `sum(w^2)`. Absolute
+weights appear only in the minibatch proposal and feature preprocessing, with
+signed importance coefficients that leave the intended net-normalized loss
+unchanged. The logit bound prevents the signed finite-sample objective from
+running to minus infinity; it does not clip or replace event weights.
 
 Run the complete Analysis, Tools, Simulation, Generation, batch-worker, and
 plotting regression suite in the same environment with:

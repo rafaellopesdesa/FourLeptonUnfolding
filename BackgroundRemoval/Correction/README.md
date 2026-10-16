@@ -65,11 +65,29 @@ deterministic fingerprint of the eight inputs plus `reco_m_ZZ`, ensuring that
 exact bootstrap replicas stay together in fit, validation, or closure.
 Pythia splits use the merged `event_id`.
 
-Ordinary BCE cannot represent a signed density. A selected negative data or
-MC weight in the sideband therefore causes training to fail explicitly; the
-code does not take absolute values or silently drop negative entries. This is
-an important precondition because the merger can emit negative unit-weight
-pseudo-data: Correction will hard-fail if one lies in the selected sideband.
+Signed data and MC weights are accepted in the sideband. The balanced BCE
+uses each signed weight directly, normalized by its class's net signed yield.
+Affine-logit calibration uses deterministic starts spanning its bounded
+parameter box and selects the converged fit with the lowest signed BCE, so a
+stationary saddle is not accepted as the solution.
+Negative entries therefore subtract their loss contribution; they are not
+made positive or silently dropped. Class yields and the factor multiplying
+`C_shape` use net sums `sum(w)`, while statistical variances and histogram
+uncertainties use `sum(w^2)`. Each class and deterministic split must retain a
+finite positive net sum so that its normalization is defined. This supports
+the negative unit-weight pseudo-data produced by the merger without changing
+their signed-measure convention.
+
+Minibatches are proposed with probabilities proportional to `abs(weight)` and
+use a signed importance coefficient, so their expected loss remains exactly
+the net-normalized signed BCE. Absolute weights are also used to construct a
+stable feature scaler; they are not used for any physical yield or learned
+density ratio. Calibration and ratio normalization use signed weights.
+Network logits are bounded by `--logit-clip`, which makes the signed
+finite-sample BCE bounded without altering event weights. Ratio normalization
+uses one shape-preserving positive multiplier and stops clearly if the signed
+reference moment is non-positive, cancellation-dominated, or would require
+per-event output clipping.
 
 The artifact contains one checksummed state file per ensemble member (four by
 default, configurable with `--ensemble-size`, with a minimum of four),

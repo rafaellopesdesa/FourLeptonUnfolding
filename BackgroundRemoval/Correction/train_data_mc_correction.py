@@ -26,6 +26,7 @@ from BackgroundRemoval.common import (
     MODEL_FEATURES,
     MODEL_KIND_DATA_MC_CORRECTION,
     SPLIT_NAMES,
+    SUPPORTED_ARTIFACT_FORMAT_VERSIONS,
     TREE_NAME,
     VALIDATION_SPLIT,
     assert_file_unchanged,
@@ -80,7 +81,7 @@ def _selected_chunks(
     expected_luminosity_fb: float,
     step_size: str,
 ) -> Iterator[SelectedChunk]:
-    """Yield positive-weight events in the strict correction sideband."""
+    """Yield finite nonzero signed-weight events in the correction sideband."""
 
     required = {
         *FEATURES,
@@ -137,14 +138,6 @@ def _selected_chunks(
                     raise ValueError(
                         f"{component_name} contains non-finite selected {weight_branch} values"
                     )
-                negative_count = int(np.count_nonzero(selected_weights < 0.0))
-                if negative_count:
-                    raise ValueError(
-                        f"{component_name} contains {negative_count} selected negative "
-                        f"{weight_branch} values. A signed weighted BCE is not a density "
-                        "ratio and can be unbounded; this training intentionally stops "
-                        "instead of taking absolute values or dropping negative events."
-                    )
                 raw = np.column_stack(
                     [np.asarray(arrays[name], dtype=np.float32) for name in FEATURES]
                 )[selected]
@@ -168,13 +161,13 @@ def _selected_chunks(
                     splits = deterministic_split(
                         event_ids, source=source, seed=split_seed
                     )[selected]
-                positive = selected_weights > 0.0
+                nonzero = selected_weights != 0.0
                 yield SelectedChunk(
                     class_name=class_name,
                     component_name=component_name,
-                    raw_features=raw[positive],
-                    weights=selected_weights[positive],
-                    splits=splits[positive],
+                    raw_features=raw[nonzero],
+                    weights=selected_weights[nonzero],
+                    splits=splits[nonzero],
                     zero_count=int(np.count_nonzero(selected_weights == 0.0)),
                 )
 
@@ -230,7 +223,10 @@ def _scan_inputs(
             transformed = transformed_features(chunk.raw_features[fit]).astype(
                 np.float64, copy=False
             )
-            weights = chunk.weights[fit]
+            # Feature scaling is numerical preprocessing rather than a
+            # physics expectation, so use |w| to keep its moments positive.
+            # Signed weights are retained by every loss/yield operation.
+            weights = np.abs(chunk.weights[fit])
             moment_sum[chunk.class_name] += np.sum(
                 transformed * weights[:, np.newaxis], axis=0, dtype=np.float64
             )
@@ -241,21 +237,29 @@ def _scan_inputs(
             )
 
     for class_name, statistics in classes.items():
-        if statistics.entries == 0 or statistics.sum_weights <= 0.0:
+        if statistics.entries == 0:
             label = "target data" if class_name == _TARGET_KEY else "reference MC"
             raise ValueError(f"the selected {label} class is empty")
+        if not np.isfinite(statistics.sum_weights) or statistics.sum_weights <= 0.0:
+            label = "target data" if class_name == _TARGET_KEY else "reference MC"
+            raise ValueError(
+                f"the selected {label} class has non-positive net signed yield"
+            )
         for split_name in SPLIT_NAMES.values():
             if statistics.split_entries[split_name] == 0:
                 raise ValueError(f"the {class_name} {split_name} split is empty")
-            if statistics.split_sum_weights[split_name] <= 0.0:
+            if (
+                not np.isfinite(statistics.split_sum_weights[split_name])
+                or statistics.split_sum_weights[split_name] <= 0.0
+            ):
                 raise ValueError(
-                    f"the {class_name} {split_name} split has non-positive total weight"
+                    f"the {class_name} {split_name} split has non-positive net signed yield"
                 )
 
     means: list[np.ndarray] = []
     seconds: list[np.ndarray] = []
     for class_name in (_TARGET_KEY, _REFERENCE_KEY):
-        fit_sum = classes[class_name].split_sum_weights["fit"]
+        fit_sum = classes[class_name].split_sum_absolute_weights["fit"]
         means.append(moment_sum[class_name] / fit_sum)
         seconds.append(moment_square_sum[class_name] / fit_sum)
     mean = 0.5 * (means[0] + means[1])
@@ -364,7 +368,7 @@ def _validate_existing_correction_artifact(path: Path) -> None:
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"invalid correction artifact manifest: {manifest_path}") from error
     if (
-        manifest.get("format_version") != ARTIFACT_FORMAT_VERSION
+        manifest.get("format_version") not in SUPPORTED_ARTIFACT_FORMAT_VERSIONS
         or manifest.get("model_kind") != MODEL_KIND_DATA_MC_CORRECTION
     ):
         raise ValueError(f"refusing to overwrite a non-correction artifact: {path}")
@@ -548,7 +552,11 @@ def train(args: argparse.Namespace) -> Path:
                 "neurons": args.neurons,
                 "activation": "SiLU",
                 "output": "logit",
-                "loss": "balanced weighted BCEWithLogitsLoss",
+                "loss": "balanced signed-weight logit-clipped BCEWithLogitsLoss",
+                "loss_logit_clip": args.logit_clip,
+                "class_risk": "sum(w * BCE) / sum(w)",
+                "sampling": "with_replacement_proportional_to_absolute_weight",
+                "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
                 "dropout": 0.0,
                 "weight_decay": 0.0,
                 "optimizer": "NAdam",
@@ -710,6 +718,13 @@ def train(args: argparse.Namespace) -> Path:
                 },
                 "weight_branch": args.weight_branch,
                 "weight_measure": weight_contract,
+                "signed_weight_policy": {
+                    "event_weights": "finite nonzero weights retain their sign",
+                    "class_normalization": "net signed sum",
+                    "yield_central_values": "sum(w)",
+                    "statistical_variances": "sum(w^2)",
+                    "zero_weight_events": "omitted from cache and counted",
+                },
                 "luminosity_fb": args.expected_luminosity_fb,
                 "yields": {
                     "target": target_yield,
@@ -765,8 +780,11 @@ def train(args: argparse.Namespace) -> Path:
                     "reference_mc": classes[_REFERENCE_KEY].serializable(),
                 },
                 "scaler": {
-                    "type": "balanced_weighted_standard",
+                    "type": "balanced_absolute_weight_standard",
                     "fit_split_only": True,
+                    "weight_semantics": (
+                        "absolute weights are used only for numerical preprocessing"
+                    ),
                     "mean": scaler_mean.tolist(),
                     "scale": scaler_scale.tolist(),
                 },
@@ -776,15 +794,19 @@ def train(args: argparse.Namespace) -> Path:
                     "size": len(results),
                     "minimum_size": 4,
                     "outlier_rule": (
-                        "validation loss is nonfinite, or worse than the median by "
+                        "validation loss is nonfinite, or differs from the median by "
                         "both >5% and >5 MAD"
                     ),
                     "maximum_retries_per_slot": args.max_retries,
                 },
                 "members": member_entries,
                 "calibration": {
-                    "method": "affine_logit_then_density_normalization",
+                    "method": (
+                        "bounded_multistart_fisher_preconditioned_affine_logit_then_"
+                        "shape_preserving_signed_density_normalization"
+                    ),
                     "fit_split": "validation",
+                    "weight_semantics": "signed class-balanced weights",
                     "scale": calibration_scale,
                     "scale_bounds": [
                         args.calibration_scale_min,
@@ -793,7 +815,9 @@ def train(args: argparse.Namespace) -> Path:
                     "bias_before_normalization": calibration_bias,
                     "normalization_before": normalization_before,
                     "bias_after_normalization": normalized_bias,
-                    "normalization_condition": "E_reference_MC[r_shape] = 1",
+                    "normalization_condition": (
+                        "signed E_reference_MC[r_shape] = 1"
+                    ),
                     "logit_clip": args.logit_clip,
                 },
                 "toolkit": {

@@ -28,8 +28,30 @@ pixi run --locked --manifest-path BackgroundRemoval/pixi.toml train \
 
 Training defaults to `weight_nominal_pb`. Because the inputs share the same
 luminosity, its yield ratio is equivalent to using the luminosity-scaled
-`weight` branch. Any selected negative base weight or nonfinite/nonpositive
-Correction prediction causes an explicit failure.
+`weight` branch. Finite negative base weights are retained and enter the BCE,
+yield totals, calibration, and closure diagnostics with their original sign.
+The Correction factor multiplying `ZZ` must remain finite and positive; it
+does not replace or erase the sign of the underlying `ZZ` event weight.
+
+Class balancing and the yield ratio use net sums `sum(w)`. Negative events
+subtract from those central values, while uncertainties use `sum(w^2)` and
+the effective count is `(sum(w))^2/sum(w^2)`. A finite positive net sum is
+required per class and split so that the signed BCE normalization is defined;
+individual negative events are fully supported.
+
+Fit events are sampled with probability proportional to `abs(weight)` and
+receive the corresponding signed importance coefficient. This is an unbiased
+minibatch estimator of `sum(w * BCE)/sum(w)`, not an absolute-weight loss.
+Only the numerical input scaler uses class-balanced absolute-weight moments;
+calibration, ratios, yields, and closure central values remain signed.
+Affine-logit calibration uses deterministic starts spanning its bounded
+parameter box and keeps the converged solution with the lowest signed BCE;
+this prevents a stationary saddle from being mistaken for a calibrated fit.
+The BCE is evaluated after bounding network logits by `--logit-clip`. This
+bounds the signed empirical objective without modifying any event weight.
+The final shape normalization is accepted only when its signed reference
+moment is positive, numerically stable, and achievable by one common
+multiplier without output clipping.
 
 More precisely, the default Correction branch `weight` and Training branch
 `weight_nominal_pb` differ only by the common `312000 pb^-1` factor written by

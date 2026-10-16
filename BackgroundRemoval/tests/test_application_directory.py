@@ -34,15 +34,25 @@ class _Bundle:
 
 
 def _write_pseudo_root(
-    path: Path, *, ensemble_index: int, ensemble_count: int
+    path: Path,
+    *,
+    ensemble_index: int,
+    ensemble_count: int,
+    weights: np.ndarray | None = None,
 ) -> dict[str, object]:
+    if weights is None:
+        weights = np.ones(1, dtype=np.float64)
+    weights = np.asarray(weights, dtype=np.float64)
+    positive = int(np.count_nonzero(weights == 1.0))
+    negative = int(np.count_nonzero(weights == -1.0))
     entry = {
         "ensemble_index": ensemble_index,
         "path": path.name,
-        "total_entries": 1,
-        "total_observed_positive": 1,
-        "total_observed_negative": 0,
-        "total_observed": 1,
+        "total_entries": int(weights.size),
+        "total_observed_positive": positive,
+        "total_observed_negative": negative,
+        "total_observed": positive - negative,
+        "total_sum_squared_weights": int(weights.size),
         "seed_spawn_key": [ensemble_index],
     }
     metadata = {
@@ -56,9 +66,10 @@ def _write_pseudo_root(
         "total_observed_positive": entry["total_observed_positive"],
         "total_observed_negative": entry["total_observed_negative"],
         "total_observed": entry["total_observed"],
+        "total_sum_squared_weights": entry["total_sum_squared_weights"],
     }
     with uproot.recreate(path) as root_file:
-        root_file["Analysis"] = {"weight": np.ones(1, dtype=np.float64)}
+        root_file["Analysis"] = {"weight": weights}
         root_file["merge_metadata"] = json.dumps(metadata)
     return entry
 
@@ -378,6 +389,110 @@ class DirectoryApplicationTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 ValueError, "ROOT metadata does not match its manifest entry"
             ):
+                discover_inputs(directory)
+
+    def test_legacy_v2_pseudo_manifest_without_sum_squared_weights_is_accepted(self):
+        with tempfile.TemporaryDirectory() as directory_name:
+            directory = Path(directory_name)
+            self._inputs(directory)
+            entry = _write_pseudo_root(
+                directory / "data.root",
+                ensemble_index=0,
+                ensemble_count=1,
+            )
+            entry.pop("total_sum_squared_weights")
+            with uproot.update(directory / "data.root") as root_file:
+                metadata = json.loads(str(root_file["merge_metadata"]))
+                metadata.pop("total_sum_squared_weights")
+                root_file["merge_metadata"] = json.dumps(metadata)
+            (directory / "pseudo_data_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "format_version": 2,
+                        "generated_ensemble_count": 1,
+                        "seed": 42,
+                        "luminosity_fb": 312.0,
+                        "files": [entry],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            found = discover_inputs(directory)
+            self.assertEqual(
+                [(path.name, kind) for path, kind in found],
+                [
+                    ("data.root", "data"),
+                    ("ZZ_pythia.root", "zz"),
+                    ("gg_H_pythia.root", "gg-h"),
+                ],
+            )
+
+    def test_corrupted_pseudo_data_weights_are_rejected(self):
+        for bad_weight in (0.0, 2.0, np.nan, np.inf):
+            with self.subTest(bad_weight=bad_weight):
+                with tempfile.TemporaryDirectory() as directory_name:
+                    directory = Path(directory_name)
+                    self._inputs(directory)
+                    entry = _write_pseudo_root(
+                        directory / "data.root",
+                        ensemble_index=0,
+                        ensemble_count=1,
+                        weights=np.array([1.0, -1.0, bad_weight]),
+                    )
+                    (directory / "pseudo_data_manifest.json").write_text(
+                        json.dumps(
+                            {
+                                "format_version": 2,
+                                "generated_ensemble_count": 1,
+                                "seed": 42,
+                                "luminosity_fb": 312.0,
+                                "files": [entry],
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    with self.assertRaisesRegex(
+                        ValueError, "finite unit-magnitude signed weights"
+                    ):
+                        discover_inputs(directory)
+
+    def test_pseudo_data_checksum_detects_same_weight_feature_corruption(self):
+        with tempfile.TemporaryDirectory() as directory_name:
+            directory = Path(directory_name)
+            self._inputs(directory)
+            path = directory / "data.root"
+            entry = _write_pseudo_root(
+                path,
+                ensemble_index=0,
+                ensemble_count=1,
+                weights=np.array([1.0, -1.0]),
+            )
+            entry["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+            with uproot.open(path) as root_file:
+                metadata = str(root_file["merge_metadata"])
+            # Preserve every signed-weight statistic while changing physics
+            # content after the campaign digest was recorded.
+            with uproot.recreate(path) as root_file:
+                root_file["Analysis"] = {
+                    "weight": np.array([1.0, -1.0]),
+                    "reco_Phi": np.array([0.1, 2.7]),
+                }
+                root_file["merge_metadata"] = metadata
+            (directory / "pseudo_data_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "format_version": 2,
+                        "generated_ensemble_count": 1,
+                        "seed": 42,
+                        "luminosity_fb": 312.0,
+                        "files": [entry],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "checksum"):
                 discover_inputs(directory)
 
     def test_late_failure_preserves_complete_previous_campaign(self):

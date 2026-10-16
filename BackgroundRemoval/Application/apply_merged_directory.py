@@ -13,6 +13,7 @@ import shutil
 import tempfile
 from typing import Any
 
+import numpy as np
 import uproot
 
 from BackgroundRemoval.Application.apply_background_ratio import (
@@ -78,7 +79,36 @@ def _validate_pseudo_data_file(
                 raise ValueError(
                     f"pseudo-data file lacks Analysis or merge_metadata: {path}"
                 )
-            entries = int(root_file[TREE_NAME].num_entries)
+            tree = root_file[TREE_NAME]
+            branches = set(tree.keys(recursive=True, full_paths=False))
+            if "weight" not in branches:
+                raise ValueError(f"pseudo-data file lacks Analysis.weight: {path}")
+
+            entries = int(tree.num_entries)
+            observed_entries = 0
+            observed_positive = 0
+            observed_negative = 0
+            observed_sum_squared_weights = 0
+            for arrays in tree.iterate(
+                expressions=["weight"],
+                step_size="100 MB",
+                library="np",
+                how=dict,
+            ):
+                weights = np.asarray(arrays["weight"], dtype=np.float64)
+                is_positive = weights == 1.0
+                is_negative = weights == -1.0
+                if not np.all(np.isfinite(weights) & (is_positive | is_negative)):
+                    raise ValueError(
+                        "pseudo-data Analysis.weight must contain only finite "
+                        f"unit-magnitude signed weights (+1 or -1): {path}"
+                    )
+                observed_entries += int(weights.size)
+                observed_positive += int(np.count_nonzero(is_positive))
+                observed_negative += int(np.count_nonzero(is_negative))
+                observed_sum_squared_weights += int(
+                    np.sum(np.square(weights), dtype=np.float64)
+                )
             metadata = json.loads(str(root_file["merge_metadata"]))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"invalid pseudo-data ROOT metadata: {path}") from error
@@ -94,6 +124,14 @@ def _validate_pseudo_data_file(
         "total_observed_negative": entry["total_observed_negative"],
         "total_observed": entry["total_observed"],
     }
+    # Older format-v2 campaigns predate explicit sumw2 metadata.  The value is
+    # nevertheless fully recoverable for their required +/-1 observation
+    # weights, so retain that read path while cross-checking the field whenever
+    # a newer v2 producer supplies it.
+    if "total_sum_squared_weights" in entry:
+        expected_pairs["total_sum_squared_weights"] = entry[
+            "total_sum_squared_weights"
+        ]
     if not isinstance(metadata, dict) or any(
         metadata.get(field) != expected
         for field, expected in expected_pairs.items()
@@ -105,6 +143,50 @@ def _validate_pseudo_data_file(
         raise ValueError(
             f"pseudo-data ROOT entry count does not match its manifest: {path}"
         )
+    observed = observed_positive - observed_negative
+    recomputed = {
+        "total_entries": observed_entries,
+        "total_observed_positive": observed_positive,
+        "total_observed_negative": observed_negative,
+        "total_observed": observed,
+        "total_sum_squared_weights": observed_sum_squared_weights,
+    }
+    if observed_entries != entries:
+        raise ValueError(
+            f"pseudo-data Analysis.weight length does not match its tree: {path}"
+        )
+    legacy_fields = tuple(
+        field for field in recomputed if field != "total_sum_squared_weights"
+    )
+    for source_name, source in (("ROOT metadata", metadata), ("manifest", entry)):
+        mismatch = any(source.get(field) != recomputed[field] for field in legacy_fields)
+        if "total_sum_squared_weights" in source:
+            mismatch = mismatch or (
+                source["total_sum_squared_weights"]
+                != recomputed["total_sum_squared_weights"]
+            )
+        if mismatch:
+            raise ValueError(
+                "pseudo-data signed-weight statistics do not match "
+                f"{source_name}: {path}"
+            )
+    expected_sha256 = entry.get("sha256")
+    if expected_sha256 is not None:
+        if (
+            not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+            or any(
+                character not in "0123456789abcdefABCDEF"
+                for character in expected_sha256
+            )
+        ):
+            raise ValueError(
+                f"pseudo-data manifest has an invalid SHA-256 for {path.name}"
+            )
+        if sha256_file(path) != expected_sha256.lower():
+            raise ValueError(
+                f"pseudo-data file checksum does not match its manifest: {path}"
+            )
 
 
 def discover_inputs(merged_directory: Path) -> list[tuple[Path, str]]:

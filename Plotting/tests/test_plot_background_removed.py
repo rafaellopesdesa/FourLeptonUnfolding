@@ -218,6 +218,74 @@ class PlotBackgroundRemovedTest(unittest.TestCase):
                     sample_kind="gg-h",
                 )
 
+    def test_omits_undefined_selected_values_but_rejects_infinities(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            selected_bad = directory / "selected_bad.root"
+            write_decorated_sample(
+                selected_bad,
+                sample_kind="data",
+                weights=np.array([1.0, 1.0]),
+                removal_weights=np.array([0.5, 1.0]),
+                masses=np.array([120.0, 140.0]),
+                reconstructed=np.array([True, True]),
+                fiducial=np.array([True, True]),
+                phi_values=np.array([np.nan, np.nan]),
+            )
+            histogram = _read_signal_region_histogram(
+                selected_bad,
+                value_branch="reco_Phi",
+                edges=np.array([-3.2, 0.0, 3.2]),
+                expected_lumi_pb_inverse=312_000.0,
+                step_size="1 MB",
+                sample_kind="data",
+            )
+            np.testing.assert_allclose(histogram.values, [0.0, 0.0])
+            np.testing.assert_allclose(histogram.variances, [0.0, 0.0])
+
+            selected_infinite = directory / "selected_infinite.root"
+            write_decorated_sample(
+                selected_infinite,
+                sample_kind="data",
+                weights=np.array([1.0]),
+                removal_weights=np.array([0.5]),
+                masses=np.array([120.0]),
+                reconstructed=np.array([True]),
+                fiducial=np.array([True]),
+                phi_values=np.array([np.inf]),
+            )
+            with self.assertRaisesRegex(ValueError, "infinite selected values"):
+                _read_signal_region_histogram(
+                    selected_infinite,
+                    value_branch="reco_Phi",
+                    edges=np.array([-3.2, 0.0, 3.2]),
+                    expected_lumi_pb_inverse=312_000.0,
+                    step_size="1 MB",
+                    sample_kind="data",
+                )
+
+            sentinel = directory / "sentinel.root"
+            write_decorated_sample(
+                sentinel,
+                sample_kind="data",
+                weights=np.array([2.0, 1.0]),
+                removal_weights=np.array([0.5, 1.0]),
+                masses=np.array([120.0, 140.0]),
+                reconstructed=np.array([True, True]),
+                fiducial=np.array([True, True]),
+                phi_values=np.array([0.2, np.nan]),
+            )
+            histogram = _read_signal_region_histogram(
+                sentinel,
+                value_branch="reco_Phi",
+                edges=np.array([-3.2, 0.0, 3.2]),
+                expected_lumi_pb_inverse=312_000.0,
+                step_size="1 MB",
+                sample_kind="data",
+            )
+            np.testing.assert_allclose(histogram.values, [0.0, 1.0])
+            np.testing.assert_allclose(histogram.variances, [0.0, 1.0])
+
     def test_creates_one_reco_page_per_shared_observable(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

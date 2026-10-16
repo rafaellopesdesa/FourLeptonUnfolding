@@ -155,8 +155,22 @@ def _read_histogram(
             values = np.asarray(arrays[value_branch], dtype=np.float64)
             weights = np.asarray(arrays["weight"], dtype=np.float64)
             selected = np.asarray(arrays[selection_branch], dtype=np.bool_)
-            mask = selected & np.isfinite(values) & np.isfinite(weights)
-            pieces.append(_weighted_histogram(values[mask], weights[mask], edges))
+            if not np.all(np.isfinite(weights[selected])):
+                raise ValueError(
+                    f"{path} contains non-finite selected event weights"
+                )
+            if np.any(np.isinf(values[selected])):
+                raise ValueError(
+                    f"{path} contains infinite selected values in {value_branch}"
+                )
+            # Analysis intentionally uses NaN for the measure-zero cases in
+            # which an angle is mathematically undefined.  Omit those rows for
+            # that observable only; their signed weights remain present in all
+            # other well-defined distributions.
+            selected &= ~np.isnan(values)
+            pieces.append(
+                _weighted_histogram(values[selected], weights[selected], edges)
+            )
     if not pieces:
         empty = np.zeros(len(edges) - 1, dtype=np.float64)
         return HistogramValues(empty.copy(), empty.copy())
@@ -223,6 +237,31 @@ def _draw_uncertainty_band(
     )
 
 
+def _ratio_quantities(
+    reference: HistogramValues,
+    denominator: HistogramValues,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return signed ratios and non-negative uncertainty magnitudes.
+
+    Negative bin contents are valid signed weighted sums. Only a zero or
+    non-finite denominator makes the ratio undefined. Uncertainty magnitudes
+    are divided by the absolute denominator so that they remain valid
+    ``yerr`` values for Matplotlib when the signed denominator is negative.
+    """
+
+    valid = np.isfinite(denominator.values) & (denominator.values != 0.0)
+    ratio = np.full_like(reference.values, np.nan)
+    ratio_error = np.full_like(reference.values, np.nan)
+    relative_denominator_error = np.full_like(denominator.values, np.nan)
+    ratio[valid] = reference.values[valid] / denominator.values[valid]
+    absolute_denominator = np.abs(denominator.values[valid])
+    ratio_error[valid] = reference.errors[valid] / absolute_denominator
+    relative_denominator_error[valid] = (
+        denominator.errors[valid] / absolute_denominator
+    )
+    return ratio, ratio_error, relative_denominator_error
+
+
 def _draw_panel(
     axis: plt.Axes,
     ratio_axis: plt.Axes,
@@ -271,13 +310,7 @@ def _draw_panel(
         frameon=False,
     )
 
-    valid = np.isfinite(total.values) & (total.values > 0.0)
-    ratio = np.full_like(reference.values, np.nan)
-    ratio_error = np.full_like(reference.values, np.nan)
-    ratio[valid] = reference.values[valid] / total.values[valid]
-    ratio_error[valid] = reference.errors[valid] / total.values[valid]
-    relative_mc_error = np.full_like(total.values, np.nan)
-    relative_mc_error[valid] = total.errors[valid] / total.values[valid]
+    ratio, ratio_error, relative_mc_error = _ratio_quantities(reference, total)
     _draw_uncertainty_band(
         ratio_axis,
         edges,

@@ -238,7 +238,7 @@ class ReducerTest(unittest.TestCase):
         muon_vectors = [p4(18.0, 0.3, 1.0), p4(18.0, -0.3, 1.0 + math.pi)]
         arrays = {
             "Event.Number": ak.Array([[17]]),
-            "Event.Weight": ak.Array([[2.5]]),
+            "Event.Weight": ak.Array([[-2.5]]),
             "Event.CrossSection": ak.Array([[0.125]]),
             "Particle.PID": ak.Array([[23, 11, -11, 13, -13]]),
             "Particle.E": ak.Array([[91.1876, 0.0, 0.0, 0.0, 0.0]]),
@@ -281,7 +281,7 @@ class ReducerTest(unittest.TestCase):
         )
         self.assertEqual(output["event_id"].tolist(), [100])
         self.assertEqual(output["event_number"].tolist(), [17])
-        self.assertEqual(output["weight"].tolist(), [2.5])
+        self.assertEqual(output["weight"].tolist(), [-2.5])
         self.assertEqual(output["cross_section_pb"].tolist(), [0.125])
         self.assertTrue(output["fiducial"][0])
         self.assertTrue(output["reconstructed"][0])
@@ -290,7 +290,9 @@ class ReducerTest(unittest.TestCase):
         self.assertEqual(output["type"][0], 2)
         self.assertAlmostEqual(output["truth_m_Z1"][0], 91.8, delta=0.5)
         self.assertEqual(diagnostics.overall.both, 1)
+        self.assertEqual(diagnostics.overall_weighted.both, -2.5)
         self.assertEqual(diagnostics.by_channel[2].fiducial, 1)
+        self.assertEqual(diagnostics.by_channel_weighted[2].fiducial, -2.5)
 
 
 if __name__ == "__main__":

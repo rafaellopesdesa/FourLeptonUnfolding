@@ -26,6 +26,15 @@ error   = sqrt(sum(weight^2)) = sqrt(N_positive + N_negative)
 ```
 
 The error is not `sqrt(abs(content))` when negative POWHEG events exist.
+Stacked totals likewise add signed bin contents while adding component
+variances. Ratio panels retain every finite, nonzero signed denominator; the
+error magnitudes use the absolute denominator, and among finite totals only
+exactly zero denominators are left undefined.
+
+An Analysis observable may be `NaN` for the measure-zero cases in which an
+angle is mathematically undefined. Such a row is omitted only from that
+observable's histogram; selected event weights must remain finite, and
+infinite observable values are rejected.
 
 `data.root` contains only reconstructed-and-selected rows. Its copied truth
 columns are therefore conditional on reconstruction and must not be presented
