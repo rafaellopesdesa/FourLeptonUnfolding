@@ -13,8 +13,8 @@ The workflow is split into:
 - [`BatchSubmit/`](BatchSubmit/) for the storage-efficient full-chain Slurm
   worker (`generation -> Delphes -> compact Analysis`);
 - [`Simulation/`](Simulation/) for the H4l Delphes response;
-- [`Analysis/`](Analysis/) for reduction, merging, and 312 fb$^{-1}$ Herwig
-  pseudo-data ensembles;
+- [`Analysis/`](Analysis/) for matched LHE, dressed-truth, and reconstructed
+  observables, merging, and 312 fb$^{-1}$ Herwig pseudo-data ensembles;
 - [`Plotting/`](Plotting/) for the multipage Herwig-versus-Pythia validation
   report and the reconstruction-level background-removed-data versus ggH
   starting-point comparison;
@@ -29,6 +29,12 @@ The workflow is split into:
 The built-in samples use 6800 GeV per beam, $\sqrt{s}=13.6$ TeV. The runtime
 also validates the LHE beam record so custom cards and external LHE inputs
 cannot silently mix collision energies.
+
+New full-chain productions retain source-matched LHE observables before
+intermediate files are deleted. The current `gg_H` hard record contains an
+undecayed Higgs: its LHE production variables are available, while its decay
+angles first exist in the shower. Availability masks keep that distinction
+explicit; dressed truth is never substituted for missing LHE information.
 
 Signed POWHEG weights are preserved throughout reduction, merging,
 pseudo-data generation, plotting, Background Correction, Background

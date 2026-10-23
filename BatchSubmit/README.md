@@ -13,6 +13,14 @@ transient. Small cards, logs, checksums, and stage status remain in the
 campaign directory. Use `--keep-intermediates` only for a small debugging
 campaign when the complete per-task work area is genuinely needed.
 
+The compact shard now includes matched LHE hard-event fields and source
+identifiers in addition to dressed truth and reconstruction. The worker
+requires a validated LHE association for every event before publication and
+before deleting the intermediate LHE. This requirement concerns source
+identity, not the presence of four decay leptons: the `gg_H` LHE still
+contains an undecayed Higgs, so its hard production kinematics are available
+and its hard decay observables are explicitly unavailable.
+
 Unity permits at most 1900 tasks in one array. Larger campaigns are split into
 dependent waves of at most 1900 tasks, with at most 100 running concurrently by
 default.
@@ -40,6 +48,13 @@ pixi install --manifest-path Analysis/pixi.toml --locked
 The submitter verifies both generated environment files and resolves the
 Analysis Python interpreter once on the login node. Workers invoke that
 interpreter directly, avoiding concurrent Pixi environment solves or locks.
+
+After updating to the LHE-retention chain, rerun the Generation installer to
+rebuild the small PYTHIA bridge, then start a fresh campaign. The HERWIG
+source-numbering setting is generated at runtime. A resumed worker does not
+accept an old output lacking the required LHE association merely because
+its event count matches. Keep old and new productions in distinct shard
+locations; the merger requires compatible schemas.
 
 ## Submit the four samples
 
@@ -115,11 +130,22 @@ gg_H_herwig_gg_H_herwig_run3_job_000137_seed1138.root
 ```
 
 Publication uses a temporary file in the destination directory, validates its
-complete tree schema and entry count, and creates the final name atomically. A
+complete tree schema, entry count, and required LHE association, and creates
+the final name atomically. A
 requeued task accepts a final file only when its checksum and campaign-config
 fingerprint match that task's recorded metadata; it never adopts a colliding
 file from another campaign. `FAILED` and `slurm-status.txt` identify the
 failing stage.
+
+Generation writes a checksummed `lhe-provenance.json`; Simulation binds that
+source record to its Delphes output. The worker reduces with `--require-lhe`
+and runs the compact validator in the same strict mode. Source LHE indices
+come from actual shower event identifiers, so skipped or retried shower
+events cannot shift a positional join. The compact ROOT `lhe_metadata`
+object retains the full source hashes and input provenance after scratch
+cleanup. Paths in that record describe the production inputs and may point
+to worker scratch that no longer exists; the stored hard-event columns and
+hashes remain usable.
 
 ## Merge immediately after all four campaigns finish
 

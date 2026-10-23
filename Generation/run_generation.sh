@@ -56,6 +56,17 @@ OUTPUT_DIR=""
 PDF_ID="${PDF_ID:-303400}"
 KEEP_GRIDS=0
 SHOWER_EVENTS=0
+SHOWER_INPUT_LHE=""
+SOURCE_LHE_EVENTS=0
+PRIVATE_LHE_DIR=""
+HEPMC_OUTPUT=""
+
+cleanup_private_lhe() {
+  if [[ -n "$PRIVATE_LHE_DIR" ]]; then
+    rm -rf -- "$PRIVATE_LHE_DIR"
+  fi
+}
+trap cleanup_private_lhe EXIT
 
 while (($#)); do
   case "$1" in
@@ -177,22 +188,7 @@ validate_run_card_energy() {
 
 read_lhe_beam_energies() {
   local file="$1"
-  awk '
-    /^[[:space:]]*<init([[:space:]>])/ { in_init = 1; next }
-    in_init {
-      line = $0
-      sub(/^[[:space:]]+/, "", line)
-      if (line == "" || substr(line, 1, 1) == "#") next
-      fields = split(line, value)
-      if (fields < 4) exit 2
-      beam1 = value[3]
-      beam2 = value[4]
-      gsub(/[dD]/, "e", beam1)
-      gsub(/[dD]/, "e", beam2)
-      printf "%.17g %.17g\n", beam1 + 0, beam2 + 0
-      exit
-    }
-  ' "$file"
+  python3 "$SCRIPT_DIR/lhe_provenance.py" beams --lhe "$file"
 }
 
 validate_lhe_energy() {
@@ -305,9 +301,10 @@ run_powheg() {
 
 run_pythia() {
   local output="$OUTPUT_DIR/events.hepmc3"
+  HEPMC_OUTPUT="$output"
   log "Showering $(basename "$INPUT_LHE") with PYTHIA 8"
   "$GENERATION_PREFIX/bin/powheg-pythia8" \
-    "$INPUT_LHE" "$output" "$SHOWER_EVENTS" "$SEED" "$PROCESS" \
+    "$SHOWER_INPUT_LHE" "$output" "$SHOWER_EVENTS" "$SEED" "$PROCESS" \
     >"$OUTPUT_DIR/pythia.log" 2>&1
   [[ -s "$output" ]] || {
     echo "PYTHIA did not produce $output; inspect $OUTPUT_DIR/pythia.log." >&2
@@ -318,6 +315,8 @@ run_pythia() {
 
 write_herwig_input() {
   local output="$OUTPUT_DIR/events.hepmc"
+  # ThePEG's legacy identity tag is confined to this private shower copy.
+  local INPUT_LHE="$SHOWER_INPUT_LHE"
   cat >"$OUTPUT_DIR/herwig.in" <<EOF
 cd /Herwig/Generators
 set EventGenerator:NumberOfEvents $SHOWER_EVENTS
@@ -334,6 +333,7 @@ set LesHouchesHandler:CascadeHandler /Herwig/Shower/ShowerHandler
 set LesHouchesHandler:DecayHandler /Herwig/Decays/DecayHandler
 set LesHouchesHandler:HadronizationHandler /Herwig/Hadronization/ClusterHadHandler
 set LesHouchesHandler:WeightOption VarNegWeight
+set LesHouchesHandler:EventNumbering LHE
 set /Herwig/Generators/EventGenerator:EventHandler /Herwig/EventHandlers/LesHouchesHandler
 
 # Do not add cuts after the POWHEG hard-event generation.
@@ -351,6 +351,8 @@ set /Herwig/Partons/PPExtractor:FirstPDF /Herwig/Partons/LHAPDF
 set /Herwig/Partons/PPExtractor:SecondPDF /Herwig/Partons/LHAPDF
 
 create ThePEG::LesHouchesFileReader LesHouchesReader
+# Keep the new reader's default empty CacheFileName: read tagged source events
+# directly, including their native LHE event numbers.
 set LesHouchesReader:FileName $INPUT_LHE
 set LesHouchesReader:AllowedToReOpen No
 set LesHouchesReader:InitPDFs 0
@@ -369,7 +371,7 @@ set /Herwig/Shower/PartnerFinder:ScaleChoice Partner
 
 read snippets/HepMC.in
 set /Herwig/Analysis/HepMC:Filename $output
-set /Herwig/Analysis/HepMC:PrintEvent 10000000
+set /Herwig/Analysis/HepMC:PrintEvent $SOURCE_LHE_EVENTS
 EOF
 
   if [[ "$PROCESS" == "gg_H" ]]; then
@@ -389,6 +391,7 @@ EOF
 
 run_herwig() {
   local output="$OUTPUT_DIR/events.hepmc"
+  HEPMC_OUTPUT="$output"
   write_herwig_input
   log "Preparing Herwig run"
   (
@@ -423,12 +426,24 @@ fi
 # custom card or --lhe input cannot silently mix collision energies.
 validate_lhe_energy "$INPUT_LHE"
 
+# Hash the original source before showering. Explicit source indices survive
+# skipped/retried showers; accepted-output ordinal must never be used to join.
+SHOWER_INPUT_LHE="$INPUT_LHE"
+SOURCE_INFO="$OUTPUT_DIR/lhe-source-info.json"
+prepare_args=(prepare --lhe "$INPUT_LHE" --output "$SOURCE_INFO")
+if [[ "$SHOWER" == herwig ]]; then
+  PRIVATE_LHE_DIR="$(mktemp -d "$OUTPUT_DIR/.shower-lhe.XXXXXXXX")"
+  SHOWER_INPUT_LHE="$PRIVATE_LHE_DIR/events.lhe"
+  prepare_args+=(--tagged-output "$SHOWER_INPUT_LHE")
+elif [[ "${INPUT_LHE,,}" == *.gz ]]; then
+  PRIVATE_LHE_DIR="$(mktemp -d "$OUTPUT_DIR/.shower-lhe.XXXXXXXX")"
+  SHOWER_INPUT_LHE="$PRIVATE_LHE_DIR/events.lhe"
+  prepare_args+=(--plain-output "$SHOWER_INPUT_LHE")
+fi
+SOURCE_LHE_EVENTS="$(python3 "$SCRIPT_DIR/lhe_provenance.py" "${prepare_args[@]}")"
+
 if ((EVENTS == 0)); then
-  SHOWER_EVENTS="$(awk '/<event([[:space:]>])/{count++} END{print count+0}' "$INPUT_LHE")"
-  ((SHOWER_EVENTS > 0)) || {
-    echo "Could not find any events in $INPUT_LHE" >&2
-    exit 1
-  }
+  SHOWER_EVENTS="$SOURCE_LHE_EVENTS"
 else
   SHOWER_EVENTS="$EVENTS"
 fi
@@ -438,6 +453,10 @@ case "$SHOWER" in
   herwig) run_herwig ;;
 esac
 
+python3 "$SCRIPT_DIR/lhe_provenance.py" finalize \
+  --source-info "$SOURCE_INFO" --hepmc "$HEPMC_OUTPUT" \
+  --shower "$SHOWER" --output "$OUTPUT_DIR/lhe-provenance.json"
+
 cat >"$OUTPUT_DIR/run-metadata.txt" <<EOF
 process=$PROCESS
 shower=$SHOWER
@@ -445,6 +464,9 @@ events=$EVENTS
 shower_events=$SHOWER_EVENTS
 seed=$SEED
 input_lhe=$INPUT_LHE
+lhe_provenance=$OUTPUT_DIR/lhe-provenance.json
+lhe_event_count=$SOURCE_LHE_EVENTS
+event_number=lhe_event_index_1based
 powheg_card=${RUN_CARD:-external-LHE}
 powheg_commit=$(git -C "$POWHEG_ROOT" rev-parse HEAD)
 process_commit=$(git -C "$PROCESS_DIR" rev-parse HEAD)

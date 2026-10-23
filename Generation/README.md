@@ -141,13 +141,41 @@ switches in the private run copy.
 ## Outputs
 
 Each run gets its own directory under `runs/` and contains the resolved
-`powheg.input`, logs, LHE input, showered HepMC output, and `run-metadata.txt`.
+`powheg.input`, logs, LHE input, showered HepMC output, `run-metadata.txt`, and
+`lhe-provenance.json`.
 Generated samples and locally installed software are excluded from Git.
 The metadata records both beam energies and `sqrt_s_gev=13600`.
 
+The provenance sidecar records the original LHE path, SHA-256 and event
+count, the HepMC path and SHA-256, and the source-event numbering convention.
+Source identity is retained automatically:
+
+- the PYTHIA bridge sets each output event number to the one-based index of
+  the actual LHE event that was read, including gaps from failed attempts;
+- HERWIG receives a private copy of the LHE with native source-event numbers
+  and uses `LesHouchesHandler:EventNumbering LHE`. The original LHE is not
+  changed.
+
+These identifiers follow the accepted hard event through the shower; they
+are not a new consecutive numbering of accepted events. Repeated source
+events, when present, retain their source identity and are recorded in the
+provenance summary. The Simulation and Analysis stages validate this
+association before copying hard-record observables into the compact tree.
+
+After pulling this feature, rerun `install_generators.sh` with the same
+installation options to rebuild the small `powheg-pythia8` bridge. HERWIG
+uses the updated generated input and does not require recompilation for
+source numbering. Existing HepMC outputs without the provenance sidecar
+cannot be safely joined by event position. If the original LHE was retained,
+reshower it with `--lhe` using the updated runner, then rerun Simulation and
+Analysis. The bookkeeping change itself does not alter the POWHEG matrix
+element or require new integration grids.
+
 Standalone runs retain their intermediates. In a submitted Unity campaign,
 the same files live only in worker scratch and are deleted after the compact
-Analysis ROOT shard has been validated and published.
+Analysis ROOT shard has been validated and published. Its hard-event
+observables and source identifiers have already been copied into the compact
+tree before that cleanup.
 
 ## Physics scope of this first baseline
 
@@ -168,6 +196,28 @@ unfolding, we must validate decay angles, off-shell behavior, identical-lepton
 effects, tau feed-down and the precise POWHEG shower-veto prescription in both
 showers. A later stage can compare this factorized baseline to a dedicated
 four-lepton matrix element such as POWHEG-BOX-RES `gg4l`.
+
+### What is present at LHE level
+
+The hard record and the shower decay record are different objects in this
+baseline. For `gg_H`, POWHEG writes an **undecayed Higgs**. Its LHE mass,
+rapidity, and transverse momentum can be retained for production-level
+reweighting, but the LHE file contains no Higgs-decay lepton angles or
+dilepton masses. PYTHIA and HERWIG subsequently generate those decays.
+For `ZZ`, the POWHEG LHE record already contains the leptonic final state.
+
+The compact analysis therefore keeps LHE information separate from its
+existing dressed-particle `truth_` quantities. Missing LHE decay variables
+remain unavailable; they are never filled from showered or dressed leptons.
+To deform Higgs **decay** distributions at the hard-matrix-element level,
+the signal generator must supply a decayed four-lepton LHE record. Retaining
+the current undecayed record does not create that information. Smooth
+dressed-particle closure tests can still use the existing `truth_` variables.
+
+When the LHE final state contains taus, their later electron or muon decay
+products belong to the shower/decay record. They must not be relabeled as
+direct LHE electrons or muons. The analysis records availability and tau
+content explicitly so these cases can be selected correctly.
 
 Do not reuse a `ZZ` integration or upper-bound grid produced before the
 `m4l > 95 GeV` patch, including grids made with either the original 4 GeV card

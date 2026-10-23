@@ -74,6 +74,34 @@ and `Particle` retains the complete ancestry used to reject photons from
 hadron decays. No fiducial pT, eta, pairing, or mass requirement is applied
 while constructing the dressed branches.
 
+### Hard-record information and dressed truth
+
+The compact Analysis stage can also retain quantities read directly from
+the associated LHE hard event. These are a separate information source from
+the Delphes `Particle`, `StableParticle`, and dressed-lepton collections.
+An event's position in a successful shower output is not sufficient to
+identify its source LHE event, because shower attempts can fail or be
+retried. The production chain must preserve and validate the source-event
+association before the Analysis stage combines the records.
+
+For new generated inputs, the runner discovers `lhe-provenance.json`, checks
+the recorded HepMC identity, and carries the source-event number through the
+Delphes `Event.Number` branch. The simulation-bound sidecar beside
+`delphes.root` records the Delphes file checksum as well as the original LHE
+identity. Analysis discovers that sidecar automatically. Preserve the source
+LHE until Analysis has extracted its hard-event fields. If the files are
+moved before reduction, Analysis's explicit `--lhe` and `--lhe-map` options
+can supply the relocated files while retaining content verification.
+
+The LHE quantities describe the hard event before showering and detector
+response. The existing `truth_` quantities describe dressed electrons and
+muons after the shower and decays; `reco_` describes the response and
+reconstruction. The LHE record is not used to change the detector simulation
+or the truth/reconstructed event selection. For the current `gg_H` process
+it contains an undecayed Higgs, so hard Higgs production quantities exist
+while hard four-lepton decay quantities do not. The branch definitions and
+availability masks are documented in [`Analysis/README.md`](../Analysis/README.md).
+
 ### H4l reconstruction and efficiency model
 
 The generic Delphes ATLAS card is not suitable for the soft four-lepton

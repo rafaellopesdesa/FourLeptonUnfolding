@@ -119,11 +119,16 @@ collect_diagnostics() {
     "$diagnostic_dir/herwig.in"
   copy_if_present "$ACTIVE_WORK_DIR/generation/run-metadata.txt" \
     "$diagnostic_dir/generation-metadata.txt"
+  copy_if_present "$ACTIVE_WORK_DIR/generation/lhe-provenance.json" \
+    "$diagnostic_dir/generation-lhe-provenance.json"
   copy_if_present "$ACTIVE_WORK_DIR/simulation/generation/delphes.log" \
     "$diagnostic_dir/delphes.log"
   copy_if_present \
     "$ACTIVE_WORK_DIR/simulation/generation/simulation-metadata.txt" \
     "$diagnostic_dir/simulation-metadata.txt"
+  copy_if_present \
+    "$ACTIVE_WORK_DIR/simulation/generation/lhe-provenance.json" \
+    "$diagnostic_dir/simulation-lhe-provenance.json"
   copy_if_present \
     "$ACTIVE_WORK_DIR/simulation/generation/delphes_card_ATLAS_resolved.tcl" \
     "$diagnostic_dir/delphes_card_ATLAS_resolved.tcl"
@@ -283,7 +288,7 @@ run_event_stage() {
       fail_event_stage 1
     }
     "$ANALYSIS_PYTHON" "$ANALYSIS_VALIDATOR" "$analysis_output" \
-      --expected-entries "$EVENTS_PER_JOB"
+      --expected-entries "$EVENTS_PER_JOB" --require-lhe
     ACTIVE_STAGE=complete
     rm -f -- "$job_dir/FAILED"
     touch "$job_dir/SUCCESS"
@@ -355,16 +360,16 @@ run_event_stage() {
   local scratch_analysis="$ACTIVE_WORK_DIR/analysis.root"
   "$ANALYSIS_PYTHON" "$ANALYSIS_RUNNER" "$delphes_output" \
     --output "$scratch_analysis" \
-    --mass-region "$MASS_REGION"
+    --mass-region "$MASS_REGION" --require-lhe
   "$ANALYSIS_PYTHON" "$ANALYSIS_VALIDATOR" "$scratch_analysis" \
-    --expected-entries "$EVENTS_PER_JOB"
+    --expected-entries "$EVENTS_PER_JOB" --require-lhe
 
   ACTIVE_STAGE=publish
   ACTIVE_PARTIAL_OUTPUT="$ANALYSIS_OUTPUT_ROOT/.${output_name}.partial.${SLURM_JOB_ID:-local}.${SLURM_ARRAY_TASK_ID}"
   rm -f -- "$ACTIVE_PARTIAL_OUTPUT"
   cp --reflink=auto -- "$scratch_analysis" "$ACTIVE_PARTIAL_OUTPUT"
   "$ANALYSIS_PYTHON" "$ANALYSIS_VALIDATOR" "$ACTIVE_PARTIAL_OUTPUT" \
-    --expected-entries "$EVENTS_PER_JOB"
+    --expected-entries "$EVENTS_PER_JOB" --require-lhe
   if ln -- "$ACTIVE_PARTIAL_OUTPUT" "$analysis_output"; then
     rm -f -- "$ACTIVE_PARTIAL_OUTPUT"
   else

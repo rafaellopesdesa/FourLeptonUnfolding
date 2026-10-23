@@ -104,6 +104,68 @@ pixi run --manifest-path Analysis/pixi.toml analyze \
 The default uproot chunk size is 50 MB and can be changed with
 `--step-size "100 MB"`.
 
+### Joining the original LHE event
+
+New generation/simulation runs carry the original **1-based LHE source-event
+index** through HepMC and into `Delphes.Event.Number`. The reducer joins on
+that identifier, using the source and output checksums recorded in the
+simulation-bound `lhe-provenance.json` beside the Delphes file. It never
+assumes that the nth accepted shower event came from the nth LHE event.
+Rejected shower attempts can therefore leave gaps without shifting later
+associations.
+
+The default reducer discovers this sidecar for each Delphes input and reads
+the original LHE path recorded there. Use strict mode for a production shard:
+
+```bash
+pixi run --manifest-path Analysis/pixi.toml analyze \
+  /path/to/run/delphes_ATLAS/delphes.root \
+  --require-lhe \
+  -o /path/to/analysis/job_000000.root
+```
+
+If a standalone run has been moved, the original LHE file and sidecar can be
+supplied explicitly for a **single** Delphes input:
+
+```bash
+pixi run --manifest-path Analysis/pixi.toml analyze \
+  /new/location/delphes.root \
+  --lhe /new/location/pwgevents.lhe \
+  --lhe-map /new/location/lhe-provenance.json \
+  --require-lhe \
+  -o /new/location/analysis.root
+```
+
+`--lhe-map` names the provenance manifest, not an array of guessed ordinal
+matches. `--lhe` overrides the source path; it does not bypass the recorded
+source-content or Delphes-content checks. A bare LHE file and a matching
+event count are insufficient evidence of the association. The output ROOT
+object `lhe_metadata` records full source hashes, paths, and the per-input
+provenance needed to audit the join.
+
+Legacy Delphes files without LHE provenance remain readable without
+`--require-lhe`; the new LHE branches are then present but marked unavailable.
+Strict mode requires a matched hard event for every output row. It does
+**not** require that every hard event contain four decay leptons, so the
+undecayed `gg_H` signal remains valid. To recover hard observables from an old
+sample, use a trustworthy recorded event association or rerun the shower and
+simulation with the updated chain. Equal numbers of events do not establish
+that association.
+
+The standalone validator supports the same production requirement:
+
+```bash
+python -m Analysis.validate_analysis_output \
+  /path/to/analysis/job_000000.root --require-lhe
+```
+
+Without this option it also accepts legacy compact files with no LHE
+branches. When any LHE branch is present, it checks the complete LHE schema
+and consistency of the availability masks. Its summary counts matched hard
+events, four-lepton candidates, and Higgs records separately. A zero hard
+four-lepton count for the current `gg_H` sample is expected, even when every
+event has a valid LHE association.
+
 ## Merging and Herwig pseudo-data
 
 `merge_analysis_outputs.py` looks in one directory for compact Analysis files
@@ -293,7 +355,61 @@ An unmerged compact tree produced by `build_analysis_tree.py` contains:
 - `type`: a compatibility alias equal to `reco_type` when a reconstructed
   candidate exists, otherwise `truth_type`;
 - truth and reconstructed copies of all Tools observables, prefixed by
-  `truth_` and `reco_` respectively.
+  `truth_` and `reco_` respectively;
+- the LHE hard-record observables, availability masks, and source identifiers
+  described below.
+
+### LHE branches
+
+LHE lepton kinematics use outgoing (`ISTUP=1`) electrons and muons from the
+hard record. Two disjoint SFOS pairs are chosen with the same leading-pair
+and subleading-pair convention as Analysis, but **no lepton pT/eta cuts or
+fiducial event cuts** are imposed. The kinematic definitions are shared with
+`Tools/four_lepton_kinematics.py`. These quantities therefore exist
+independently of the dressed-truth and reconstructed selections.
+
+| Branches | Meaning |
+|---|---|
+| `lhe_available` | A source LHE event was matched and read successfully |
+| `lhe_event_index`, `lhe_source_id` | One-based source-event index and source-content identifier; together identify the source event across merged shards |
+| `lhe_process_id`, `lhe_weight`, `lhe_scale` | Raw `IDPRUP`, signed `XWGTUP`, and `SCALUP` from the LHE event header |
+| `lhe_n_final_leptons` | Number of direct outgoing electrons and muons in the hard record |
+| `lhe_has_taus` | The hard record contains at least one outgoing tau |
+| `lhe_has_four_leptons`, `lhe_type` | A candidate containing two disjoint SFOS electron/muon pairs exists; channel codes use the same 0–3 convention as truth/reco |
+| `lhe_kinematics_valid` | All eleven four-lepton observables are finite |
+| `lhe_cos_theta_star`, `lhe_cos_theta1`, `lhe_cos_theta2` | Hard four-lepton polar-angle observables |
+| `lhe_Phi`, `lhe_Phi1`, `lhe_Psi` | Hard four-lepton azimuthal-angle observables |
+| `lhe_m_Z1`, `lhe_m_Z2`, `lhe_m_ZZ` | Hard dilepton and four-lepton masses |
+| `lhe_y_ZZ`, `lhe_pT_ZZ` | Hard four-lepton rapidity and transverse momentum |
+| `lhe_has_higgs`, `lhe_higgs_kinematics_valid` | A status-1/2 Higgs is present; a unique terminal Higgs has finite production kinematics |
+| `lhe_higgs_m`, `lhe_higgs_y`, `lhe_higgs_pT` | Mass, rapidity, and transverse momentum of that hard Higgs |
+
+The source ID is the first 64 bits of the original LHE SHA-256. Full digests
+are kept in `lhe_metadata`, and combining sources with colliding short IDs
+but different full digests is rejected. Merging can renumber `event_id`
+without changing the LHE source/index pair. Multiple accepted entries or
+pseudo-data resamples of the same hard event intentionally share that pair.
+
+Absent quantities are `NaN`, absent event indices and channel codes are `-1`,
+and availability masks are false. A four-lepton candidate can exist while
+its angles are mathematically undefined; in that case finite masses or
+production kinematics can still be retained and `lhe_kinematics_valid` is
+false. Check the relevant masks and finite values before applying a
+deformation.
+
+The current `gg_H` LHE contains an undecayed Higgs. Such events can have
+`lhe_available=True` and valid `lhe_higgs_*` while
+`lhe_has_four_leptons=False` and all four-lepton `lhe_*` observables are
+unavailable. An LHE tau final state is not replaced by its later shower
+electron/muon descendants. Neither case is repaired with dressed `truth_`
+values. A decayed hard-process signal sample is required to define genuine
+LHE Higgs-decay angular deformations.
+
+`lhe_weight` remains the raw source-event weight for provenance; it is not
+the normalized MC training weight. Use the merged `weight_nominal_pb` or
+luminosity-scaled `weight` for physical yields, and multiply a chosen
+deformation factor into that weight once. Merging and pseudo-data sampling
+preserve the per-event LHE columns along with the other compact observables.
 
 Merged MC trees add/replace the normalization branches described above:
 `weight_shape`, `weight_nominal_pb`, `lumi`, `luminosity_fb`, and the
@@ -327,4 +443,5 @@ For channel rows, truth-selected counts and `Nboth` use the truth pairing,
 while reconstructed and reconstructed-only counts use the reconstructed
 pairing. This makes a rare `2mu2e`/`2e2mu` pairing migration visible rather
 than assigning both levels a shared channel by construction. These diagnostics
-are printed only; the compact ROOT schema is unchanged.
+are printed only; the LHE availability columns are separate from these
+truth/reconstruction overlap diagnostics.

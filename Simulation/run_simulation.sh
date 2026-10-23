@@ -227,6 +227,22 @@ for input_file in "${INPUT_FILES[@]}"; do
   file_index=$((file_index + 1))
   input_dir="$(dirname "$input_file")"
   metadata_file="$input_dir/run-metadata.txt"
+  source_lhe_provenance="$input_dir/lhe-provenance.json"
+  # Record both inputs before validation. A replacement of the HepMC and its
+  # manifest during a long Delphes run must not certify the new pair as the
+  # source of an output produced from the old one.
+  input_hepmc_sha256="$(sha256sum "$input_file" | awk '{print $1}')"
+  source_lhe_provenance_sha256=unavailable
+  if [[ -f "$source_lhe_provenance" ]]; then
+    source_lhe_provenance_sha256="$(sha256sum "$source_lhe_provenance" | awk '{print $1}')"
+  fi
+  if [[ -e "$source_lhe_provenance" ]] && ! \
+      python3 "$SCRIPT_DIR/lhe_provenance.py" verify-input \
+        "$source_lhe_provenance" "$input_file"; then
+    echo "Invalid LHE provenance for $input_file; refusing an unsafe event match." >&2
+    failures=$((failures + 1))
+    continue
+  fi
   metadata_process="$(metadata_value process "$metadata_file")"
   resolved_process="$PROCESS"
   if [[ "$resolved_process" == auto ]]; then
@@ -275,10 +291,17 @@ for input_file in "${INPUT_FILES[@]}"; do
   else
     output_dir="$input_dir/delphes_ATLAS"
   fi
+  output_dir="$(realpath -m "$output_dir")"
+  if [[ "$output_dir" == "$(realpath "$input_dir")" ]]; then
+    echo "Simulation output directory must differ from the generation input directory: $input_dir" >&2
+    failures=$((failures + 1))
+    continue
+  fi
   output_file="$output_dir/delphes.root"
   resolved_card="$output_dir/delphes_card_ATLAS_resolved.tcl"
   log_file="$output_dir/delphes.log"
   status_file="$output_dir/simulation-metadata.txt"
+  bound_lhe_provenance="$output_dir/lhe-provenance.json"
 
   input_events="$(count_hepmc_events "$input_file")"
   if ((input_events <= 0)); then
@@ -292,6 +315,19 @@ for input_file in "${INPUT_FILES[@]}"; do
   fi
 
   if [[ -f "$output_dir/SUCCESS" && -s "$output_file" && $OVERWRITE -eq 0 ]]; then
+    if [[ -f "$source_lhe_provenance" ]]; then
+      if ! python3 "$SCRIPT_DIR/lhe_provenance.py" verify-output \
+          "$source_lhe_provenance" "$output_file" "$bound_lhe_provenance" \
+          --events "$expected_events"; then
+        echo "Existing output has no matching LHE provenance; rerun with --overwrite." >&2
+        failures=$((failures + 1))
+        continue
+      fi
+    elif [[ -e "$bound_lhe_provenance" ]]; then
+      echo "Existing output has LHE provenance but its generation manifest is missing." >&2
+      failures=$((failures + 1))
+      continue
+    fi
     if validate_delphes_output "$output_file" "$log_file" "$expected_events"; then
       printf '[simulation] Already complete: %s\n' "$output_file"
     else
@@ -304,8 +340,8 @@ for input_file in "${INPUT_FILES[@]}"; do
   mkdir -p "$output_dir"
   if ((OVERWRITE)); then
     rm -f "$output_file" "$resolved_card" "$log_file" "$status_file" \
-      "$output_dir/SUCCESS" "$output_dir/FAILED"
-  elif [[ -e "$output_file" || -e "$output_dir/FAILED" ]]; then
+      "$bound_lhe_provenance" "$output_dir/SUCCESS" "$output_dir/FAILED"
+  elif [[ -e "$output_file" || -e "$output_dir/FAILED" || -e "$bound_lhe_provenance" ]]; then
     echo "Existing incomplete output blocks $output_dir; inspect it or use --overwrite." >&2
     failures=$((failures + 1))
     continue
@@ -326,9 +362,41 @@ for input_file in "${INPUT_FILES[@]}"; do
   if "$reader" "$resolved_card" "$output_file" "$input_file" >"$log_file" 2>&1 && \
       [[ -s "$output_file" ]] && \
       validate_delphes_output "$output_file" "$log_file" "$expected_events"; then
+    current_lhe_provenance_sha256=unavailable
+    if [[ -f "$source_lhe_provenance" ]]; then
+      current_lhe_provenance_sha256="$(sha256sum "$source_lhe_provenance" | awk '{print $1}')"
+    fi
+    if [[ ! -f "$input_file" || \
+          "$input_hepmc_sha256" != "$(sha256sum "$input_file" | awk '{print $1}')" || \
+          "$source_lhe_provenance_sha256" != "$current_lhe_provenance_sha256" ]]; then
+      touch "$output_dir/FAILED"
+      echo "Generation inputs changed during simulation; refusing to bind $output_file." >&2
+      failures=$((failures + 1))
+      continue
+    fi
+    if [[ -f "$source_lhe_provenance" ]]; then
+      if ! python3 "$SCRIPT_DIR/lhe_provenance.py" bind-output \
+          "$source_lhe_provenance" "$output_file" "$bound_lhe_provenance" \
+          --events "$expected_events" \
+          --expected-manifest-sha256 "$source_lhe_provenance_sha256" \
+          >>"$log_file" 2>&1; then
+        touch "$output_dir/FAILED"
+        echo "Could not bind LHE provenance to $output_file; inspect $log_file" >&2
+        failures=$((failures + 1))
+        continue
+      fi
+    fi
     {
       printf 'input_file=%s\n' "$input_file"
       printf 'output_file=%s\n' "$output_file"
+      printf 'delphes_sha256=%s\n' "$(sha256sum "$output_file" | awk '{print $1}')"
+      if [[ -f "$bound_lhe_provenance" ]]; then
+        printf 'lhe_provenance=%s\n' "$bound_lhe_provenance"
+        printf 'lhe_provenance_sha256=%s\n' "$(sha256sum "$bound_lhe_provenance" | awk '{print $1}')"
+        printf 'event_number=lhe_event_index_1based\n'
+      else
+        printf 'lhe_provenance=unavailable\n'
+      fi
       printf 'process=%s\n' "$resolved_process"
       printf 'hepmc_format=%s\n' "$format"
       printf 'random_seed=%s\n' "$delphes_seed"

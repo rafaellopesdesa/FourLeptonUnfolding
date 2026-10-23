@@ -101,10 +101,19 @@ def _passes_lepton_definition(lepton: Lepton) -> bool:
     return float(lepton.p4.pt) > LEPTON_PT_MIN and abs(float(lepton.p4.eta)) < LEPTON_ETA_MAX
 
 
-def choose_candidate(leptons: Iterable[Lepton]) -> FourLeptonCandidate | None:
-    """Choose two disjoint SFOS pairs using the stated closest-to-mZ rule."""
+def choose_candidate(
+    leptons: Iterable[Lepton], *, apply_lepton_cuts: bool = True
+) -> FourLeptonCandidate | None:
+    """Choose two disjoint SFOS pairs using the stated closest-to-mZ rule.
 
-    accepted = [lepton for lepton in leptons if _passes_lepton_definition(lepton)]
+    Hard-process LHE observables use the same pairing without the fiducial
+    lepton acceptance. Truth and reconstruction retain their existing cuts.
+    """
+
+    accepted = [
+        lepton for lepton in leptons
+        if not apply_lepton_cuts or _passes_lepton_definition(lepton)
+    ]
     pairs: list[tuple[int, int, Lepton, Lepton, float]] = []
     for first, second in combinations(range(len(accepted)), 2):
         one, two = accepted[first], accepted[second]

@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from functools import lru_cache
+import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 from typing import Iterable
 
 import awkward as ak
@@ -20,6 +23,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from Analysis.selection import Lepton, SelectionResult, select_event  # noqa: E402
+from Analysis.lhe import empty_columns as empty_lhe_columns  # noqa: E402
+from Analysis.lhe_matching import (  # noqa: E402
+    EVENT_NUMBER_CONVENTION, file_identity, load_lhe_source,
+)
 from Tools.four_lepton_kinematics import KinematicError  # noqa: E402
 
 
@@ -474,6 +481,7 @@ def _empty_output(size: int, first_event_id: int) -> dict[str, np.ndarray]:
     for level in ("truth", "reco"):
         for field in KINEMATIC_FIELDS:
             output[f"{level}_{field}"] = np.full(size, np.nan, dtype=np.float32)
+    output.update(empty_lhe_columns(size))
     return output
 
 
@@ -553,6 +561,9 @@ def main() -> None:
     parser.add_argument("-o", "--output", required=True, type=Path)
     parser.add_argument("--tree-name", default="Delphes")
     parser.add_argument("--step-size", default="50 MB", help="uproot chunk size")
+    parser.add_argument("--lhe", type=Path, help="Relocated original LHE input (single Delphes input only)")
+    parser.add_argument("--lhe-map", type=Path, help="Simulation-bound lhe-provenance.json (single input only)")
+    parser.add_argument("--require-lhe", action="store_true", help="Require verified LHE matches for every row")
     parser.add_argument(
         "--mass-region",
         choices=("extended", "signal"),
@@ -562,6 +573,8 @@ def main() -> None:
     args = parser.parse_args()
 
     inputs = discover_inputs(args.inputs)
+    if len(inputs) != 1 and (args.lhe is not None or args.lhe_map is not None):
+        parser.error("--lhe and --lhe-map overrides require exactly one Delphes input")
     output_path = args.output.expanduser().resolve()
     if output_path in inputs:
         raise ValueError("output file must not overwrite a Delphes input")
@@ -570,35 +583,69 @@ def main() -> None:
 
     event_id = 0
     diagnostics = SelectionDiagnostics()
-    with uproot.recreate(output_path) as output_file:
-        output_file.mktree("Analysis", output_schema(), title="Compact H to four-lepton analysis tree")
-        output_tree = output_file["Analysis"]
-        for input_path in inputs:
-            with uproot.open(input_path) as input_file:
-                if args.tree_name not in input_file:
-                    raise KeyError(f"{input_path} does not contain tree {args.tree_name}")
-                tree = input_file[args.tree_name]
-                missing = sorted(set(INPUT_BRANCHES).difference(available_branch_names(tree)))
-                if missing:
-                    raise KeyError(
-                        f"{input_path} is missing required branches: {', '.join(missing)}; "
-                        "rerun Delphes with the current H4l response card"
+    lhe_sources = []
+    source_ids = {}
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{output_path.name}.", suffix=".partial", dir=output_path.parent)
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        with uproot.recreate(temporary) as output_file:
+            output_file.mktree("Analysis", output_schema(), title="Compact H to four-lepton analysis tree")
+            output_tree = output_file["Analysis"]
+            for input_path in inputs:
+                original_identity = file_identity(input_path)
+                with uproot.open(input_path) as input_file:
+                    if args.tree_name not in input_file:
+                        raise KeyError(f"{input_path} does not contain tree {args.tree_name}")
+                    tree = input_file[args.tree_name]
+                    missing = sorted(set(INPUT_BRANCHES).difference(available_branch_names(tree)))
+                    if missing:
+                        raise KeyError(
+                            f"{input_path} is missing required branches: {', '.join(missing)}; "
+                            "rerun Delphes with the current H4l response card"
+                        )
+                    lhe_source = load_lhe_source(
+                        input_path, tree, lhe_path=args.lhe, manifest_path=args.lhe_map,
+                        require_lhe=args.require_lhe,
                     )
-                for arrays in tree.iterate(
-                    expressions=INPUT_BRANCHES,
-                    step_size=args.step_size,
-                    library="ak",
-                    how=dict,
-                ):
-                    reduced = reduce_chunk(
-                        arrays,
-                        first_event_id=event_id,
-                        four_lepton_mass_window=mass_window,
-                        diagnostics=diagnostics,
-                    )
-                    output_tree.extend(reduced)
-                    size = len(reduced["event_id"])
-                    event_id += size
+                    if lhe_source is not None:
+                        if output_path in {
+                            Path(lhe_source.metadata["lhe_file"]),
+                            Path(lhe_source.metadata["provenance_file"]),
+                        }:
+                            raise ValueError("output file must not overwrite the LHE source or provenance")
+                        digest = lhe_source.metadata["lhe_sha256"]
+                        if source_ids.setdefault(lhe_source.source_id, digest) != digest:
+                            raise ValueError("LHE source ID collision between distinct SHA-256 digests")
+                        lhe_sources.append(lhe_source.metadata)
+                    else:
+                        print(f"No verified LHE provenance for {input_path}; LHE fields are unavailable")
+                    for arrays in tree.iterate(
+                        expressions=INPUT_BRANCHES,
+                        step_size=args.step_size,
+                        library="ak",
+                        how=dict,
+                    ):
+                        reduced = reduce_chunk(
+                            arrays,
+                            first_event_id=event_id,
+                            four_lepton_mass_window=mass_window,
+                            diagnostics=diagnostics,
+                        )
+                        if lhe_source is not None:
+                            lhe_source.decorate(reduced)
+                        output_tree.extend(reduced)
+                        size = len(reduced["event_id"])
+                        event_id += size
+                if file_identity(input_path) != original_identity:
+                    raise ValueError(f"Delphes input changed while reducing: {input_path}")
+            output_file["lhe_metadata"] = json.dumps(
+                {"schema_version": 1, "event_number": EVENT_NUMBER_CONVENTION,
+                 "sources": lhe_sources}, sort_keys=True, allow_nan=False,
+            )
+        os.replace(temporary, output_path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
     print(f"Wrote {event_id} events to {output_path}")
     for line in diagnostic_lines(diagnostics):

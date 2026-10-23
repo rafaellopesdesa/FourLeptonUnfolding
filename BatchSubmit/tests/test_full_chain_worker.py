@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from pathlib import Path
 import shlex
 import subprocess
@@ -53,6 +54,7 @@ class FullChainWorkerTest(unittest.TestCase):
             mkdir -p "$output"
             printf 'HepMC::Version 3.0.0\nHepMC::Asciiv3-START_EVENT_LISTING\nE 1\n' >"$output/events.hepmc3"
             printf 'process=gg_H\nseed=1001\n' >"$output/run-metadata.txt"
+            printf '{"schema_version": 1}\n' >"$output/lhe-provenance.json"
             printf 'generation log\n' >"$output/powheg.log"
             """,
         )
@@ -67,6 +69,7 @@ class FullChainWorkerTest(unittest.TestCase):
             printf 'delphes placeholder\n' >"$output/delphes.root"
             printf 'simulation log\n' >"$output/delphes.log"
             printf 'process=gg_H\n' >"$output/simulation-metadata.txt"
+            cp "$input/lhe-provenance.json" "$output/lhe-provenance.json"
         """
         write_executable(
             fake_repo / "Simulation" / "run_simulation.sh",
@@ -87,7 +90,9 @@ class FullChainWorkerTest(unittest.TestCase):
             parser.add_argument("input")
             parser.add_argument("--output", required=True)
             parser.add_argument("--mass-region")
+            parser.add_argument("--require-lhe", action="store_true")
             args = parser.parse_args()
+            assert args.require_lhe, "batch analysis must require LHE matching"
             size = 3
             index = np.arange(size)
             with uproot.recreate(args.output) as root_file:
@@ -100,6 +105,7 @@ class FullChainWorkerTest(unittest.TestCase):
                     "reconstructed": np.ones(size, dtype=np.bool_),
                     "truth_type": np.zeros(size, dtype=np.int8),
                     "reco_type": np.zeros(size, dtype=np.int8),
+                    "lhe_available": np.ones(size, dtype=np.bool_),
                 }
             """,
         )
@@ -112,9 +118,12 @@ class FullChainWorkerTest(unittest.TestCase):
             parser = argparse.ArgumentParser()
             parser.add_argument("path")
             parser.add_argument("--expected-entries", type=int, required=True)
+            parser.add_argument("--require-lhe", action="store_true")
             args = parser.parse_args()
+            assert args.require_lhe, "batch validation must require LHE matching"
             with uproot.open(args.path) as root_file:
                 assert root_file["Analysis"].num_entries == args.expected_entries
+                assert root_file["Analysis"]["lhe_available"].array(library="np").all()
             """,
         )
 
@@ -176,6 +185,8 @@ class FullChainWorkerTest(unittest.TestCase):
             self.assertTrue((job / "SUCCESS").is_file())
             self.assertFalse((job / "FAILED").exists())
             self.assertTrue((job / "diagnostics" / "generation-powheg.log").is_file())
+            self.assertTrue((job / "diagnostics" / "generation-lhe-provenance.json").is_file())
+            self.assertTrue((job / "diagnostics" / "simulation-lhe-provenance.json").is_file())
             self.assertFalse(any((root / "scratch").iterdir()))
             self.assertEqual(
                 (root / "campaign" / "grid" / "pwg-test-grid.dat").read_text(),
@@ -221,6 +232,36 @@ class FullChainWorkerTest(unittest.TestCase):
             rejected = self.run_worker(config)
             self.assertNotEqual(rejected.returncode, 0)
             self.assertIn("campaign provenance", rejected.stderr)
+
+    def test_requeue_rejects_a_legacy_output_without_lhe_matching(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, outputs = self.make_campaign(root)
+            first = self.run_worker(config)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            output = next(outputs.glob("*.root"))
+            with uproot.open(output) as root_file:
+                arrays = root_file["Analysis"].arrays(library="np", how=dict)
+            arrays.pop("lhe_available")
+            with uproot.recreate(output) as root_file:
+                root_file["Analysis"] = arrays
+            # A matching file hash alone must not let pre-LHE output bypass
+            # the new batch schema requirement on a resumed campaign.
+            job = root / "campaign" / "jobs" / "job_000000_seed1001"
+            metadata = job / "output-metadata.txt"
+            lines = metadata.read_text(encoding="utf-8").splitlines()
+            digest = hashlib.sha256(output.read_bytes()).hexdigest()
+            metadata.write_text(
+                "\n".join(
+                    f"analysis_sha256={digest}" if line.startswith("analysis_sha256=") else line
+                    for line in lines
+                ) + "\n",
+                encoding="utf-8",
+            )
+            rejected = self.run_worker(config)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("lhe_available", rejected.stderr)
+            self.assertFalse((job / "SUCCESS").exists())
 
 
 if __name__ == "__main__":

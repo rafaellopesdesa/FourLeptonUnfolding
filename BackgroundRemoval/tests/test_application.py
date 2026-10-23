@@ -83,6 +83,7 @@ def _write_sample(
     reconstructed: np.ndarray,
     masses: np.ndarray,
     nan_feature_rows: tuple[int, ...] = (),
+    with_lhe: bool = False,
 ) -> dict[str, np.ndarray]:
     size = reconstructed.size
     arrays: dict[str, np.ndarray] = {
@@ -98,9 +99,26 @@ def _write_sample(
         arrays[name] = np.linspace(index, index + 1.0, size, dtype=np.float32)
         if nan_feature_rows:
             arrays[name][list(nan_feature_rows)] = np.nan
+    if with_lhe:
+        arrays.update(
+            lhe_available=np.ones(size, dtype=np.bool_),
+            lhe_event_index=np.arange(1, size + 1, dtype=np.int64),
+            lhe_source_id=np.full(size, 0xFEDCBA9876543210, dtype=np.uint64),
+            lhe_weight=arrays["weight"].copy(),
+            lhe_Phi=np.linspace(-2.0, 2.0, size, dtype=np.float64),
+            lhe_higgs_m=np.full(size, np.nan, dtype=np.float64),
+        )
     with uproot.recreate(path) as root_file:
         root_file["Analysis"] = arrays
         root_file["merge_metadata"] = json.dumps({"kept": True})
+        if with_lhe:
+            root_file["lhe_metadata"] = json.dumps({
+                "schema_version": 1,
+                "event_number": "lhe_event_index_1based",
+                "sources": [{"lhe_source_id": "fedcba9876543210",
+                             "lhe_sha256": "fedcba9876543210" + "a" * 48,
+                             "lhe_file": "/production/original.lhe"}],
+            })
     return arrays
 
 
@@ -194,8 +212,11 @@ class ApplicationTest(unittest.TestCase):
                 reconstructed=np.array([True, True, False]),
                 masses=np.array([120.0, 140.0, np.nan]),
                 nan_feature_rows=(1, 2),
+                with_lhe=True,
             )
             source_sha256 = sha256_file(source)
+            with uproot.open(source) as root_file:
+                original_lhe_metadata = str(root_file["lhe_metadata"])
             metadata = _decorate(
                 source, output, _models(directory), sample_kind="data", diagnostics=True
             )
@@ -206,6 +227,11 @@ class ApplicationTest(unittest.TestCase):
                 np.testing.assert_array_equal(
                     arrays["fixed_vector"], original["fixed_vector"]
                 )
+                for name, values in original.items():
+                    if name.startswith("lhe_"):
+                        np.testing.assert_equal(arrays[name], values)
+                        self.assertEqual(arrays[name].dtype, values.dtype)
+                self.assertEqual(str(root_file["lhe_metadata"]), original_lhe_metadata)
                 np.testing.assert_allclose(
                     arrays["weight_background_removed"], [0.25, -1.0, 1.0]
                 )

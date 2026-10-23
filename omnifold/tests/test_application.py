@@ -41,7 +41,8 @@ def _iterations():
     ]
 
 
-def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False, overrides=None):
+def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False,
+            overrides=None, with_lhe=False):
     arrays = {
         "event_id": np.arange(5, dtype=np.uint64),
         "weight": np.array([2.0, -0.5, 3.0, 4.0, 5.0]),
@@ -60,10 +61,27 @@ def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False, ov
         arrays["fiducial"] = np.array([True, True, True, True, False])
         for i, name in enumerate(TRUTH_FEATURES):
             arrays[name] = np.full(5, 0.2 * i, dtype=np.float32)
+    if with_lhe:
+        arrays.update(
+            lhe_available=np.ones(5, dtype=np.bool_),
+            lhe_event_index=np.array([1, 3, 5, 5, 8], dtype=np.int64),
+            lhe_source_id=np.full(5, 0xFEDCBA9876543210, dtype=np.uint64),
+            lhe_weight=arrays["weight"].copy(),
+            lhe_Phi=np.linspace(-2.0, 2.0, 5, dtype=np.float64),
+            lhe_higgs_m=np.full(5, np.nan, dtype=np.float64),
+        )
     arrays.update(overrides or {})
     with uproot.recreate(path) as root_file:
         root_file.mktree("Analysis", arrays)
         root_file["background_removal_metadata"] = json.dumps({"keep_me": True})
+        if with_lhe:
+            root_file["lhe_metadata"] = json.dumps({
+                "schema_version": 1,
+                "event_number": "lhe_event_index_1based",
+                "sources": [{"lhe_source_id": "fedcba9876543210",
+                             "lhe_sha256": "fedcba9876543210" + "a" * 48,
+                             "lhe_file": "/production/original.lhe"}],
+            })
     return arrays
 
 
@@ -73,8 +91,10 @@ class ApplicationTest(unittest.TestCase):
             root = Path(directory)
             data = root / "data.root"
             mc = root / "gg_H_pythia.root"
-            original = _sample(data)
-            _sample(mc, with_weight=False)
+            original = _sample(data, with_lhe=True)
+            original_mc = _sample(mc, with_weight=False, with_lhe=True)
+            with uproot.open(data) as file:
+                original_lhe_metadata = str(file["lhe_metadata"])
             before = sha256_file(data)
             iterations = _iterations()
             paths = decorate_files([data], root / "decorated", iterations, mc_path=mc, step_size=2)
@@ -83,6 +103,9 @@ class ApplicationTest(unittest.TestCase):
                 arrays = file["Analysis"].arrays(library="np")
                 for name, values in original.items():
                     np.testing.assert_equal(arrays[name], values)
+                    if name.startswith("lhe_"):
+                        self.assertEqual(arrays[name].dtype, values.dtype)
+                self.assertEqual(str(file["lhe_metadata"]), original_lhe_metadata)
                 np.testing.assert_allclose(arrays["omnifold_reco_pull"][[0, 1, 4]], [[1.2, 1.1]] * 3)
                 np.testing.assert_allclose(arrays["omnifold_reco_likelihood"][[0, 1, 4]], [[1.4, 1.7]] * 3)
                 np.testing.assert_allclose(arrays["omnifold_weight"][1], [-0.125, -0.125])
@@ -94,6 +117,11 @@ class ApplicationTest(unittest.TestCase):
                 self.assertEqual(metadata["source_provenance"]["sha256"], before)
             with uproot.open(paths[1]) as file:
                 arrays = file["Analysis"].arrays(library="np")
+                for name, values in original_mc.items():
+                    if name.startswith("lhe_"):
+                        np.testing.assert_equal(arrays[name], values)
+                        self.assertEqual(arrays[name].dtype, values.dtype)
+                self.assertEqual(str(file["lhe_metadata"]), original_lhe_metadata)
                 np.testing.assert_allclose(arrays["omnifold_truth_push"][:4], [[1.5, 1.8]] * 4)
                 # Index 1 is negative; second column is cumulative, not 1.5*1.8.
                 np.testing.assert_allclose(arrays["omnifold_weight"][1], [-0.75, -0.9])
