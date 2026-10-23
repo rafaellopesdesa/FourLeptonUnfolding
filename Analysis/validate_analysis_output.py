@@ -50,6 +50,9 @@ class ValidationSummary:
     lhe_matched_entries: int | None = None
     lhe_four_lepton_entries: int | None = None
     lhe_higgs_entries: int | None = None
+    born_source_entries: int | None = None
+    born_available_entries: int | None = None
+    born_kinematics_valid_entries: int | None = None
 
 
 def _branch_names(tree: object) -> set[str]:
@@ -166,14 +169,113 @@ def _validate_lhe_chunk(arrays, *, path: Path, branch_types, require_lhe: bool,
     return int(np.count_nonzero(available)), int(np.count_nonzero(four_leptons)), int(np.count_nonzero(higgs))
 
 
+def _validate_born_metadata(root_file, path: Path) -> None:
+    """If supplied, the projection definition must identify this exact map."""
+    if "born_metadata" not in root_file:
+        return
+    from Tools.born_projection import BORN_PROJECTION_METADATA
+
+    metadata = json.loads(str(root_file["born_metadata"]))
+    if (not isinstance(metadata, dict) or type(metadata.get("schema_version")) is not int
+            or metadata["schema_version"] != 1
+            or metadata.get("projection") != BORN_PROJECTION_METADATA
+            or not isinstance(metadata.get("sources"), list)):
+        raise ValueError(f"{path}: unsupported Born projection metadata contract")
+    for record in metadata["sources"]:
+        if (not isinstance(record, dict) or type(record.get("born_source")) is not int
+                or record["born_source"] not in (1, 2, 3)):
+            raise ValueError(f"{path}: invalid Born source metadata")
+
+
+def _validate_born_chunk(arrays, *, path: Path, branch_types, require_born: bool,
+                         has_lhe_schema: bool) -> tuple[int, int, int]:
+    """Keep source availability distinct from a projectable four-lepton state."""
+    size = len(arrays["weight"])
+    columns = {}
+    for name, expected_dtype in branch_types.items():
+        column = np.asarray(arrays[name])
+        expected_dtype = np.dtype(expected_dtype)
+        if (column.shape != (size,) or column.dtype.kind != expected_dtype.kind
+                or column.dtype.itemsize != expected_dtype.itemsize):
+            raise ValueError(f"{path}: {name} must be a scalar {expected_dtype} branch")
+        columns[name] = column
+    source = columns["born_source"]
+    available, valid = columns["born_available"], columns["born_kinematics_valid"]
+    native = np.isin(source, (2, 3))
+    if not np.all(np.isin(source, (0, 1, 2, 3))):
+        raise ValueError(f"{path}: born_source must be 0, 1, 2 or 3")
+    if require_born and np.any(source == 0):
+        raise ValueError(f"{path}: --require-born requires a nonzero Born source for every row")
+    if np.any(available & (source == 0)) or np.any(valid & ~available):
+        raise ValueError(f"{path}: Born availability/kinematics flags disagree with their source")
+    indices = columns["born_shower_event_index"]
+    if np.any(native & (indices < 1)) or np.any(~native & (indices != -1)):
+        raise ValueError(f"{path}: Born native sources require a one-based shower event index; other sources require -1")
+    from_lhe = source == 1
+    if np.any(from_lhe):
+        if not has_lhe_schema or not np.all(np.asarray(arrays["lhe_available"])[from_lhe]):
+            raise ValueError(f"{path}: Born source 1 requires a matched canonical LHE record")
+    types, taus = columns["born_type"], columns["born_n_taus"]
+    if (np.any(available & ~np.isin(types, tuple(range(9))))
+            or np.any(~available & (types != -1))):
+        raise ValueError(f"{path}: Born channel type disagrees with availability")
+    if np.any(available & ~np.isin(taus, (0, 2, 4))) or np.any(~available & (taus != 0)):
+        raise ValueError(f"{path}: Born tau count disagrees with availability")
+    expected_taus = np.where(types == 4, 4, np.where(types >= 5, 2, 0))
+    if np.any(available & (taus != expected_taus)):
+        raise ValueError(f"{path}: Born tau count disagrees with its channel type")
+
+    for name, values in columns.items():
+        if values.dtype.kind == "f":
+            if np.any(np.isinf(values)):
+                raise ValueError(f"{path}: {name} contains infinite Born values")
+            if np.any(~available & ~np.isnan(values)):
+                raise ValueError(f"{path}: unavailable Born rows require NaN in {name}")
+    inputs = np.column_stack([columns[f"born_input_{field}"] for field in ("m_ZZ", "y_ZZ", "pT_ZZ")])
+    if not np.all(np.isfinite(inputs[available])):
+        raise ValueError(f"{path}: available Born rows require finite pre-projection inputs")
+    kinematics = np.column_stack([columns[f"born_{field}"] for field in KINEMATIC_FIELDS])
+    if np.any(valid != np.all(np.isfinite(kinematics), axis=1)):
+        raise ValueError(f"{path}: born_kinematics_valid must agree with finite Born kinematics")
+    # Undefined angles do not invalidate a successful projection of the
+    # masses, rapidity and transverse momentum.
+    for field in ("m_Z1", "m_Z2", "m_ZZ", "y_ZZ", "pT_ZZ"):
+        if not np.all(np.isfinite(columns[f"born_{field}"][available])):
+            raise ValueError(f"{path}: available Born rows require finite projected {field}")
+    tolerance = 2.0e-8 * np.maximum.reduce([
+        np.abs(columns["born_input_m_ZZ"][available]),
+        np.abs(columns["born_input_pT_ZZ"][available]),
+        np.ones(np.count_nonzero(available)),
+    ])
+    if np.any(np.abs(columns["born_pT_ZZ"][available]) > tolerance):
+        raise ValueError(f"{path}: projected Born transverse momentum is not zero")
+    for field in ("m_ZZ", "y_ZZ"):
+        if not np.all(np.isclose(columns[f"born_{field}"][available],
+                                 columns[f"born_input_{field}"][available], rtol=2.0e-8, atol=1.0e-9)):
+            raise ValueError(f"{path}: Born projection does not preserve input {field}")
+    # Raw LHE e/mu candidates use the same SFOS pairing.  Their pair masses
+    # are Lorentz invariants and therefore survive the common projection.
+    if has_lhe_schema:
+        compare = from_lhe & available & np.asarray(arrays["lhe_has_four_leptons"]) & (taus == 0)
+        for field in ("m_Z1", "m_Z2"):
+            raw = np.asarray(arrays[f"lhe_{field}"])
+            selected = compare & np.isfinite(raw)
+            if not np.all(np.isclose(columns[f"born_{field}"][selected], raw[selected], rtol=2.0e-8, atol=1.0e-9)):
+                raise ValueError(f"{path}: Born projection does not preserve LHE {field}")
+    return int(np.count_nonzero(source)), int(np.count_nonzero(available)), int(np.count_nonzero(valid))
+
+
 def validate_analysis_output(
     path: Path, *, expected_entries: int | None = None, step_size: str = "100 MB",
     require_lhe: bool = False,
+    require_born: bool = False,
 ) -> ValidationSummary:
     """Validate schema, signed normalization and any available LHE provenance.
 
-    Legacy files without LHE branches remain valid unless ``require_lhe`` is
-    true.  A partially present LHE schema is always an error.
+    Legacy files without optional LHE/Born branches remain valid unless the
+    corresponding requirement is enabled.  Partially present schemas are
+    always errors.  ``require_born`` checks that a source was evaluated; it
+    does not reject unsupported native Higgs decays.
     """
 
     path = path.expanduser().resolve()
@@ -198,6 +300,15 @@ def validate_analysis_output(
             if missing_lhe:
                 raise KeyError(f"{path} is missing required LHE branches: {', '.join(missing_lhe)}")
             source_inventory = _lhe_inventory(root_file, path)
+        born_branch_types = None
+        if require_born or any(name.startswith("born_") for name in available_branches):
+            from Analysis.born import BORN_BRANCH_TYPES
+
+            born_branch_types = BORN_BRANCH_TYPES
+            missing_born = sorted(set(born_branch_types) - available_branches)
+            if missing_born:
+                raise KeyError(f"{path} is missing required Born branches: {', '.join(missing_born)}")
+            _validate_born_metadata(root_file, path)
         entries = int(tree.num_entries)
         if entries <= 0:
             raise ValueError(f"{path} contains no analysis entries")
@@ -210,9 +321,12 @@ def validate_analysis_output(
         sum_squared_weights = 0.0
         final_cross_section = float("nan")
         lhe_counts = [0, 0, 0] if lhe_branch_types is not None else None
+        born_counts = [0, 0, 0] if born_branch_types is not None else None
         expressions = ["weight", "cross_section_pb"]
         if lhe_branch_types is not None:
             expressions.extend(lhe_branch_types)
+        if born_branch_types is not None:
+            expressions.extend(born_branch_types)
         for arrays in tree.iterate(
             expressions=expressions,
             step_size=step_size,
@@ -241,6 +355,13 @@ def validate_analysis_output(
                 )
                 for index, count in enumerate(local_counts):
                     lhe_counts[index] += count
+            if born_branch_types is not None:
+                local_counts = _validate_born_chunk(
+                    arrays, path=path, branch_types=born_branch_types, require_born=require_born,
+                    has_lhe_schema=lhe_branch_types is not None,
+                )
+                for index, count in enumerate(local_counts):
+                    born_counts[index] += count
 
     # An individual NLO shard may legitimately have a zero or negative net
     # sum even though the complete process sample has a positive cross
@@ -261,6 +382,9 @@ def validate_analysis_output(
         lhe_matched_entries=lhe_counts[0] if lhe_counts is not None else None,
         lhe_four_lepton_entries=lhe_counts[1] if lhe_counts is not None else None,
         lhe_higgs_entries=lhe_counts[2] if lhe_counts is not None else None,
+        born_source_entries=born_counts[0] if born_counts is not None else None,
+        born_available_entries=born_counts[1] if born_counts is not None else None,
+        born_kinematics_valid_entries=born_counts[2] if born_counts is not None else None,
     )
 
 
@@ -271,6 +395,8 @@ def main() -> None:
     parser.add_argument("--step-size", default="100 MB")
     parser.add_argument("--require-lhe", action="store_true",
                         help="require a matched LHE event for every row (no four-lepton or Higgs requirement)")
+    parser.add_argument("--require-born", action="store_true",
+                        help="require a nonzero Born source for every row (unsupported decay channels may remain unavailable)")
     args = parser.parse_args()
     if args.expected_entries is not None and args.expected_entries <= 0:
         parser.error("--expected-entries must be positive")
@@ -279,6 +405,7 @@ def main() -> None:
         expected_entries=args.expected_entries,
         step_size=args.step_size,
         require_lhe=args.require_lhe,
+        require_born=args.require_born,
     )
     print(
         f"validated {args.path}: entries={summary.entries}, "
@@ -289,6 +416,10 @@ def main() -> None:
            f"lhe_four_leptons={summary.lhe_four_lepton_entries}, "
            f"lhe_higgs={summary.lhe_higgs_entries}"
            if summary.lhe_matched_entries is not None else "")
+        + (f", born_source={summary.born_source_entries}, "
+           f"born_available={summary.born_available_entries}, "
+           f"born_kinematics_valid={summary.born_kinematics_valid_entries}"
+           if summary.born_source_entries is not None else "")
     )
 
 

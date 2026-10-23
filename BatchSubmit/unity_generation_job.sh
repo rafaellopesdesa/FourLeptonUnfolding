@@ -288,7 +288,7 @@ run_event_stage() {
       fail_event_stage 1
     }
     "$ANALYSIS_PYTHON" "$ANALYSIS_VALIDATOR" "$analysis_output" \
-      --expected-entries "$EVENTS_PER_JOB" --require-lhe
+      --expected-entries "$EVENTS_PER_JOB" --require-lhe --require-born
     ACTIVE_STAGE=complete
     rm -f -- "$job_dir/FAILED"
     touch "$job_dir/SUCCESS"
@@ -360,16 +360,16 @@ run_event_stage() {
   local scratch_analysis="$ACTIVE_WORK_DIR/analysis.root"
   "$ANALYSIS_PYTHON" "$ANALYSIS_RUNNER" "$delphes_output" \
     --output "$scratch_analysis" \
-    --mass-region "$MASS_REGION" --require-lhe
+    --mass-region "$MASS_REGION" --require-lhe --require-born
   "$ANALYSIS_PYTHON" "$ANALYSIS_VALIDATOR" "$scratch_analysis" \
-    --expected-entries "$EVENTS_PER_JOB" --require-lhe
+    --expected-entries "$EVENTS_PER_JOB" --require-lhe --require-born
 
   ACTIVE_STAGE=publish
   ACTIVE_PARTIAL_OUTPUT="$ANALYSIS_OUTPUT_ROOT/.${output_name}.partial.${SLURM_JOB_ID:-local}.${SLURM_ARRAY_TASK_ID}"
   rm -f -- "$ACTIVE_PARTIAL_OUTPUT"
   cp --reflink=auto -- "$scratch_analysis" "$ACTIVE_PARTIAL_OUTPUT"
   "$ANALYSIS_PYTHON" "$ANALYSIS_VALIDATOR" "$ACTIVE_PARTIAL_OUTPUT" \
-    --expected-entries "$EVENTS_PER_JOB" --require-lhe
+    --expected-entries "$EVENTS_PER_JOB" --require-lhe --require-born
   if ln -- "$ACTIVE_PARTIAL_OUTPUT" "$analysis_output"; then
     rm -f -- "$ACTIVE_PARTIAL_OUTPUT"
   else

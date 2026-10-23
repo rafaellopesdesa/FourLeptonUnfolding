@@ -33,7 +33,9 @@ manifest and refreshed lockfile. The local environment is stored under
 On Unity, clone the repository under `/work/pi_rclsa_umass_edu/` before running
 `pixi install`; the resulting environment is then visible from the worker
 nodes. The reducer reads ROOT files with uproot, so neither the ROOT module nor
-PyROOT is required for this analysis step.
+PyROOT is required for this analysis step. The environment also includes
+`pyhepmc` to read the certified hard-decay record used for the signal Born
+projection. Update the Analysis environment after pulling that feature.
 
 As a compatibility fallback, the existing pip requirements can still be used
 from the repository root:
@@ -165,6 +167,80 @@ and consistency of the availability masks. Its summary counts matched hard
 events, four-lepton candidates, and Higgs records separately. A zero hard
 four-lepton count for the current `gg_H` sample is expected, even when every
 event has a valid LHE association.
+
+### Born projection and the signal decay record
+
+The separate `born_*` level projects four hard charged leptons onto a system
+with zero transverse momentum. It implements the common Lorentz boost
+sequence in Section 2.3, Eqs. (2.14)–(2.16), of
+[arXiv:2606.11083v2](https://arxiv.org/abs/2606.11083v2): first remove the
+system's longitudinal motion, then its transverse recoil, then undo the
+first boost. Applied to every lepton, this preserves the system rapidity,
+its invariant mass, and all dilepton invariant masses. The projected system
+has four-momentum `(M cosh(y), 0, 0, M sinh(y))`; `born_pT_ZZ` is therefore
+zero up to numerical precision. Pairing precedes projection and applies no
+fiducial or reconstruction cuts.
+
+The input has a process-specific definition:
+
+- For `ZZ`, use exactly four outgoing LHE charged leptons, including taus,
+  with optional final-state QCD partons providing recoil. Additional final
+  photons, neutrinos, or other non-QCD particles are unsupported: the LHE
+  source remains certified, but `born_available=False` and the Born
+  observables remain `NaN`. The projection does not undo photon radiation
+  or reconstruct missing tau-decay neutrinos.
+- For `gg_H`, use the first direct charged daughters of the two showered
+  Higgs-decay Z bosons. Tau parents are retained before their decays. The
+  PYTHIA bridge saves these native hard-decay momenta in a HepMC attribute;
+  the supported HERWIG angular shower retains them in its original decay
+  graph. These are the momenta before lepton QED radiation, after production
+  recoil. They are neither the dressed truth leptons nor secondary electrons
+  and muons from tau decay.
+
+This is a kinematic projection of the defined input. It does not invert QED
+radiation, recover a full POWHEG underlying-Born event, or calculate the
+paper's NLO matrix-element likelihood, radiation integration, or Jacobian
+weights. The nominal event weight is unchanged. In particular, the signal
+projection retains the shower's decay model and does not create a decayed
+LHE matrix element. Raw `lhe_*`, dressed `truth_*`, and reconstructed
+`reco_*` observables remain separate and unchanged.
+
+Use both production requirements to demand source coverage:
+
+```bash
+pixi run --manifest-path Analysis/pixi.toml analyze \
+  /path/to/run/delphes_ATLAS/delphes.root \
+  --require-lhe --require-born \
+  -o /path/to/analysis/job_000000.root
+```
+
+`--require-born` requires a certified input source (`born_source > 0`) for
+every row. It does not require every event to have a projectable quartet:
+unsupported or incomplete decay configurations remain explicit as
+`born_available=False`. A valid quartet can also have undefined angles,
+reported by `born_kinematics_valid=False`. These masks must be checked when
+using projected variables for deformations.
+
+For the `gg_H` projection, Analysis reads the original, checksummed HepMC
+file recorded in the simulation-bound manifest. Retain it until reduction
+finishes. For one relocated Delphes input, add
+`--hepmc /new/location/events.hepmc3` (or the HERWIG `.hepmc` file) to the
+explicit `--lhe`/`--lhe-map` command above. Overrides retain content checks.
+HepMC events are matched using both their accepted-event sequence and LHE
+source number: two accepted showers of the same LHE event can have different
+decays and must not share a cached signal quartet.
+
+New generation manifests certify the process and hard-decay definition.
+Legacy inputs without that certification have `born_source=0`; strict Born
+mode rejects them. Rebuild the PYTHIA bridge, reshower a retained LHE file,
+and rerun Simulation and Analysis when upgrading old signal outputs.
+Generation validates transport of the native `FourLeptonHardDecay` HepMC
+attribute before certifying a new PYTHIA signal output. An old bridge that
+does not write that attribute therefore fails during generation, instead of
+producing a misleadingly certified file.
+The ROOT object `born_metadata` records the projection definition/version,
+input conventions, and provenance. The standalone validator accepts
+`--require-born` together with `--require-lhe`.
 
 ## Merging and Herwig pseudo-data
 
@@ -357,7 +433,8 @@ An unmerged compact tree produced by `build_analysis_tree.py` contains:
 - truth and reconstructed copies of all Tools observables, prefixed by
   `truth_` and `reco_` respectively;
 - the LHE hard-record observables, availability masks, and source identifiers
-  described below.
+  described below;
+- separate Born-projected observables, input-system checks, and source masks.
 
 ### LHE branches
 
@@ -410,6 +487,35 @@ the normalized MC training weight. Use the merged `weight_nominal_pb` or
 luminosity-scaled `weight` for physical yields, and multiply a chosen
 deformation factor into that weight once. Merging and pseudo-data sampling
 preserve the per-event LHE columns along with the other compact observables.
+
+### Born branches
+
+| Branches | Meaning |
+|---|---|
+| `born_source` | 0: unavailable/uncertified source; 1: certified LHE hard record; 2: PYTHIA native hard-decay record; 3: supported HERWIG hard-decay graph |
+| `born_available` | A quartet of exactly four hard charged leptons could be paired and projected |
+| `born_kinematics_valid` | All eleven projected observables are finite |
+| `born_type`, `born_n_taus` | Pairing channel and number of hard tau leptons in the quartet |
+| `born_shower_event_index` | One-based accepted HepMC event index for sources 2/3; -1 for source 0/1 |
+| `born_input_m_ZZ`, `born_input_y_ZZ`, `born_input_pT_ZZ` | Input quartet's mass, rapidity, and transverse momentum before projection |
+| `born_cos_theta_star`, `born_cos_theta1`, `born_cos_theta2` | Projected polar-angle observables |
+| `born_Phi`, `born_Phi1`, `born_Psi` | Projected azimuthal-angle observables |
+| `born_m_Z1`, `born_m_Z2`, `born_m_ZZ` | Projected dilepton and four-lepton masses |
+| `born_y_ZZ`, `born_pT_ZZ` | Projected rapidity and transverse momentum |
+
+`born_type` extends the existing channel convention to taus: 0=`4mu`,
+1=`2mu2e`, 2=`2e2mu`, 3=`4e`, 4=`4tau`, 5=`2tau2e`, 6=`2e2tau`,
+7=`2tau2mu`, and 8=`2mu2tau`. The first flavor identifies the leading,
+closest-to-mZ pair. An unavailable quartet has type -1, tau count 0, and
+`NaN` floating-point observables, even if its source is certified. For an
+available quartet with degenerate angles, finite masses and production
+variables remain useful while `born_kinematics_valid` is false. Tau channel
+codes describe the hard parents; subsequent e/mu truth/reco channels can
+differ.
+
+Merging and pseudo-data sampling retain these per-event columns and the
+Born-definition metadata. As with the LHE columns, projection creates no
+new normalization or deformation weight.
 
 Merged MC trees add/replace the normalization branches described above:
 `weight_shape`, `weight_nominal_pb`, `lumi`, `luminosity_fb`, and the

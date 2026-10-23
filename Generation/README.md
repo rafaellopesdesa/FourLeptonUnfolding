@@ -162,6 +162,28 @@ events, when present, retain their source identity and are recorded in the
 provenance summary. The Simulation and Analysis stages validate this
 association before copying hard-record observables into the compact tree.
 
+New manifests also record `process` and a versioned `hard_decay_definition`
+for the separate Born projection in Analysis. For `gg_H`, the PYTHIA bridge
+saves the first direct Z-decay charged leptons in a native HepMC JSON
+attribute before lepton QED radiation or tau decay, with production recoil
+already present. For HERWIG, the generated input explicitly selects the
+supported angular (`QTilde`) shower configuration; Analysis reads the
+original hard-decay graph retained in HepMC. The source definition includes
+tau parents, not their secondary electron/muon daughters. Unsupported or
+incomplete quartets are marked unavailable rather than replaced with final
+stable or dressed leptons.
+
+Both the source definition and the HepMC checksum are required to use a
+signal record for production Born projection. Rebuild the small PYTHIA
+bridge with the installer after pulling this feature, then generate new
+shower outputs. Older HepMC files lack the new certification and/or native
+record. Retained POWHEG LHE inputs can be reshowered; a new POWHEG matrix
+element or integration grid is not needed for this bookkeeping change.
+The manifest finalizer checks that every new PYTHIA signal event transports
+the native `FourLeptonHardDecay` attribute. An old bridge missing that
+attribute fails at generation and cannot receive the new hard-decay
+certification.
+
 After pulling this feature, rerun `install_generators.sh` with the same
 installation options to rebuild the small `powheg-pythia8` bridge. HERWIG
 uses the updated generated input and does not require recompilation for
@@ -209,10 +231,22 @@ For `ZZ`, the POWHEG LHE record already contains the leptonic final state.
 The compact analysis therefore keeps LHE information separate from its
 existing dressed-particle `truth_` quantities. Missing LHE decay variables
 remain unavailable; they are never filled from showered or dressed leptons.
-To deform Higgs **decay** distributions at the hard-matrix-element level,
+To deform Higgs **decay** distributions at the LHE hard-matrix-element level,
 the signal generator must supply a decayed four-lepton LHE record. Retaining
 the current undecayed record does not create that information. Smooth
 dressed-particle closure tests can still use the existing `truth_` variables.
+
+The new `born_*` level provides a distinct option for controlled hard-decay
+deformations with this baseline. It projects the direct LHE quartet for
+`ZZ`, or the certified shower hard-decay quartet for `gg_H`, using the
+rapidity-preserving recoil-removal map in
+[arXiv:2606.11083v2, Sec. 2.3, Eqs. (2.14)–(2.16)](https://arxiv.org/abs/2606.11083v2).
+The common boost preserves masses and rapidity and sets the system pT to
+zero. It does not invert photon radiation or supply the paper's full NLO
+MEM weight. Signal Born variables consequently retain the chosen shower
+decay model, and raw `lhe_*` variables remain unchanged. See the
+[Analysis definitions](../Analysis/README.md#born-projection-and-the-signal-decay-record)
+before selecting a deformation target.
 
 When the LHE final state contains taus, their later electron or muon decay
 products belong to the shower/decay record. They must not be relabeled as

@@ -102,6 +102,23 @@ it contains an undecayed Higgs, so hard Higgs production quantities exist
 while hard four-lepton decay quantities do not. The branch definitions and
 availability masks are documented in [`Analysis/README.md`](../Analysis/README.md).
 
+Analysis also constructs a separate Born-projected quartet. For `gg_H`, it
+needs the original HepMC file and the manifest's certified process and
+hard-decay definition. Simulation preserves these extra manifest fields
+when binding the source to Delphes; it does not reconstruct Born momenta
+from Delphes particles. Keep both the LHE and HepMC inputs until reduction
+finishes. If they move, pass Analysis's `--lhe`, `--lhe-map`, and `--hepmc`
+overrides for a single input; checksums still have to match.
+
+The signal input is the first direct Z-decay charged quartet before lepton
+QED radiation and tau decay, including tau parents. PYTHIA provides a native
+HepMC attribute and the supported HERWIG angular shower provides its
+original decay graph. The Born projection removes the quartet's transverse
+recoil while preserving its rapidity and invariant masses. It leaves all
+Delphes weights, object definitions, and truth/reco selection unchanged.
+The `born_*` columns and their source/validity masks are written downstream
+in Analysis, before full-chain batch scratch cleanup.
+
 ### H4l reconstruction and efficiency model
 
 The generic Delphes ATLAS card is not suitable for the soft four-lepton

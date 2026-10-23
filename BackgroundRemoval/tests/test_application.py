@@ -84,6 +84,7 @@ def _write_sample(
     masses: np.ndarray,
     nan_feature_rows: tuple[int, ...] = (),
     with_lhe: bool = False,
+    with_born: bool = False,
 ) -> dict[str, np.ndarray]:
     size = reconstructed.size
     arrays: dict[str, np.ndarray] = {
@@ -108,6 +109,18 @@ def _write_sample(
             lhe_Phi=np.linspace(-2.0, 2.0, size, dtype=np.float64),
             lhe_higgs_m=np.full(size, np.nan, dtype=np.float64),
         )
+    if with_born:
+        arrays.update(
+            born_source=np.resize(np.array([1, 2, 3], dtype=np.int8), size),
+            born_available=np.resize(np.array([True, False, True]), size),
+            born_kinematics_valid=np.resize(np.array([True, False, False]), size),
+            born_type=np.resize(np.array([2, -1, 4], dtype=np.int8), size),
+            born_n_taus=np.resize(np.array([0, 0, 4], dtype=np.int8), size),
+            born_shower_event_index=np.resize(np.array([-1, 7, 8], dtype=np.int64), size),
+            born_m_ZZ=np.resize(np.array([125., np.nan, 125.], dtype=np.float64), size),
+            born_pT_ZZ=np.resize(np.array([0., np.nan, 0.], dtype=np.float64), size),
+            born_Phi=np.resize(np.array([.3, np.nan, np.nan], dtype=np.float64), size),
+        )
     with uproot.recreate(path) as root_file:
         root_file["Analysis"] = arrays
         root_file["merge_metadata"] = json.dumps({"kept": True})
@@ -118,6 +131,14 @@ def _write_sample(
                 "sources": [{"lhe_source_id": "fedcba9876543210",
                              "lhe_sha256": "fedcba9876543210" + "a" * 48,
                              "lhe_file": "/production/original.lhe"}],
+            })
+        if with_born:
+            root_file["born_metadata"] = json.dumps({
+                "schema_version": 1,
+                "projection": {"arxiv_version": "2606.11083v2", "equations": [14, 15, 16]},
+                "sources": [{"born_source": 3,
+                             "hard_decay_definition": "herwig_qtilde_original_decay",
+                             "hepmc_sha256": "b" * 64}],
             })
     return arrays
 
@@ -213,10 +234,12 @@ class ApplicationTest(unittest.TestCase):
                 masses=np.array([120.0, 140.0, np.nan]),
                 nan_feature_rows=(1, 2),
                 with_lhe=True,
+                with_born=True,
             )
             source_sha256 = sha256_file(source)
             with uproot.open(source) as root_file:
                 original_lhe_metadata = str(root_file["lhe_metadata"])
+                original_born_metadata = str(root_file["born_metadata"])
             metadata = _decorate(
                 source, output, _models(directory), sample_kind="data", diagnostics=True
             )
@@ -228,10 +251,11 @@ class ApplicationTest(unittest.TestCase):
                     arrays["fixed_vector"], original["fixed_vector"]
                 )
                 for name, values in original.items():
-                    if name.startswith("lhe_"):
+                    if name.startswith(("lhe_", "born_")):
                         np.testing.assert_equal(arrays[name], values)
                         self.assertEqual(arrays[name].dtype, values.dtype)
                 self.assertEqual(str(root_file["lhe_metadata"]), original_lhe_metadata)
+                self.assertEqual(str(root_file["born_metadata"]), original_born_metadata)
                 np.testing.assert_allclose(
                     arrays["weight_background_removed"], [0.25, -1.0, 1.0]
                 )

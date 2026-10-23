@@ -15,6 +15,7 @@ from contextlib import nullcontext
 import gzip
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -26,6 +27,8 @@ EVENT_NUMBER_CONVENTION = "lhe_event_index_1based"
 MAX_HEPMC_EVENT_NUMBER = 2**31 - 1
 _EVENT_OPEN = re.compile(r"^\s*<event(?:\s+[^>]*)?>\s*$")
 _EVENT_CLOSE = re.compile(r"^\s*</event>\s*$")
+_HARD_DECAY_ATTRIBUTE = "FourLeptonHardDecay"
+_PYTHIA_HARD_DECAY_SOURCE = "pythia_event_before_decay_fsr"
 
 
 def sha256_file(path: str | Path) -> str:
@@ -160,7 +163,49 @@ def prepare_lhe(
         raise
 
 
-def inspect_hepmc(hepmc_file: str | Path, source_event_count: int) -> dict[str, Any]:
+def _validate_hard_decay_attribute(raw: str, line_number: int) -> None:
+    """Validate snapshot transport, allowing explicit physics-failure records."""
+    def reject_constant(value: str):
+        raise ValueError(f"nonfinite JSON constant {value}")
+
+    try:
+        payload = json.loads(raw, parse_constant=reject_constant)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"malformed {_HARD_DECAY_ATTRIBUTE} JSON at line {line_number}") from error
+    if (not isinstance(payload, dict)
+            or type(payload.get("schema_version")) is not int
+            or payload["schema_version"] != 1
+            or payload.get("source") != _PYTHIA_HARD_DECAY_SOURCE
+            or payload.get("momentum_unit") != "GEV"
+            or not isinstance(payload.get("status"), str)
+            or not payload["status"]):
+        raise ValueError(f"invalid {_HARD_DECAY_ATTRIBUTE} schema/source/units/status at line {line_number}")
+    parent, bosons, particles = (payload.get(name) for name in ("parent", "bosons", "particles"))
+    if payload["status"] != "ok":
+        if parent != [] or bosons != [] or particles != []:
+            raise ValueError(f"failed {_HARD_DECAY_ATTRIBUTE} record must have empty momenta at line {line_number}")
+        return
+
+    def numeric_vector(value, size):
+        return (isinstance(value, list) and len(value) == size
+                and all(type(item) in (int, float) and math.isfinite(item) for item in value))
+
+    if (not numeric_vector(parent, 4)
+            or not isinstance(bosons, list) or len(bosons) != 2
+            or not all(numeric_vector(boson, 4) for boson in bosons)
+            or not isinstance(particles, list) or len(particles) != 4
+            or not all(isinstance(particle, list) and len(particle) == 5
+                       and type(particle[0]) is int and numeric_vector(particle[1:], 4)
+                       for particle in particles)):
+        raise ValueError(f"invalid {_HARD_DECAY_ATTRIBUTE} momentum arrays at line {line_number}")
+
+
+def inspect_hepmc(
+    hepmc_file: str | Path,
+    source_event_count: int,
+    *,
+    require_hard_decay_attribute: bool = False,
+) -> dict[str, Any]:
     """Check every explicit source ID, permitting skips and repeated showers."""
     if not 0 < source_event_count <= MAX_HEPMC_EVENT_NUMBER:
         raise ValueError("invalid source LHE event count")
@@ -170,6 +215,7 @@ def inspect_hepmc(hepmc_file: str | Path, source_event_count: int) -> dict[str, 
     unique = 0
     format_name = None
     ended = False
+    attribute_seen = False
     starts = {
         "HepMC::Asciiv3-START_EVENT_LISTING": "HepMC3",
         "HepMC::IO_GenEvent-START_EVENT_LISTING": "HepMC2",
@@ -185,11 +231,15 @@ def inspect_hepmc(hepmc_file: str | Path, source_event_count: int) -> dict[str, 
                 if format_name is not None:
                     raise ValueError("multiple HepMC event listings are not supported")
                 format_name = starts[stripped]
+                if require_hard_decay_attribute and format_name != "HepMC3":
+                    raise ValueError(f"PYTHIA native {_HARD_DECAY_ATTRIBUTE} snapshots require HepMC3")
             elif stripped in ends:
                 if format_name != ends[stripped] or ended:
                     raise ValueError("inconsistent HepMC listing footer")
                 ended = True
             elif re.match(r"^E(?:\s|$)", stripped):
+                if require_hard_decay_attribute and total and not attribute_seen:
+                    raise ValueError(f"missing event-level {_HARD_DECAY_ATTRIBUTE} on accepted HepMC event {total}")
                 fields = stripped.split()
                 if format_name is None or ended or len(fields) < 2 or not re.fullmatch(r"[0-9]+", fields[1]):
                     raise ValueError(f"invalid HepMC event record at line {line_number}")
@@ -204,14 +254,29 @@ def inspect_hepmc(hepmc_file: str | Path, source_event_count: int) -> dict[str, 
                     seen[byte] |= 1 << bit
                     unique += 1
                 total += 1
+                attribute_seen = False
+            elif require_hard_decay_attribute and re.match(r"^A(?:\s|$)", stripped):
+                fields = stripped.split(maxsplit=3)
+                if len(fields) >= 3 and fields[2] == _HARD_DECAY_ATTRIBUTE and fields[1] == "0":
+                    if not total or ended or len(fields) != 4:
+                        raise ValueError(f"invalid event-level {_HARD_DECAY_ATTRIBUTE} record at line {line_number}")
+                    if attribute_seen:
+                        raise ValueError(f"duplicate event-level {_HARD_DECAY_ATTRIBUTE} on accepted HepMC event {total}")
+                    _validate_hard_decay_attribute(fields[3], line_number)
+                    attribute_seen = True
     if format_name is None or not ended or total == 0:
         raise ValueError("incomplete or empty HepMC event listing")
-    return {
+    if require_hard_decay_attribute and not attribute_seen:
+        raise ValueError(f"missing event-level {_HARD_DECAY_ATTRIBUTE} on accepted HepMC event {total}")
+    result = {
         "hepmc_format": format_name,
         "hepmc_event_count": total,
         "hepmc_unique_source_events": unique,
         "hepmc_repeated_source_events": total - unique,
     }
+    if require_hard_decay_attribute:
+        result["hard_decay_attribute_event_count"] = total
+    return result
 
 
 def finalize_provenance(
@@ -219,10 +284,14 @@ def finalize_provenance(
     hepmc_file: str | Path,
     shower: str,
     output: str | Path,
+    *,
+    process: str | None = None,
 ) -> dict[str, Any]:
     """Publish provenance only after the shower and all source checks succeed."""
     if shower not in {"pythia", "herwig"}:
         raise ValueError("shower must be pythia or herwig")
+    if process not in {None, "gg_H", "ZZ"}:
+        raise ValueError("process must be gg_H or ZZ")
     with Path(source_info).open(encoding="utf-8") as stream:
         info = json.load(stream)
     if info.get("schema_version") != 1 or info.get("kind") != "lhe_source_info" or info.get("event_number") != EVENT_NUMBER_CONVENTION:
@@ -235,7 +304,10 @@ def finalize_provenance(
     if destination in {source, hepmc, Path(source_info).resolve()}:
         raise ValueError("provenance output must differ from its input files")
     initial_stat = _stat_identity(hepmc)
-    counts = inspect_hepmc(hepmc, int(info["lhe_event_count"]))
+    counts = inspect_hepmc(
+        hepmc, int(info["lhe_event_count"]),
+        require_hard_decay_attribute=(process == "gg_H" and shower == "pythia"),
+    )
     hepmc_hash = sha256_file(hepmc)
     if _stat_identity(hepmc) != initial_stat:
         raise RuntimeError("HepMC changed while validating its source identities")
@@ -251,6 +323,17 @@ def finalize_provenance(
         "association": "explicit source-event identity; not accepted-output ordinal",
         **counts,
     }
+    if process is not None:
+        manifest["process"] = process
+        if process == "ZZ":
+            manifest["hard_decay_definition"] = "lhe_status1_charged_leptons"
+        elif shower == "pythia":
+            manifest["hard_decay_definition"] = _PYTHIA_HARD_DECAY_SOURCE
+            manifest["hard_decay_attribute"] = _HARD_DECAY_ATTRIBUTE
+            manifest["hard_decay_momentum_unit"] = "GEV"
+        else:
+            manifest["hard_decay_definition"] = "herwig_qtilde_original_decay"
+            manifest["hard_decay_configuration"] = "qtilde_full_history_no_yfs"
     _write_json(destination, manifest)
     return manifest
 
@@ -298,6 +381,7 @@ def main() -> None:
     finalize.add_argument("--hepmc", required=True, type=Path)
     finalize.add_argument("--shower", required=True, choices=("pythia", "herwig"))
     finalize.add_argument("--output", required=True, type=Path)
+    finalize.add_argument("--process", choices=("gg_H", "ZZ"))
     verify = commands.add_parser("verify")
     verify.add_argument("--manifest", required=True, type=Path)
     verify.add_argument("--hepmc", required=True, type=Path)
@@ -308,7 +392,7 @@ def main() -> None:
         info = prepare_lhe(args.lhe, args.output, tagged_output=args.tagged_output, plain_output=args.plain_output)
         print(info["lhe_event_count"])
     elif args.command == "finalize":
-        finalize_provenance(args.source_info, args.hepmc, args.shower, args.output)
+        finalize_provenance(args.source_info, args.hepmc, args.shower, args.output, process=args.process)
     elif args.command == "verify":
         verify_provenance(args.manifest, args.hepmc)
     else:

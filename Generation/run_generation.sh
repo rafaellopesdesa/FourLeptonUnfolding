@@ -336,6 +336,11 @@ set LesHouchesHandler:WeightOption VarNegWeight
 set LesHouchesHandler:EventNumbering LHE
 set /Herwig/Generators/EventGenerator:EventHandler /Herwig/EventHandlers/LesHouchesHandler
 
+# Native pre-FSR decay extraction requires the angular QTilde shower. Query
+# its specific interface so a different shower implementation fails at read.
+# This fresh LesHouchesHandler has no additional YFS radiation handlers.
+get /Herwig/Shower/ShowerHandler:SplittingGenerator
+
 # Do not add cuts after the POWHEG hard-event generation.
 create ThePEG::Cuts /Herwig/Cuts/NoCuts
 
@@ -455,7 +460,7 @@ esac
 
 python3 "$SCRIPT_DIR/lhe_provenance.py" finalize \
   --source-info "$SOURCE_INFO" --hepmc "$HEPMC_OUTPUT" \
-  --shower "$SHOWER" --output "$OUTPUT_DIR/lhe-provenance.json"
+  --shower "$SHOWER" --process "$PROCESS" --output "$OUTPUT_DIR/lhe-provenance.json"
 
 cat >"$OUTPUT_DIR/run-metadata.txt" <<EOF
 process=$PROCESS

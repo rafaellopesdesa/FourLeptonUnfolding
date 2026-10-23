@@ -20,6 +20,8 @@ def write_output(
     missing_branch: str | None = None,
     lhe_columns: dict[str, np.ndarray] | None = None,
     lhe_metadata: dict | None = None,
+    born_columns: dict[str, np.ndarray] | None = None,
+    born_metadata: dict | None = None,
 ) -> None:
     if weights is not None:
         weights = np.asarray(weights, dtype=np.float64)
@@ -43,12 +45,16 @@ def write_output(
             arrays[f"{level}_{field}"] = np.ones(entries, dtype=np.float32)
     if lhe_columns is not None:
         arrays.update(lhe_columns)
+    if born_columns is not None:
+        arrays.update(born_columns)
     if missing_branch is not None:
         del arrays[missing_branch]
     with uproot.recreate(path) as root_file:
         root_file["Analysis"] = arrays
         if lhe_metadata is not None:
             root_file["lhe_metadata"] = json.dumps(lhe_metadata)
+        if born_metadata is not None:
+            root_file["born_metadata"] = json.dumps(born_metadata)
 
 
 class ValidateAnalysisOutputTest(unittest.TestCase):
@@ -266,6 +272,146 @@ class ValidateLHEOutputTest(unittest.TestCase):
                     write_output(path, lhe_columns=columns)
                     with self.assertRaisesRegex(ValueError, error):
                         validate_analysis_output(path)
+
+
+def native_born_columns(entries: int = 3) -> dict[str, np.ndarray]:
+    from Analysis.born import empty_columns
+
+    columns = empty_columns(entries)
+    columns["born_source"][:] = 2
+    columns["born_available"][:] = True
+    columns["born_kinematics_valid"][:] = True
+    columns["born_shower_event_index"][:] = np.arange(1, entries + 1)
+    columns["born_type"][:] = np.resize([0, 4, 5], entries)
+    columns["born_n_taus"][:] = np.resize([0, 4, 2], entries)
+    for field in KINEMATIC_FIELDS:
+        columns[f"born_{field}"][:] = 0.1
+    columns["born_input_m_ZZ"][:] = columns["born_m_ZZ"][:] = 125.0
+    columns["born_input_y_ZZ"][:] = columns["born_y_ZZ"][:] = 0.4
+    columns["born_input_pT_ZZ"][:] = 45.0
+    columns["born_pT_ZZ"][:] = 0.0
+    columns["born_m_Z1"][:] = 70.0
+    columns["born_m_Z2"][:] = 30.0
+    return columns
+
+
+class ValidateBornOutputTest(unittest.TestCase):
+    def test_legacy_and_partial_born_schema(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "legacy.root"
+            write_output(path)
+            self.assertIsNone(validate_analysis_output(path).born_source_entries)
+            with self.assertRaisesRegex(KeyError, "missing required Born branches"):
+                validate_analysis_output(path, require_born=True)
+            write_output(path, born_columns={"born_source": np.ones(3, dtype=np.int8)})
+            with self.assertRaisesRegex(KeyError, "born_available"):
+                validate_analysis_output(path)
+
+    def test_available_native_projection_counts_and_tau_channels(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "projected.root"
+            write_output(path, born_columns=native_born_columns())
+            summary = validate_analysis_output(path, require_born=True, step_size=1)
+            self.assertEqual(summary.born_source_entries, 3)
+            self.assertEqual(summary.born_available_entries, 3)
+            self.assertEqual(summary.born_kinematics_valid_entries, 3)
+
+    def test_requirement_allows_unsupported_native_decay_but_not_missing_source(self):
+        from Analysis.born import empty_columns
+
+        columns = empty_columns(3)
+        columns["born_source"][:] = 3
+        columns["born_shower_event_index"][:] = np.arange(1, 4)
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "unsupported.root"
+            write_output(path, born_columns=columns)
+            summary = validate_analysis_output(path, require_born=True)
+            self.assertEqual(summary.born_source_entries, 3)
+            self.assertEqual(summary.born_available_entries, 0)
+            columns["born_source"][0] = 0
+            columns["born_shower_event_index"][0] = -1
+            write_output(path, born_columns=columns)
+            self.assertEqual(validate_analysis_output(path).born_source_entries, 2)
+            with self.assertRaisesRegex(ValueError, "nonzero Born source"):
+                validate_analysis_output(path, require_born=True)
+
+    def test_lhe_source_requires_matched_lhe_and_preserves_pair_masses(self):
+        born = native_born_columns()
+        born["born_source"][:] = 1
+        born["born_shower_event_index"][:] = -1
+        born["born_type"][:] = 0
+        born["born_n_taus"][:] = 0
+        lhe = matched_lhe_columns()
+        lhe["lhe_has_four_leptons"][:] = True
+        lhe["lhe_kinematics_valid"][:] = True
+        lhe["lhe_n_final_leptons"][:] = 4
+        lhe["lhe_type"][:] = 0
+        for field in KINEMATIC_FIELDS:
+            lhe[f"lhe_{field}"][:] = born[f"born_{field}"]
+        lhe["lhe_pT_ZZ"][:] = born["born_input_pT_ZZ"]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "lhe_source.root"
+            write_output(path, born_columns=born)
+            with self.assertRaisesRegex(ValueError, "matched canonical LHE record"):
+                validate_analysis_output(path)
+            write_output(path, born_columns=born, lhe_columns=lhe)
+            self.assertEqual(validate_analysis_output(path, require_born=True).born_available_entries, 3)
+            born["born_m_Z1"][0] += 1.0
+            write_output(path, born_columns=born, lhe_columns=lhe)
+            with self.assertRaisesRegex(ValueError, "preserve LHE m_Z1"):
+                validate_analysis_output(path)
+
+    def test_degenerate_angles_leave_a_valid_projection_available(self):
+        columns = native_born_columns()
+        columns["born_kinematics_valid"][0] = False
+        for field in KINEMATIC_FIELDS[:6]:
+            columns[f"born_{field}"][0] = np.nan
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "degenerate.root"
+            write_output(path, born_columns=columns)
+            summary = validate_analysis_output(path, require_born=True)
+            self.assertEqual(summary.born_available_entries, 3)
+            self.assertEqual(summary.born_kinematics_valid_entries, 2)
+            columns["born_kinematics_valid"][0] = True
+            write_output(path, born_columns=columns)
+            with self.assertRaisesRegex(ValueError, "finite Born kinematics"):
+                validate_analysis_output(path)
+
+    def test_flags_projection_invariants_and_native_indices(self):
+        modifications = (
+            ("born_source", 4, "born_source must be"),
+            ("born_shower_event_index", 0, "one-based shower event index"),
+            ("born_n_taus", 2, "channel type"),
+            ("born_type", 9, "channel type"),
+            ("born_input_m_ZZ", np.nan, "finite pre-projection inputs"),
+            ("born_input_m_ZZ", 124.0, "preserve input m_ZZ"),
+            ("born_input_y_ZZ", 1.0, "preserve input y_ZZ"),
+            ("born_pT_ZZ", 1.0, "transverse momentum is not zero"),
+            ("born_m_Z1", np.inf, "infinite Born values"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "invalid.root"
+            for name, value, error in modifications:
+                with self.subTest(name=name, value=value):
+                    columns = native_born_columns()
+                    columns[name][0] = value
+                    write_output(path, born_columns=columns)
+                    with self.assertRaisesRegex(ValueError, error):
+                        validate_analysis_output(path)
+
+    def test_optional_metadata_requires_exact_projection_definition(self):
+        from Tools.born_projection import BORN_PROJECTION_METADATA
+
+        metadata = {"schema_version": 1, "projection": BORN_PROJECTION_METADATA,
+                    "sources": [{"born_source": 2}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "metadata.root"
+            write_output(path, born_columns=native_born_columns(), born_metadata=metadata)
+            self.assertEqual(validate_analysis_output(path).born_available_entries, 3)
+            metadata["projection"] = {**BORN_PROJECTION_METADATA, "equations": [99]}
+            write_output(path, born_columns=native_born_columns(), born_metadata=metadata)
+            with self.assertRaisesRegex(ValueError, "Born projection metadata contract"):
+                validate_analysis_output(path)
 
 
 if __name__ == "__main__":

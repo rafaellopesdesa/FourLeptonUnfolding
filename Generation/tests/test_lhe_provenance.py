@@ -32,11 +32,24 @@ def lhe_text(count: int = 3) -> str:
     )
 
 
-def hepmc_text(ids=(1, 3, 3), version=3) -> str:
+def native_attribute(status="ok") -> str:
+    payload = {
+        "schema_version": 1, "source": "pythia_event_before_decay_fsr",
+        "momentum_unit": "GEV", "status": status,
+        "parent": [0., 0., 0., 120.] if status == "ok" else [],
+        "bosons": [[0., 0., 36., 60.], [0., 0., -36., 60.]] if status == "ok" else [],
+        "particles": [[11, 24., 0., 18., 30.], [-11, -24., 0., 18., 30.],
+                      [13, 0., 24., -18., 30.], [-13, 0., -24., -18., 30.]] if status == "ok" else [],
+    }
+    return "A 0 FourLeptonHardDecay " + json.dumps(payload) + "\n"
+
+
+def hepmc_text(ids=(1, 3, 3), version=3, native_attributes=False) -> str:
     listing = "Asciiv3" if version == 3 else "IO_GenEvent"
+    attribute = native_attribute() if native_attributes else ""
     return (
         f"HepMC::Version {version}.0.0\nHepMC::{listing}-START_EVENT_LISTING\n"
-        + "".join(f"E {number} 0 0\n" for number in ids)
+        + "".join(f"E {number} 0 0\n{attribute}" for number in ids)
         + f"HepMC::{listing}-END_EVENT_LISTING\n"
     )
 
@@ -111,6 +124,62 @@ class ProvenanceTest(unittest.TestCase):
             provenance.finalize_provenance(self.info, self.hepmc, "pythia", self.manifest)
         self.assertFalse(self.manifest.exists())
 
+    def test_process_definitions_are_explicit_and_legacy_api_does_not_claim_born_support(self):
+        provenance.prepare_lhe(self.lhe, self.info)
+        legacy = provenance.finalize_provenance(self.info, self.hepmc, "pythia", self.manifest)
+        self.assertNotIn("hard_decay_definition", legacy)
+        self.hepmc.write_text(hepmc_text(native_attributes=True))
+        for process, shower, definition in (
+            ("gg_H", "pythia", "pythia_event_before_decay_fsr"),
+            ("gg_H", "herwig", "herwig_qtilde_original_decay"),
+            ("ZZ", "pythia", "lhe_status1_charged_leptons"),
+            ("ZZ", "herwig", "lhe_status1_charged_leptons"),
+        ):
+            with self.subTest(process=process, shower=shower):
+                result = provenance.finalize_provenance(self.info, self.hepmc, shower, self.manifest, process=process)
+                self.assertEqual(result["process"], process)
+                self.assertEqual(result["hard_decay_definition"], definition)
+                if process == "gg_H" and shower == "pythia":
+                    self.assertEqual(result["hard_decay_attribute"], "FourLeptonHardDecay")
+                    self.assertEqual(result["hard_decay_momentum_unit"], "GEV")
+
+    def test_gg_h_pythia_requires_exactly_one_valid_native_attribute_per_event(self):
+        provenance.prepare_lhe(self.lhe, self.info)
+        valid = hepmc_text(native_attributes=True)
+        attribute = native_attribute()
+        cases = {
+            "old bridge": hepmc_text(),
+            "one missing snapshot": valid.replace(attribute, "", 1),
+            "particle attribute only": valid.replace("A 0 FourLeptonHardDecay", "A 1 FourLeptonHardDecay"),
+            "duplicate snapshot": valid.replace(attribute, attribute + attribute, 1),
+            "malformed JSON": valid.replace(attribute, "A 0 FourLeptonHardDecay not-json\n", 1),
+            "wrong stage": valid.replace("pythia_event_before_decay_fsr", "pythia_process_before_shower", 1),
+            "wrong units": valid.replace('"momentum_unit": "GEV"', '"momentum_unit": "MEV"', 1),
+            "empty success arrays": valid.replace(attribute, native_attribute("missing_higgs").replace('"status": "missing_higgs"', '"status": "ok"'), 1),
+            "nonfinite JSON": valid.replace("120.0", "NaN", 1),
+            "unsupported format": hepmc_text(version=2, native_attributes=True),
+        }
+        for label, content in cases.items():
+            with self.subTest(label=label):
+                self.hepmc.write_text(content)
+                with self.assertRaisesRegex(ValueError, "FourLeptonHardDecay"):
+                    provenance.finalize_provenance(self.info, self.hepmc, "pythia", self.manifest, process="gg_H")
+                self.assertFalse(self.manifest.exists())
+
+    def test_explicit_native_failure_status_is_valid_transport(self):
+        provenance.prepare_lhe(self.lhe, self.info)
+        self.hepmc.write_text(hepmc_text(native_attributes=True).replace(native_attribute(), native_attribute("invalid_z_decay"), 1))
+        result = provenance.finalize_provenance(self.info, self.hepmc, "pythia", self.manifest, process="gg_H")
+        self.assertEqual(result["hard_decay_attribute_event_count"], 3)
+        self.assertEqual(result["hepmc_repeated_source_events"], 1)
+
+    def test_native_attribute_requirement_does_not_apply_to_zz_or_herwig(self):
+        provenance.prepare_lhe(self.lhe, self.info)
+        for process, shower in (("ZZ", "pythia"), ("gg_H", "herwig")):
+            with self.subTest(process=process, shower=shower):
+                result = provenance.finalize_provenance(self.info, self.hepmc, shower, self.manifest, process=process)
+                self.assertNotIn("hard_decay_attribute_event_count", result)
+
     def test_verification_rejects_mutated_hepmc(self):
         provenance.prepare_lhe(self.lhe, self.info)
         provenance.finalize_provenance(self.info, self.hepmc, "pythia", self.manifest)
@@ -169,7 +238,7 @@ class GenerationRunnerProvenanceTest(unittest.TestCase):
                 "#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\n"
                 "source = Path(sys.argv[1]).read_text()\n"
                 "assert '<event num>' not in source\n"
-                f"Path(sys.argv[2]).write_text({hepmc_text()!r})\n"
+                f"Path(sys.argv[2]).write_text({hepmc_text(native_attributes=True)!r})\n"
             )
             pythia.chmod(0o755)
             herwig = binaries / "Herwig"
@@ -177,6 +246,7 @@ class GenerationRunnerProvenanceTest(unittest.TestCase):
                 "#!/usr/bin/env python3\nimport sys, re\nfrom pathlib import Path\n"
                 "config = Path('herwig.in').read_text()\n"
                 "assert 'set LesHouchesHandler:EventNumbering LHE' in config\n"
+                "assert 'get /Herwig/Shower/ShowerHandler:SplittingGenerator' in config\n"
                 "assert 'set /Herwig/Analysis/HepMC:PrintEvent 3' in config\n"
                 "source_path = re.search(r'LesHouchesReader:FileName (.+)', config).group(1)\n"
                 "source = Path(source_path).read_text()\n"
@@ -201,6 +271,8 @@ class GenerationRunnerProvenanceTest(unittest.TestCase):
                     self.assertEqual(manifest["lhe_file"], str(source.resolve()))
                     self.assertEqual(manifest["lhe_sha256"], hashlib.sha256(original).hexdigest())
                     self.assertEqual(manifest["shower"], shower)
+                    self.assertEqual(manifest["process"], "gg_H")
+                    self.assertEqual(manifest["hard_decay_definition"], "pythia_event_before_decay_fsr" if shower == "pythia" else "herwig_qtilde_original_decay")
                     self.assertEqual(manifest["hepmc_unique_source_events"], 2)
                     self.assertEqual(manifest["hepmc_repeated_source_events"], 1)
                     self.assertEqual(list(output.glob(".shower-lhe.*")), [])

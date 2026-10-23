@@ -16,6 +16,7 @@ uproot = ">=5.3,<6"
 matplotlib = ">=3.8,<4"
 hist = ">=2.8,<3"
 mplhep = ">=0.4,<1"
+pyhepmc = ">=2.14,<3"
 
 [tasks]
 analyze = { cmd = "python build_analysis_tree.py", description = "Build a compact analysis ROOT tree; append the CLI arguments" }

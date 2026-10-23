@@ -277,10 +277,12 @@ def compute_paired_kinematics(
     pairs by mass.  Z1 is the analysis-selected leading pair (normally the
     pair closest to the Z pole) and Z2 is the selected remaining pair.  Each
     pair must be passed as negative lepton followed by positive lepton.
+    ``z1_flavor`` is a label; ``tau`` is supported for hard parent-lepton
+    observables and uses the same four-vector equations.
     """
 
-    if z1_flavor not in {"electron", "muon"}:
-        raise ValueError("z1_flavor must be 'electron' or 'muon'")
+    if z1_flavor not in {"electron", "muon", "tau"}:
+        raise ValueError("z1_flavor must be 'electron', 'muon' or 'tau'")
 
     q11 = _coerce_p4(z1_negative)
     q12 = _coerce_p4(z1_positive)

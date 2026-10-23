@@ -91,8 +91,10 @@ class FullChainWorkerTest(unittest.TestCase):
             parser.add_argument("--output", required=True)
             parser.add_argument("--mass-region")
             parser.add_argument("--require-lhe", action="store_true")
+            parser.add_argument("--require-born", action="store_true")
             args = parser.parse_args()
             assert args.require_lhe, "batch analysis must require LHE matching"
+            assert args.require_born, "batch analysis must require a certified Born source"
             size = 3
             index = np.arange(size)
             with uproot.recreate(args.output) as root_file:
@@ -106,6 +108,8 @@ class FullChainWorkerTest(unittest.TestCase):
                     "truth_type": np.zeros(size, dtype=np.int8),
                     "reco_type": np.zeros(size, dtype=np.int8),
                     "lhe_available": np.ones(size, dtype=np.bool_),
+                    "born_source": np.full(size, 2, dtype=np.int8),
+                    "born_available": np.array([True, False, True]),
                 }
             """,
         )
@@ -119,11 +123,14 @@ class FullChainWorkerTest(unittest.TestCase):
             parser.add_argument("path")
             parser.add_argument("--expected-entries", type=int, required=True)
             parser.add_argument("--require-lhe", action="store_true")
+            parser.add_argument("--require-born", action="store_true")
             args = parser.parse_args()
             assert args.require_lhe, "batch validation must require LHE matching"
+            assert args.require_born, "batch validation must require a certified Born source"
             with uproot.open(args.path) as root_file:
                 assert root_file["Analysis"].num_entries == args.expected_entries
                 assert root_file["Analysis"]["lhe_available"].array(library="np").all()
+                assert (root_file["Analysis"]["born_source"].array(library="np") > 0).all()
             """,
         )
 
@@ -234,6 +241,12 @@ class FullChainWorkerTest(unittest.TestCase):
             self.assertIn("campaign provenance", rejected.stderr)
 
     def test_requeue_rejects_a_legacy_output_without_lhe_matching(self):
+        self.assert_legacy_branch_rejected("lhe_available")
+
+    def test_requeue_rejects_a_legacy_output_without_born_source(self):
+        self.assert_legacy_branch_rejected("born_source")
+
+    def assert_legacy_branch_rejected(self, branch: str):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config, outputs = self.make_campaign(root)
@@ -242,10 +255,10 @@ class FullChainWorkerTest(unittest.TestCase):
             output = next(outputs.glob("*.root"))
             with uproot.open(output) as root_file:
                 arrays = root_file["Analysis"].arrays(library="np", how=dict)
-            arrays.pop("lhe_available")
+            arrays.pop(branch)
             with uproot.recreate(output) as root_file:
                 root_file["Analysis"] = arrays
-            # A matching file hash alone must not let pre-LHE output bypass
+            # A matching file hash alone must not let legacy output bypass
             # the new batch schema requirement on a resumed campaign.
             job = root / "campaign" / "jobs" / "job_000000_seed1001"
             metadata = job / "output-metadata.txt"
@@ -260,7 +273,7 @@ class FullChainWorkerTest(unittest.TestCase):
             )
             rejected = self.run_worker(config)
             self.assertNotEqual(rejected.returncode, 0)
-            self.assertIn("lhe_available", rejected.stderr)
+            self.assertIn(branch, rejected.stderr)
             self.assertFalse((job / "SUCCESS").exists())
 
 

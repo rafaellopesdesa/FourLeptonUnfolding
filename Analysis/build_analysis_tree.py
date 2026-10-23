@@ -24,10 +24,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from Analysis.selection import Lepton, SelectionResult, select_event  # noqa: E402
 from Analysis.lhe import empty_columns as empty_lhe_columns  # noqa: E402
+from Analysis.born import empty_columns as empty_born_columns  # noqa: E402
 from Analysis.lhe_matching import (  # noqa: E402
     EVENT_NUMBER_CONVENTION, file_identity, load_lhe_source,
 )
 from Tools.four_lepton_kinematics import KinematicError  # noqa: E402
+from Tools.born_projection import BORN_PROJECTION_METADATA  # noqa: E402
 
 
 KINEMATIC_FIELDS = (
@@ -482,6 +484,7 @@ def _empty_output(size: int, first_event_id: int) -> dict[str, np.ndarray]:
         for field in KINEMATIC_FIELDS:
             output[f"{level}_{field}"] = np.full(size, np.nan, dtype=np.float32)
     output.update(empty_lhe_columns(size))
+    output.update(empty_born_columns(size))
     return output
 
 
@@ -564,6 +567,8 @@ def main() -> None:
     parser.add_argument("--lhe", type=Path, help="Relocated original LHE input (single Delphes input only)")
     parser.add_argument("--lhe-map", type=Path, help="Simulation-bound lhe-provenance.json (single input only)")
     parser.add_argument("--require-lhe", action="store_true", help="Require verified LHE matches for every row")
+    parser.add_argument("--hepmc", type=Path, help="Relocated original HepMC input for Higgs Born decays (single input only)")
+    parser.add_argument("--require-born", action="store_true", help="Require a certified Born input source for every row; validity masks still apply")
     parser.add_argument(
         "--mass-region",
         choices=("extended", "signal"),
@@ -573,8 +578,8 @@ def main() -> None:
     args = parser.parse_args()
 
     inputs = discover_inputs(args.inputs)
-    if len(inputs) != 1 and (args.lhe is not None or args.lhe_map is not None):
-        parser.error("--lhe and --lhe-map overrides require exactly one Delphes input")
+    if len(inputs) != 1 and any(value is not None for value in (args.lhe, args.lhe_map, args.hepmc)):
+        parser.error("--lhe, --lhe-map and --hepmc overrides require exactly one Delphes input")
     output_path = args.output.expanduser().resolve()
     if output_path in inputs:
         raise ValueError("output file must not overwrite a Delphes input")
@@ -584,6 +589,7 @@ def main() -> None:
     event_id = 0
     diagnostics = SelectionDiagnostics()
     lhe_sources = []
+    born_sources = []
     source_ids = {}
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{output_path.name}.", suffix=".partial", dir=output_path.parent)
     os.close(descriptor)
@@ -606,7 +612,8 @@ def main() -> None:
                         )
                     lhe_source = load_lhe_source(
                         input_path, tree, lhe_path=args.lhe, manifest_path=args.lhe_map,
-                        require_lhe=args.require_lhe,
+                        require_lhe=args.require_lhe, hepmc_path=args.hepmc,
+                        require_born=args.require_born,
                     )
                     if lhe_source is not None:
                         if output_path in {
@@ -618,8 +625,22 @@ def main() -> None:
                         if source_ids.setdefault(lhe_source.source_id, digest) != digest:
                             raise ValueError("LHE source ID collision between distinct SHA-256 digests")
                         lhe_sources.append(lhe_source.metadata)
+                        if lhe_source.born_metadata is not None:
+                            record = lhe_source.born_metadata
+                            if record["born_source"] in (2, 3) and output_path == Path(record["hepmc_file"]):
+                                raise ValueError("output file must not overwrite the native HepMC Born input")
+                            born_sources.append(record)
+                            print(
+                                f"Born input {record['hard_decay_definition']}: "
+                                f"{record['born_available_entries']}/{tree.num_entries} projectable quartets, "
+                                f"{record['born_kinematics_valid_entries']} complete kinematics; "
+                                f"decay status counts={record['decay_status_counts']}"
+                            )
+                        else:
+                            print(f"No certified Born input definition for {input_path}; born_* fields are unavailable")
                     else:
                         print(f"No verified LHE provenance for {input_path}; LHE fields are unavailable")
+                    input_entry = 0
                     for arrays in tree.iterate(
                         expressions=INPUT_BRANCHES,
                         step_size=args.step_size,
@@ -633,15 +654,20 @@ def main() -> None:
                             diagnostics=diagnostics,
                         )
                         if lhe_source is not None:
-                            lhe_source.decorate(reduced)
+                            lhe_source.decorate(reduced, first_input_entry=input_entry)
                         output_tree.extend(reduced)
                         size = len(reduced["event_id"])
                         event_id += size
+                        input_entry += size
                 if file_identity(input_path) != original_identity:
                     raise ValueError(f"Delphes input changed while reducing: {input_path}")
             output_file["lhe_metadata"] = json.dumps(
                 {"schema_version": 1, "event_number": EVENT_NUMBER_CONVENTION,
                  "sources": lhe_sources}, sort_keys=True, allow_nan=False,
+            )
+            output_file["born_metadata"] = json.dumps(
+                {"schema_version": 1, "projection": BORN_PROJECTION_METADATA,
+                 "sources": born_sources}, sort_keys=True, allow_nan=False,
             )
         os.replace(temporary, output_path)
     finally:

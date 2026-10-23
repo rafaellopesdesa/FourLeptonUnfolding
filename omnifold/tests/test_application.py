@@ -42,7 +42,7 @@ def _iterations():
 
 
 def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False,
-            overrides=None, with_lhe=False):
+            overrides=None, with_lhe=False, with_born=False):
     arrays = {
         "event_id": np.arange(5, dtype=np.uint64),
         "weight": np.array([2.0, -0.5, 3.0, 4.0, 5.0]),
@@ -70,6 +70,18 @@ def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False,
             lhe_Phi=np.linspace(-2.0, 2.0, 5, dtype=np.float64),
             lhe_higgs_m=np.full(5, np.nan, dtype=np.float64),
         )
+    if with_born:
+        arrays.update(
+            born_source=np.array([1, 2, 3, 3, 2], dtype=np.int8),
+            born_available=np.array([True, False, True, True, False]),
+            born_kinematics_valid=np.array([True, False, False, True, False]),
+            born_type=np.array([2, -1, 4, 7, -1], dtype=np.int8),
+            born_n_taus=np.array([0, 0, 4, 2, 0], dtype=np.int8),
+            born_shower_event_index=np.array([-1, 3, 5, 6, 8], dtype=np.int64),
+            born_m_ZZ=np.array([125., np.nan, 125., 124., np.nan], dtype=np.float64),
+            born_pT_ZZ=np.array([0., np.nan, 0., 0., np.nan], dtype=np.float64),
+            born_Phi=np.array([.3, np.nan, np.nan, -.4, np.nan], dtype=np.float64),
+        )
     arrays.update(overrides or {})
     with uproot.recreate(path) as root_file:
         root_file.mktree("Analysis", arrays)
@@ -82,6 +94,14 @@ def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False,
                              "lhe_sha256": "fedcba9876543210" + "a" * 48,
                              "lhe_file": "/production/original.lhe"}],
             })
+        if with_born:
+            root_file["born_metadata"] = json.dumps({
+                "schema_version": 1,
+                "projection": {"arxiv_version": "2606.11083v2", "equations": [14, 15, 16]},
+                "sources": [{"born_source": 3,
+                             "hard_decay_definition": "herwig_qtilde_original_decay",
+                             "hepmc_sha256": "b" * 64}],
+            })
     return arrays
 
 
@@ -91,10 +111,11 @@ class ApplicationTest(unittest.TestCase):
             root = Path(directory)
             data = root / "data.root"
             mc = root / "gg_H_pythia.root"
-            original = _sample(data, with_lhe=True)
-            original_mc = _sample(mc, with_weight=False, with_lhe=True)
+            original = _sample(data, with_lhe=True, with_born=True)
+            original_mc = _sample(mc, with_weight=False, with_lhe=True, with_born=True)
             with uproot.open(data) as file:
                 original_lhe_metadata = str(file["lhe_metadata"])
+                original_born_metadata = str(file["born_metadata"])
             before = sha256_file(data)
             iterations = _iterations()
             paths = decorate_files([data], root / "decorated", iterations, mc_path=mc, step_size=2)
@@ -103,9 +124,10 @@ class ApplicationTest(unittest.TestCase):
                 arrays = file["Analysis"].arrays(library="np")
                 for name, values in original.items():
                     np.testing.assert_equal(arrays[name], values)
-                    if name.startswith("lhe_"):
+                    if name.startswith(("lhe_", "born_")):
                         self.assertEqual(arrays[name].dtype, values.dtype)
                 self.assertEqual(str(file["lhe_metadata"]), original_lhe_metadata)
+                self.assertEqual(str(file["born_metadata"]), original_born_metadata)
                 np.testing.assert_allclose(arrays["omnifold_reco_pull"][[0, 1, 4]], [[1.2, 1.1]] * 3)
                 np.testing.assert_allclose(arrays["omnifold_reco_likelihood"][[0, 1, 4]], [[1.4, 1.7]] * 3)
                 np.testing.assert_allclose(arrays["omnifold_weight"][1], [-0.125, -0.125])
@@ -118,10 +140,11 @@ class ApplicationTest(unittest.TestCase):
             with uproot.open(paths[1]) as file:
                 arrays = file["Analysis"].arrays(library="np")
                 for name, values in original_mc.items():
-                    if name.startswith("lhe_"):
+                    if name.startswith(("lhe_", "born_")):
                         np.testing.assert_equal(arrays[name], values)
                         self.assertEqual(arrays[name].dtype, values.dtype)
                 self.assertEqual(str(file["lhe_metadata"]), original_lhe_metadata)
+                self.assertEqual(str(file["born_metadata"]), original_born_metadata)
                 np.testing.assert_allclose(arrays["omnifold_truth_push"][:4], [[1.5, 1.8]] * 4)
                 # Index 1 is negative; second column is cumulative, not 1.5*1.8.
                 np.testing.assert_allclose(arrays["omnifold_weight"][1], [-0.75, -0.9])
