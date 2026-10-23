@@ -21,13 +21,16 @@ The workflow is split into:
 - [`BackgroundRemoval/`](BackgroundRemoval/) for the decay-only, strict
   130--160 GeV sideband data-to-MC correction, strict 115--130 GeV
   signal-purity training, and consistent frozen-model decoration of nominal
-  data, pseudo-experiments, and Pythia samples.
+  data, pseudo-experiments, and Pythia samples;
+- [`omnifold/`](omnifold/) for interactive notebook-driven unfolding,
+  calibrated reco/truth/reco ratios per iteration, fiducial closure,
+  fixed-reference likelihood objectives, and pseudo-experiment decoration.
 
 The built-in samples use 6800 GeV per beam, $\sqrt{s}=13.6$ TeV. The runtime
 also validates the LHE beam record so custom cards and external LHE inputs
 cannot silently mix collision energies.
 
 Signed POWHEG weights are preserved throughout reduction, merging,
-pseudo-data generation, plotting, Background Correction, and Background
-Removal. Physics yields use net sums `sum(w)` and statistical variances use
+pseudo-data generation, plotting, Background Correction, Background
+Removal, and OmniFold. Physics yields use net sums `sum(w)` and statistical variances use
 `sum(w^2)`; negative events are not dropped or converted to positive weights.

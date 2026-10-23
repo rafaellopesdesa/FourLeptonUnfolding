@@ -1,0 +1,5 @@
+# Keep the density-ratio stack identical to BackgroundRemoval.
+-r ../BackgroundRemoval/requirements.txt
+ipykernel>=6.29,<7
+jupyterlab>=4.3,<5
+nbformat>=5.10,<6
