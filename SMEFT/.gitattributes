@@ -1,0 +1,5 @@
+# Preserve upstream formatting and keep generated amplitudes identifiable.
+generated/src/** linguist-generated=true -whitespace
+generated/processes/** linguist-generated=true -whitespace
+cards/*.dat -whitespace
+licenses/*.txt -whitespace

@@ -15,6 +15,8 @@ The workflow is split into:
 - [`Simulation/`](Simulation/) for the H4l Delphes response;
 - [`Analysis/`](Analysis/) for matched LHE, Born-projected, dressed-truth, and reconstructed
   observables, merging, and 312 fb$^{-1}$ Herwig pseudo-data ensembles;
+- [`SMEFT/`](SMEFT/) for standalone LO `O_HB` Higgs-decay ratios and
+  coefficient-scan weights from certified Born observables;
 - [`Plotting/`](Plotting/) for the multipage Herwig-versus-Pythia validation
   report and the reconstruction-level background-removed-data versus ggH
   starting-point comparison;

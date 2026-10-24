@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "generator": {
+    "name": "MadGraph5_aMC@NLO",
+    "version": "3.5.17",
+    "commit": "4492b3e392effbb650447763fef5f67700673f03",
+    "archive_url": "https://api.github.com/repos/mg5amcnlo/mg5amcnlo/tarball/4492b3e392effbb650447763fef5f67700673f03",
+    "archive_sha256": "a3b68eb489098cf30ca2684e186802c4454a3c2611aa0cbe9bb55e580b336286"
+  },
+  "model": {
+    "name": "SMEFTsim_U35_MwScheme_UFO",
+    "version": "3.0.2",
+    "commit": "db7d4a80bdcff424eee27dde71f1eb09ac894039",
+    "archive_url": "https://api.github.com/repos/SMEFTsim/SMEFTsim/tarball/db7d4a80bdcff424eee27dde71f1eb09ac894039",
+    "archive_sha256": "64b6014bc6a3749f0040eafd4bfa24e3dc9f80d48c523cde2465f85b8649ad97"
+  },
+  "operator": "cHB * (H_dagger H) B_mu_nu B^mu_nu / LambdaSMEFT^2",
+  "coefficient": {
+    "parameter": "cHB",
+    "block": "SMEFT",
+    "index": 8,
+    "LambdaSMEFT_GeV": 1000.0
+  },
+  "input_scheme": "MwScheme: MW, MZ, Gf",
+  "approximation": "LO, massless charged leptons, fixed widths; SMHLOOP=0; at most one dimension-six insertion per amplitude",
+  "restriction": "SMlimit_massless with cHB=0.1; all other WCs zero and linearPropCorrections=0. NPprop is removed by this restriction.",
+  "commands": [
+    "import model SMEFTsim_U35_MwScheme_UFO-OHB",
+    "generate h > e- e+ mu- mu+ QCD=0 SMHLOOP=0 NP<=1",
+    "add process h > e- e+ e- e+ QCD=0 SMHLOOP=0 NP<=1",
+    "add process h > mu- mu+ mu- mu+ QCD=0 SMHLOOP=0 NP<=1",
+    "output standalone_cpp EXPORT_DIRECTORY -f"
+  ],
+  "patches": [
+    "Rename CPPProcess classes per flavor channel.",
+    "Replace adaptive sigmaKin helicity cache by a full sum of all 16 helicities; unchanged generated wavefunctions/amplitudes and symmetry factors.",
+    "Suppress informational parameter/coupling and SLHA opening prints.",
+    "Set runtime card cHB=0; generation restriction keeps cHB=0.1 to retain its vertices."
+  ],
+  "channels": {
+    "mixed": {
+      "pdg": [
+        11,
+        -11,
+        13,
+        -13
+      ],
+      "diagrams": 5,
+      "identical_factor": 1
+    },
+    "eeee": {
+      "pdg": [
+        11,
+        -11,
+        11,
+        -11
+      ],
+      "diagrams": 10,
+      "identical_factor": 4
+    },
+    "mmmm": {
+      "pdg": [
+        13,
+        -13,
+        13,
+        -13
+      ],
+      "diagrams": 10,
+      "identical_factor": 4
+    }
+  },
+  "upstream_generated_sha256": {
+    "src/HelAmps_SMEFTsim_U35_MwScheme_UFO_OHB.cc": "9cbd39284a2138fd81c4ccfb057c9f3d91759cde6a30257baa9aef00aa14e935",
+    "src/HelAmps_SMEFTsim_U35_MwScheme_UFO_OHB.h": "d2aa44f91a6a6ac3b83c3151c2fd2ec566132722965c195a36876e2f0af03eda",
+    "src/Parameters_SMEFTsim_U35_MwScheme_UFO_OHB.cc": "5410892e3e4cb1a9846a6cf33cc8422716e65a005ea27885ecfc85b49bfe1230",
+    "src/Parameters_SMEFTsim_U35_MwScheme_UFO_OHB.h": "8edbcc14253844d0ed05a5eca69686aaea03afe5c29bfe8fc634f30b5ebce93a",
+    "src/read_slha.cc": "27c6cb4d0a7920ad98f371794b12f8bdaea8b6c0a6faeba4bcf53fe3d6a537cf",
+    "src/read_slha.h": "49626919513bc8fbf292434f98ad2bc9b096703fd4dd834be1096e35aa7658ae",
+    "SubProcesses/P1_Sigma_SMEFTsim_U35_MwScheme_UFO_OHB_h_emepmummup/CPPProcess.h": "e8e2f9233f7218d45a60af11a9ce2b6addf7b002e20933340cb6ffe0414e7d3a",
+    "SubProcesses/P1_Sigma_SMEFTsim_U35_MwScheme_UFO_OHB_h_emepmummup/CPPProcess.cc": "68e5e0794aa0f35346361890c7c4621d2e782202e10124f0e0578fe4e5c3b9fe",
+    "SubProcesses/P2_Sigma_SMEFTsim_U35_MwScheme_UFO_OHB_h_emepemep/CPPProcess.h": "f6561d27dfcfb27355199b78fefdf2a1c62d12d06c70c3a89d840242bfb2349a",
+    "SubProcesses/P2_Sigma_SMEFTsim_U35_MwScheme_UFO_OHB_h_emepemep/CPPProcess.cc": "ccad2a642be308225408223521cbc4cc71e74df7baa313f268a4475fba0eab0f",
+    "SubProcesses/P3_Sigma_SMEFTsim_U35_MwScheme_UFO_OHB_h_mummupmummup/CPPProcess.h": "ead996ff0d25df4d52a17d31b2a8050c0250f57e38abb232280fab32eabb7e70",
+    "SubProcesses/P3_Sigma_SMEFTsim_U35_MwScheme_UFO_OHB_h_mummupmummup/CPPProcess.cc": "1f7687b691e85dfd987d8bb2b072a1b099e8253afa91af9987b2338f2b534c45"
+  },
+  "generated_sha256": {
+    "generated/processes/eeee/CPPProcess.cc": "b70a9816de0272b4053e6ab5d3c9a386391de464da0c18ba37884c7ca9d16725",
+    "generated/processes/eeee/CPPProcess.h": "431ab3dcc3bc57f67c47cf6eeaf91dbe7c040ffe1a14aaa2abd93b4f77648c57",
+    "generated/processes/mixed/CPPProcess.cc": "2c3f9a02c3728e9f3ca0a354be212c5953f7349cf62e778ae65df617086a7c81",
+    "generated/processes/mixed/CPPProcess.h": "28649617ba40bc1f47d2d2ba51401591181d15f98a6a5455b394e246fbea1485",
+    "generated/processes/mmmm/CPPProcess.cc": "0b48d4a6e9c8555a97be3ac692dd5e131cec09445e7aa35cdee04025b266c55f",
+    "generated/processes/mmmm/CPPProcess.h": "414a07ba1e486ebc295bba875d192c368cfd8d1f4db17b5119bca43295bbfb80",
+    "generated/src/HelAmps_SMEFTsim_U35_MwScheme_UFO_OHB.cc": "9cbd39284a2138fd81c4ccfb057c9f3d91759cde6a30257baa9aef00aa14e935",
+    "generated/src/HelAmps_SMEFTsim_U35_MwScheme_UFO_OHB.h": "d2aa44f91a6a6ac3b83c3151c2fd2ec566132722965c195a36876e2f0af03eda",
+    "generated/src/Parameters_SMEFTsim_U35_MwScheme_UFO_OHB.cc": "5410892e3e4cb1a9846a6cf33cc8422716e65a005ea27885ecfc85b49bfe1230",
+    "generated/src/Parameters_SMEFTsim_U35_MwScheme_UFO_OHB.h": "8edbcc14253844d0ed05a5eca69686aaea03afe5c29bfe8fc634f30b5ebce93a",
+    "generated/src/read_slha.cc": "91f6c4e62398c2a8ab7145b2c376abb068ff4ae38a6a0720101997e507246635",
+    "generated/src/read_slha.h": "49626919513bc8fbf292434f98ad2bc9b096703fd4dd834be1096e35aa7658ae"
+  },
+  "param_card_sha256": "71c534c21e1b04b083237cc65e0b3972ba4f5c741e66acd74d979585b2d48970",
+  "restriction_sha256": "4f7e3948ff4e06ed6de94021550af5c7ad7d99109eef26d4d06dc5e0e2836e92"
+}

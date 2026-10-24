@@ -1,0 +1,4 @@
+numpy>=1.26,<3
+awkward>=2.6,<3
+uproot>=5.3,<6
+vector>=1.6,<2
