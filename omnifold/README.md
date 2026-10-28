@@ -1,10 +1,16 @@
-# Interactive OmniFold
+# OmniFold in a notebook or from the command line
 
-Open [`interactive_omnifold.ipynb`](interactive_omnifold.ipynb) after running
-BackgroundRemoval. The notebook fits **one iteration each time you run its
-`session.step()` cell**, then displays ratio diagnostics and reconstructed
-and fiducial closure plots. Completed iterations are saved under a run
-directory so a later Jupyter session can resume them.
+After BackgroundRemoval, use either
+[`interactive_omnifold.ipynb`](interactive_omnifold.ipynb) or
+`python -m omnifold` from the repository root. Both interfaces use the same
+session, three density-ratio fits, and saved iteration checkpoints. A campaign
+created in the notebook can continue from the CLI, and a CLI campaign can
+continue in the notebook.
+
+The notebook fits **one iteration each time you run its `session.step()`
+cell**, then displays diagnostics and closure plots. The CLI runs a requested
+number of iterations and saves PDF reports after each completed iteration by
+default. Neither interface automatically chooses the stopping iteration.
 
 ## Inputs
 
@@ -95,11 +101,13 @@ partition supplies its reweighting and calibration diagnostics. This local
 closure split is a diagnostic of that ratio fit, not an independent dataset
 for estimating the statistical uncertainty of the entire adaptive unfolding.
 
-The notebook exposes learning curves, calibration, ensemble spread, and
-per-variable weighted closure for each stage. Its reconstructed and truth
-comparison figures show absolute expected-event yields by default; set
-`SHAPE_ONLY=True` for normalized comparisons. The Herwig truth curve is an
-independent diagnostic target, not a training input.
+The notebook and CLI reports expose learning curves, calibration, ensemble
+spread, and per-variable weighted closure for each stage. Reconstructed and
+truth comparison figures show absolute expected-event yields by default;
+set notebook `SHAPE_ONLY=True` or CLI `--shape-only` for normalized
+comparisons. This plotting option does not change training or fitted yield
+ratios. The Herwig truth curve is an independent diagnostic target, not a
+training input.
 
 ## Unity OnDemand setup
 
@@ -150,6 +158,126 @@ Do not place Python package names in the OnDemand **Modules** field. Request
 sufficient wall time for an iteration and resume completed iterations after
 an allocation ends; an interrupted fit may need to be repeated.
 
+The command-line interface uses this same environment and adds no
+dependencies. Run it in an existing allocated Unity session or job with the
+appropriate resources; invoking a training command does not request an
+allocation. CLI plots use a noninteractive backend, so report generation
+does not need a notebook or display server.
+
+## Command-line workflow
+
+The following commands assume the existing OmniFold environment is active
+and the working directory is the repository root. To use Pixi instead,
+replace `python -m omnifold COMMAND` with
+`pixi run --manifest-path omnifold/pixi.toml COMMAND`; tasks are provided for
+`train`, `resume`, `report`, `apply`, `history`, and `likelihood`.
+
+Create a campaign and fit one complete three-stage iteration:
+
+```bash
+RUN_DIR=/work/YOUR_GROUP/YOUR_USER/omnifold/run_001
+
+python -m omnifold train \
+  --run-dir "$RUN_DIR" \
+  --data-root /path/to/background_removed/data.root \
+  --gg-h-root /path/to/merged/gg_H_pythia.root \
+  --truth-root /path/to/merged/gg_H_herwig.root \
+  --iterations 1
+```
+
+`--truth-root` is optional and is used only for fiducial closure. `train`
+requires a new run directory. `--iterations` defaults to 1. To inspect that
+result and then fit two more iterations:
+
+```bash
+python -m omnifold history --run-dir "$RUN_DIR"
+python -m omnifold resume --run-dir "$RUN_DIR" --iterations 2
+```
+
+On `resume`, `--iterations 2` means **two additional iterations**, not a total
+of two. For example, a run with iteration 1 already committed will finish
+with iterations 1–3. Neural-network patience and epoch limits still operate
+within each ratio fit; they do not select an OmniFold stopping iteration.
+
+Training options are the hyphenated `RatioConfig` names, except that model
+overwrite is not exposed: `--ensemble-size`, `--hidden-layers`, `--neurons`,
+`--batch-size`, `--maximum-epochs`, `--patience`, `--learning-rate`,
+`--learning-rate-decay`, `--max-retries`, `--seed`, `--logit-clip`,
+`--calibration-scale-min`, `--calibration-scale-max`,
+`--inference-batch-size`, `--steps-per-epoch`, and `--device`.
+`--seed` controls the ratio-model randomness; `--split-seed` separately
+controls the fixed data partitions. `--data-weight-branch`,
+`--mc-weight-branch`, and `--truth-weight-branch` select the input weights
+described above. Use `python -m omnifold train --help` to inspect defaults.
+
+All commands accept `--cpu-threads`; its default is `SLURM_CPUS_PER_TASK`
+when set, otherwise 4. `--device auto` uses CUDA when available and CPU
+otherwise; use `--device cuda` to require the allocated GPU. Commands that
+load an existing campaign can override the execution device, for example
+`resume --run-dir "$RUN_DIR" --device cpu --iterations 1`. The saved inputs,
+features, split, weight branches, and training configuration remain fixed;
+use a new campaign to change them.
+
+### Reports without retraining
+
+`train` and `resume` save PDF diagnostics after every completed iteration.
+Use `--no-reports` to postpone plotting, then generate reports separately:
+
+```bash
+python -m omnifold report --run-dir "$RUN_DIR"
+python -m omnifold report --run-dir "$RUN_DIR" --iteration 1
+python -m omnifold report --run-dir "$RUN_DIR" --all-iterations --shape-only
+```
+
+With no iteration option, `report` uses the latest completed iteration.
+`--iteration` is one-based and is mutually exclusive with `--all-iterations`.
+Reports are written below `RUN_DIR/reports/iteration_NNNN/`; ratio diagnostics
+go in `ratios/*.pdf` and comparisons in either `comparison_yields/*.pdf` or
+`comparison_shapes/*.pdf`. The accompanying `history.json` is a snapshot of
+the history through the selected iteration. `--shape-only` changes only the
+comparison plots; the ratio diagnostics remain the same. It is also
+available on `train` and `resume` for their automatic comparison reports.
+
+Each training iteration is committed before its reports are generated. If
+plotting fails, the command exits with an error but the completed checkpoint
+is retained. Run `history` to see what completed, repair the reporting issue,
+and rerun `report`. Resuming trains additional iterations; it does not refit
+that committed iteration merely to regenerate its plots.
+
+### Export and evaluate the frozen sequence
+
+Apply the saved sequence to all requested pseudo-experiments:
+
+```bash
+python -m omnifold apply \
+  --run-dir "$RUN_DIR" \
+  --inputs '/path/to/background_removed/data*.root' \
+  --output-dir /path/to/omnifold_export
+```
+
+`--inputs` accepts one or more files, quoted globs, or directories. Directory
+inputs select `data*.root`. The nominal PYTHIA MC is included by default;
+`--no-mc` omits it. `--overwrite` permits replacement of a recognized prior
+export; original inputs are never overwritten. The vector branches and
+their interpretation are described below.
+
+History and frozen-model likelihood commands print JSON; add `--output` to
+save the same result to a new file. Existing JSON output files are not
+replaced:
+
+```bash
+python -m omnifold history --run-dir "$RUN_DIR" \
+  --output /path/to/omnifold_history.json
+python -m omnifold likelihood --run-dir "$RUN_DIR"
+python -m omnifold likelihood --run-dir "$RUN_DIR" \
+  --data-root /path/to/background_removed/data_0001.root \
+  --output /path/to/toy_0001_likelihood.json
+```
+
+Omitting `--data-root` evaluates the nominal data. Supplying another toy
+evaluates the same frozen models and does not retrain that pseudo-experiment.
+The statistical limitations of these weighted objectives are discussed below.
+
 ## Notebook workflow and resuming
 
 1. Set the ROOT paths, a new `RUN_DIR`, `MODE="create"`, and `RatioConfig` in
@@ -165,6 +293,11 @@ an allocation ends; an interrupted fit may need to be repeated.
    override can be passed as `device="cpu"` or `device="cuda"`.
 6. Run the export cell when the desired iteration sequence is complete.
 
+The same resume instructions apply to a campaign created with the CLI.
+Conversely, `python -m omnifold resume --run-dir RUN_DIR --iterations N`
+continues a notebook-created campaign. No conversion or copied model files
+are needed.
+
 The original ROOT inputs must remain unchanged during a campaign. Use a new
 run directory for different input files, selections, or model settings.
 For exact reruns, preserve the run manifest, model artifacts, input files,
@@ -179,6 +312,8 @@ iteration; the interrupted iteration is fitted again. Abandoned staging
 directories named `RUN_DIR/iterations/.iteration_*` are ignored by loading
 and may be removed after confirming that no training is using them. Do not
 remove the committed `iteration_0001`, `iteration_0002`, etc. directories.
+Do not train the same run concurrently from a notebook, CLI process, or
+second batch job. The lock protects one campaign across both interfaces.
 
 ## Decoration and likelihood objectives
 

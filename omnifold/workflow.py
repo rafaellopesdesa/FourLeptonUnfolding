@@ -454,7 +454,10 @@ class OmniFoldSession:
         paths = [Path(path).expanduser().resolve() for path in inputs]
         if include_mc and self._mc.path not in paths:
             paths.append(self._mc.path)
-        return decorate_files(paths, output_dir, self.iterations, mc_path=self._mc.path,
+        # The application helper appends mc_path automatically. Pass it only
+        # when selected, including an explicitly listed MC with include_mc=False.
+        mc_path = self._mc.path if self._mc.path in paths else None
+        return decorate_files(paths, output_dir, self.iterations, mc_path=mc_path,
                               data_weight_branch=self.manifest["settings"]["data_weight_branch"],
                               mc_weight_branch=self.manifest["settings"]["mc_weight_branch"], overwrite=overwrite,
                               metadata={"session_path": str(self.run_dir), "session_sha256": self._manifest_sha,

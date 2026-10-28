@@ -1,7 +1,7 @@
 [workspace]
 name = "four-lepton-omnifold"
 version = "0.1.0"
-description = "Interactive signed-weight OmniFold with calibrated density ratios"
+description = "Notebook and command-line signed-weight OmniFold with calibrated density ratios"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 requires-pixi = ">=0.40,<1"
@@ -30,4 +30,10 @@ PYTHONNOUSERSITE = "1"
 [tasks]
 install-kernel = { cmd = "python -m ipykernel install --user --name fourlepton-omnifold --display-name 'FourLepton OmniFold'", cwd = "..", description = "Register the environment with Unity OnDemand JupyterLab" }
 notebook = { cmd = "jupyter lab omnifold/interactive_omnifold.ipynb", cwd = "..", description = "Open the interactive OmniFold notebook" }
+train = { cmd = "python -m omnifold train", cwd = "..", description = "Create an OmniFold campaign and train the requested iterations" }
+resume = { cmd = "python -m omnifold resume", cwd = "..", description = "Train additional iterations in an existing campaign" }
+report = { cmd = "python -m omnifold report", cwd = "..", description = "Save PDF diagnostics for completed iterations without retraining" }
+apply = { cmd = "python -m omnifold apply", cwd = "..", description = "Decorate data and nominal MC with the frozen iteration sequence" }
+history = { cmd = "python -m omnifold history", cwd = "..", description = "Print the completed-iteration history as JSON" }
+likelihood = { cmd = "python -m omnifold likelihood", cwd = "..", description = "Evaluate frozen-model likelihood objectives and print JSON" }
 test = { cmd = "python -m unittest discover -s omnifold/tests -v", cwd = "..", description = "Run OmniFold regression tests" }
