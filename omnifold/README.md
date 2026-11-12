@@ -81,13 +81,15 @@ kinematics, should be checked with closure tests.
 
 ## Network and raw-score diagnostics
 
-`RatioConfig` defaults match BackgroundRemoval: four hidden layers of 1024
-neurons with swish activation, the pinned NSBI toolkit
-`DensityRatioLightning` model, four ensemble members, NAdam, batch size 8192,
-initial learning rate $3\times10^{-4}$ with exponential factor 0.98,
-100 maximum epochs, and patience 12. Logits are bounded at 30. The same
-signed BCE and ensemble checks are reused. The shape ratio is computed
-from the raw mean probability of the ensemble:
+All three OmniFold ratios use the same `RatioConfig`. New campaigns default
+to two hidden layers of 64 neurons with swish activation, four ensemble
+members, and batch size 512. They use the pinned NSBI toolkit
+`DensityRatioLightning` model and NAdam. Background Correction and Removal
+retain four hidden layers of 1024 neurons and batch size 8192 for their
+different classification tasks. The features, signed BCE, training controls,
+and raw-odds inference are shared.
+
+The shape ratio is computed from the raw mean probability of the ensemble:
 
 $$
 s(x)=\frac{1}{M}\sum_{m=1}^{M}s_m(x),\qquad
@@ -100,13 +102,67 @@ $\langle r\rangle_{\mathrm{reference}}=1$. The physical yield factor $K$
 is retained. The empirical ratio mean and raw-score reliability are measured
 as diagnostics; training must produce a reliable density-ratio estimate.
 Consequently, finite-sample reweighted yields need not match the target exactly.
-Removing post-training corrections does not itself fix overfitting: the
-architecture, loss, and early-stopping defaults are unchanged.
+The smaller architecture and training controls below aim to reduce overfitting;
+their adequacy must be checked on validation and held-out closure.
 
 Negative weights remain signed in the loss, physical yields,
 and diagnostics. Absolute weights are used only for the stable input scaler
 and importance-sampling proposal. A finite positive net yield is required
 for each normalized class/split. Statistical variances use $\sum w^2$.
+Expected-event yields are not training sample counts. Compare fit row counts,
+unique source events, and $(\sum w)^2/\sum w^2$; they measure different things.
+Repeated bootstrap rows do not add independent information, and weighted
+resampling during training does not create new events.
+
+### Validation and optimization controls
+
+New `RatioConfig` defaults are:
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `weight_decay` | `1e-4` | Coupled L2 in NAdam, matrix weights only; no bias penalty |
+| `learning_rate` | `3e-4` | Initial learning rate |
+| `learning_rate_decay` | `0.98` | Decay per `learning_rate_decay_steps` optimizer updates |
+| `learning_rate_decay_steps` | `100` | Update scale for learning-rate decay |
+| `validation_interval_steps` | `25` | Maximum updates between validation checks; reduced for small fit classes |
+| `validation_min_delta` | `1e-5` | Minimum validation BCE improvement that resets patience |
+| `patience` | `12` | Validation checks without sufficient improvement before stopping |
+| `baseline_tolerance` | `0.01` | Allowed validation BCE excess above the constant classifier's `ln(2)` |
+| `maximum_epochs` | `100` | Update budget multiplier, not the validation cadence |
+
+There is no dropout, and logits remain bounded at 30. Validation runs at
+update 0, update 1, the configured effective cadence, and the last update.
+The cadence is the smaller of `validation_interval_steps` and
+`max(1, ceil(min(N_target_fit, N_reference_fit) / (batch_size // 2)))`, using
+nonzero-weight fit row counts. Validation measures unpenalized signed BCE.
+The lowest-loss checked NN state is restored, including a state found within
+the first epoch; `validation_min_delta` sets the patience improvement
+threshold without preventing a new minimum from being saved. The initial
+untrained NN is eligible; selecting it is flagged
+explicitly and does not substitute a synthetic constant classifier.
+Learning-rate decay depends on optimizer updates, so changing
+`steps_per_epoch` cannot change the learning rate at a given update. An epoch
+defaults to enough balanced batches to match the larger fit class's row
+count. `maximum_epochs * steps_per_epoch` caps the total updates; explicit
+`steps_per_epoch` changes that budget, not validation-check patience.
+After $t$ optimizer updates, $\eta_t=\eta_0\,0.98^{t/100}$ with the defaults;
+the first update uses $\eta_0$.
+
+The ensemble rejects or retries a member above `ln(2) + baseline_tolerance`,
+as well as relative validation-loss outliers. Before publication, validation
+BCE of the actual raw mean-score ensemble must also pass that absolute
+threshold. Each member records whether it improves on the constant
+classifier; a warning is emitted if the ensemble mean score does not improve
+on that baseline. No discrimination is forced and no constant ratio is
+substituted. A nearly unity ratio can be appropriate when target and reference
+agree.
+
+For a capacity comparison, start separate campaigns with
+`RatioConfig(hidden_layers=2, neurons=64)` and
+`RatioConfig(hidden_layers=3, neurons=128)`, holding inputs and split seeds
+fixed. Compare validation BCE and checkpoint behavior to choose capacity;
+reserve the untouched closure split for assessment. Do not choose network
+settings by matching the Herwig truth curve.
 
 Fit, validation, and closure partitions are kept fixed across iterations.
 Copies of a source event in the target and reference must share their partition.
@@ -116,13 +172,20 @@ is fitted on either held-out partition. This local
 closure split is a diagnostic of that ratio fit, not an independent dataset
 for estimating the statistical uncertainty of the entire adaptive unfolding.
 
-The notebook and CLI reports expose learning curves, one raw-score reliability
-panel per ratio, ensemble spread, and per-variable weighted closure for each
+The notebook and CLI reports expose learning curves indexed by optimizer
+update, one raw-score reliability panel per ratio, ensemble spread, and
+per-variable weighted closure for each
 stage. Reconstructed and truth comparison figures show absolute expected-event yields by default;
 set notebook `SHAPE_ONLY=True` or CLI `--shape-only` for normalized
 comparisons. This plotting option does not change training or fitted yield
 ratios. The Herwig truth curve is an independent diagnostic target, not a
 training input.
+Each member records its checked losses, learning rates, selected checkpoint,
+stopping reason, and baseline comparison, so a short epoch count can be
+interpreted using the actual number of updates and checks.
+Reports also summarize recorded fit counts, parameter counts, effective
+counts, and average draws per fit event. Earlier raw artifacts with only
+epoch-level histories retain their original axis when reported.
 
 ## Unity OnDemand setup
 
@@ -217,7 +280,9 @@ within each ratio fit; they do not select an OmniFold stopping iteration.
 Training options are the hyphenated `RatioConfig` names, except that model
 overwrite is not exposed: `--ensemble-size`, `--hidden-layers`, `--neurons`,
 `--batch-size`, `--maximum-epochs`, `--patience`, `--learning-rate`,
-`--learning-rate-decay`, `--max-retries`, `--seed`, `--logit-clip`,
+`--learning-rate-decay`, `--learning-rate-decay-steps`, `--weight-decay`,
+`--validation-interval-steps`, `--validation-min-delta`, `--baseline-tolerance`,
+`--max-retries`, `--seed`, `--logit-clip`,
 `--inference-batch-size`, `--steps-per-epoch`, and `--device`.
 `--seed` controls the ratio-model randomness; `--split-seed` separately
 controls the fixed data partitions. `--data-weight-branch`,
@@ -308,9 +373,20 @@ The statistical limitations of these weighted objectives are discussed below.
 6. Run the export cell when the desired iteration sequence is complete.
 
 The same resume instructions apply to a campaign created with the CLI using
-this raw-odds artifact format. Conversely,
+the current raw-odds artifact format and training policy. Conversely,
 `python -m omnifold resume --run-dir RUN_DIR --iterations N` continues a notebook-created campaign. No conversion or copied model files
 are needed.
+
+### Training-policy compatibility
+
+New model and session manifests record `training_policy_version: 1`. The
+smaller default network and update-based validation apply to new campaigns;
+existing explicit configurations are not rewritten. Earlier raw-odds models
+and campaigns still load for inference, export, and reports, but an older
+session cannot append iterations under the new training policy. Start a new
+run directory to use these controls throughout an unfolding sequence. Do not
+edit the saved policy version to bypass the check: the earlier iterations
+were trained under different rules.
 
 ### Moving from calibrated campaigns
 

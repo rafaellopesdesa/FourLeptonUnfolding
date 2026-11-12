@@ -78,14 +78,23 @@ class RatioContractTests(unittest.TestCase):
             self.assertEqual(outputs["shape_ratio"][index], alone["shape_ratio"][0])
         self.assertNotAlmostEqual(outputs["shape_ratio"][0], np.mean(scores[0] / (1.0 - scores[0])))
 
-    def test_configuration_matches_existing_training_defaults(self):
+    def test_configuration_uses_compact_regularized_training_defaults(self):
         config = ratios.RatioConfig()
         config.validate()
-        self.assertEqual((config.ensemble_size, config.hidden_layers, config.neurons), (4, 4, 1024))
+        self.assertEqual((config.ensemble_size, config.hidden_layers, config.neurons, config.batch_size), (4, 2, 64, 512))
+        self.assertEqual((config.weight_decay, config.validation_interval_steps,
+                          config.learning_rate_decay_steps, config.validation_min_delta,
+                          config.baseline_tolerance), (1e-4, 25, 100, 1e-5, .01))
+        replace(config, hidden_layers=3, neurons=128).validate()
         for replacement in ({"ensemble_size": 3}, {"batch_size": 7}, {"logit_clip": np.inf},
-                            {"learning_rate": 0.0}, {"steps_per_epoch": 0}, {"max_retries": -1}):
-            with self.assertRaises(ValueError):
-                replace(config, **replacement).validate()
+                            {"learning_rate": 0.0}, {"steps_per_epoch": 0}, {"max_retries": -1},
+                            {"weight_decay": -1e-4}, {"weight_decay": np.inf},
+                            {"validation_interval_steps": 0}, {"validation_interval_steps": 2.5},
+                            {"learning_rate_decay_steps": 0}, {"validation_min_delta": -1e-5},
+                            {"baseline_tolerance": np.nan}, {"baseline_tolerance": True}):
+            with self.subTest(replacement=replacement):
+                with self.assertRaises(ValueError):
+                    replace(config, **replacement).validate()
 
 
 @unittest.skipUnless(importlib.util.find_spec("torch"), "signed ratio smoke test requires PyTorch")
@@ -147,7 +156,14 @@ class RatioTrainingTests(unittest.TestCase):
         self.assertEqual(self.model.manifest["classes"]["target"]["negative_weight_entries"], 3)
         self.assertEqual(self.model.manifest["metadata"], {"stage": "truth", "iteration": 1})
         self.assertEqual(len(self.model.history), 4)
-        self.assertEqual(len(self.model.history[0]["history"]["training_loss"]), 2)
+        self.assertEqual(self.model.manifest["training_policy_version"], ratios.TRAINING_POLICY_VERSION)
+        self.assertTrue(self.model.manifest["ensemble_validation"]["within_baseline_tolerance"])
+        for member in self.model.history:
+            summary = member["training_summary"]
+            self.assertIn(summary["selected_optimizer_step"], member["history"]["optimizer_step"])
+            self.assertEqual(summary["weight_decay"], self.config.weight_decay)
+            self.assertEqual(summary["learning_rate_decay_steps"], self.config.learning_rate_decay_steps)
+            self.assertEqual(member["history"]["optimizer_step"][:2], [0, 1])
         np.testing.assert_allclose(prediction["full_ratio"], 3.0 * prediction["shape_ratio"])
         restored = ratios.RatioEstimator.load(self.model.root, device="cpu")
         other = restored.predict(self.features, batch_size=7)
@@ -169,6 +185,44 @@ class RatioTrainingTests(unittest.TestCase):
                          [entry["history"] for entry in second.history])
         np.testing.assert_array_equal(self.model.predict(self.features)["shape_ratio"],
                                       second.predict(self.features)["shape_ratio"])
+
+    def test_previous_raw_artifact_keeps_serialized_topology_and_inference(self):
+        destination = self.root / "previous-raw-policy"
+        shutil.copytree(self.model.root, destination)
+        path = destination / "manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest.pop("training_policy_version")
+        manifest.pop("ensemble_validation")
+        for name in ("weight_decay", "validation_interval_steps", "learning_rate_decay_steps",
+                     "validation_min_delta", "baseline_tolerance"):
+            manifest["config"].pop(name)
+        for member in manifest["members"]:
+            member.pop("training_summary")
+        path.write_text(json.dumps(manifest))
+        restored = ratios.RatioEstimator.load(destination, device="cpu")
+        self.assertEqual(restored.manifest["architecture"]["hidden_layers"], self.config.hidden_layers)
+        self.assertEqual(restored.manifest["architecture"]["neurons"], self.config.neurons)
+        np.testing.assert_array_equal(restored.predict(self.features)["shape_ratio"],
+                                      self.model.predict(self.features)["shape_ratio"])
+
+    def test_new_policy_training_controls_must_match_serialized_architecture(self):
+        destination = self.root / "inconsistent-policy"
+        shutil.copytree(self.model.root, destination)
+        path = destination / "manifest.json"
+        original = json.loads(path.read_text())
+        for name in ("weight_decay", "validation_interval_steps", "learning_rate_decay_steps",
+                     "validation_min_delta", "baseline_tolerance"):
+            with self.subTest(name=name):
+                changed = json.loads(json.dumps(original))
+                changed["architecture"][name] *= 2
+                path.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(ValueError, "training policy mismatch"):
+                    ratios.RatioEstimator.load(destination, device="cpu")
+                changed = json.loads(json.dumps(original))
+                changed["config"].pop(name)
+                path.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(ValueError, "training policy mismatch"):
+                    ratios.RatioEstimator.load(destination, device="cpu")
 
     def test_same_events_cannot_leak_between_target_and_reference_banks(self):
         changed_splits = (self.splits + 1) % 3

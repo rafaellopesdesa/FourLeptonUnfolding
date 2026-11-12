@@ -42,6 +42,7 @@ from BackgroundRemoval.common import (
     deterministic_split,
     known_weight_measures_compatible,
     sha256_file,
+    stable_logit,
     toolkit_runtime_provenance,
     transformed_features,
     validate_manifest_mass_window,
@@ -150,11 +151,12 @@ class MemberResult:
     attempt: int
     seed: int
     state_dict: dict[str, Any]
-    history: dict[str, list[float]]
+    history: dict[str, list[float | int | None]]
     validation_loss: float
     validation_score_mean: float
     validation_score_std: float
     validation_saturated_fraction: float
+    training_summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -611,6 +613,25 @@ def _train_member(
     import torch
     import torch.nn.functional as functional
 
+    def positive_integer(name: str, default: int) -> int:
+        value = architecture.get(name, default)
+        if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
+        return int(value)
+
+    validation_cap = positive_integer("validation_interval_steps", 25)
+    decay_steps = positive_integer("learning_rate_decay_steps", 100)
+    weight_decay = float(architecture.get("weight_decay", 1.0e-4))
+    minimum_delta = float(architecture.get("validation_min_delta", 1.0e-5))
+    baseline_tolerance = float(architecture.get("baseline_tolerance", 0.01))
+    for name, value in (("weight_decay", weight_decay), ("validation_min_delta", minimum_delta),
+                        ("baseline_tolerance", baseline_tolerance)):
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError(f"{name} must be finite and nonnegative")
+    decay_factor = float(architecture["learning_rate_decay"])
+    if not np.isfinite(decay_factor) or not 0.0 < decay_factor <= 1.0:
+        raise ValueError("learning_rate_decay must lie in (0, 1]")
+
     seed = (base_seed + 1009 * slot + 100_003 * attempt) % (2**32)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -619,190 +640,283 @@ def _train_member(
 
     model = build_toolkit_model(architecture).to(device)
     loss_logit_clip = float(architecture["loss_logit_clip"])
+    matrix_parameters = [parameter for parameter in model.parameters()
+                         if parameter.requires_grad and parameter.ndim > 1]
+    other_parameters = [parameter for parameter in model.parameters()
+                        if parameter.requires_grad and parameter.ndim <= 1]
+    # NAdam's coupled decay is the gradient of wd/2 * sum(W**2).
+    # Biases and other scalar/vector parameters are deliberately not penalized.
     optimizer = torch.optim.NAdam(
-        model.parameters(),
+        [{"params": matrix_parameters, "weight_decay": weight_decay},
+         {"params": other_parameters, "weight_decay": 0.0}],
         lr=float(architecture["learning_rate"]),
         weight_decay=0.0,
     )
     scheduler = torch.optim.lr_scheduler.ExponentialLR(
-        optimizer, gamma=float(architecture["learning_rate_decay"])
+        optimizer, gamma=decay_factor ** (1.0 / decay_steps)
     )
     rng = np.random.default_rng(seed)
-    signal_indices = np.flatnonzero(cache["signal"].splits == FIT_SPLIT)
-    background_indices = np.flatnonzero(cache["background"].splits == FIT_SPLIT)
+    signal_indices = np.flatnonzero((cache["signal"].splits == FIT_SPLIT)
+                                    & (cache["signal"].weights != 0.0))
+    background_indices = np.flatnonzero((cache["background"].splits == FIT_SPLIT)
+                                        & (cache["background"].weights != 0.0))
     half_batch = batch_size // 2
-    if steps_per_epoch is None:
-        epoch_steps = math.ceil(
-            max(signal_indices.size, background_indices.size) / half_batch
-        )
-    else:
-        epoch_steps = steps_per_epoch
+    if half_batch < 1 or batch_size % 2:
+        raise ValueError("batch_size must be even and at least two")
+    if not signal_indices.size or not background_indices.size:
+        raise ValueError("each class must have nonzero-weight fit events")
+    epoch_steps = (math.ceil(max(signal_indices.size, background_indices.size) / half_batch)
+                   if steps_per_epoch is None else steps_per_epoch)
+    if epoch_steps < 1 or maximum_epochs < 1 or patience < 1:
+        raise ValueError("epoch steps, maximum epochs and validation patience must be positive")
+    planned_steps = int(maximum_epochs * epoch_steps)
+    validation_interval = min(validation_cap, max(1, math.ceil(
+        min(signal_indices.size, background_indices.size) / half_batch)))
     signal_cumulative, signal_coefficient_scale = _absolute_weight_sampling_plan(
-        cache["signal"].weights,
-        signal_indices,
-        class_name="signal",
-    )
-    background_cumulative, background_coefficient_scale = (
-        _absolute_weight_sampling_plan(
-            cache["background"].weights,
-            background_indices,
-            class_name="background",
-        )
-    )
+        cache["signal"].weights, signal_indices, class_name="signal")
+    background_cumulative, background_coefficient_scale = _absolute_weight_sampling_plan(
+        cache["background"].weights, background_indices, class_name="background")
 
-    history = {"training_loss": [], "validation_loss": [], "learning_rate": []}
-    best_loss = math.inf
-    best_state: dict[str, Any] | None = None
-    epochs_without_improvement = 0
-    for epoch in range(maximum_epochs):
+    def regularization_value() -> float:
+        if weight_decay == 0.0 or not matrix_parameters:
+            return 0.0
+        with torch.no_grad():
+            squared_norm = sum(torch.sum(parameter.detach() ** 2)
+                               for parameter in matrix_parameters)
+            return 0.5 * weight_decay * float(squared_norm.item())
+
+    def evaluate() -> tuple[float, float, float, float]:
+        result = _evaluate_member(
+            model, cache, split_code=VALIDATION_SPLIT, mean=mean, scale=scale,
+            device=device, inference_batch_size=inference_batch_size,
+            logit_clip=loss_logit_clip)
+        if not np.all(np.isfinite(result)):
+            raise RuntimeError(f"member {slot} produced non-finite validation diagnostics")
+        return result
+
+    def snapshot() -> dict[str, Any]:
+        return {name: value.detach().cpu().clone() for name, value in model.state_dict().items()}
+
+    initial_validation_loss, _, _, _ = evaluate()
+    best_loss = initial_validation_loss
+    patience_reference_loss = initial_validation_loss
+    best_state = snapshot()  # The actual initialized network, never a fabricated unity ratio.
+    best_step = 0
+    checks_without_improvement = 0
+    history = {
+        "optimizer_step": [0], "epoch": [0.0], "training_loss": [None],
+        "validation_loss": [initial_validation_loss],
+        "regularization_loss": [regularization_value()], "objective_loss": [None],
+        "learning_rate": [float(optimizer.param_groups[0]["lr"])],
+    }
+    print(f"member={slot} attempt={attempt} step=0/{planned_steps} epoch=0 "
+          f"validation={initial_validation_loss:.7g} baseline={math.log(2.0):.7g} "
+          f"validation_interval_steps={validation_interval}", flush=True)
+    accumulated_bce = accumulated_regularization = 0.0
+    accumulated_steps = 0
+    completed_steps = 0
+    stop_reason = "maximum_optimizer_steps"
+    for step in range(1, planned_steps + 1):
         model.train()
-        accumulated = 0.0
-        for _ in range(epoch_steps):
-            signal_draw = _draw_absolute_weighted(
-                rng,
-                signal_indices,
-                signal_cumulative,
-                size=half_batch,
-            )
-            background_draw = _draw_absolute_weighted(
-                rng,
-                background_indices,
-                background_cumulative,
-                size=half_batch,
-            )
-            # Sorted indices turn random memmap access into mostly sequential reads.
-            signal_draw.sort()
-            background_draw.sort()
-            signal_tensor = _scaled_tensor(
-                np.asarray(cache["signal"].features[signal_draw]), mean, scale, device
-            )
-            background_tensor = _scaled_tensor(
-                np.asarray(cache["background"].features[background_draw]), mean, scale, device
-            )
-            signal_coefficients = torch.from_numpy(
-                np.asarray(
-                    np.sign(cache["signal"].weights[signal_draw])
-                    * signal_coefficient_scale,
-                    dtype=np.float32,
-                )
-            ).to(device)
-            background_coefficients = torch.from_numpy(
-                np.asarray(
-                    np.sign(cache["background"].weights[background_draw])
-                    * background_coefficient_scale,
-                    dtype=np.float32,
-                )
-            ).to(device)
-            optimizer.zero_grad(set_to_none=True)
-            # A finite logit domain is essential for a signed empirical BCE:
-            # without it, a negative-weight event can drive its contribution
-            # to minus infinity.  Clipping bounds the objective without
-            # changing, dropping, or taking the absolute value of any event
-            # weight.  The same bound is used for validation and inference.
-            signal_logits = torch.clamp(
-                model(signal_tensor).reshape(-1),
-                min=-loss_logit_clip,
-                max=loss_logit_clip,
-            )
-            background_logits = torch.clamp(
-                model(background_tensor).reshape(-1),
-                min=-loss_logit_clip,
-                max=loss_logit_clip,
-            )
-            signal_loss = functional.binary_cross_entropy_with_logits(
-                signal_logits, torch.ones_like(signal_logits), reduction="none"
-            )
-            background_loss = functional.binary_cross_entropy_with_logits(
-                background_logits, torch.zeros_like(background_logits), reduction="none"
-            )
-            loss = 0.5 * (
-                torch.mean(signal_loss * signal_coefficients)
-                + torch.mean(background_loss * background_coefficients)
-            )
-            if not torch.isfinite(loss):
-                raise RuntimeError(f"member {slot} produced a non-finite training loss")
-            loss.backward()
-            optimizer.step()
-            accumulated += float(loss.detach().cpu())
-
-        validation_loss, score_mean, score_std, saturated_fraction = _evaluate_member(
-            model,
-            cache,
-            split_code=VALIDATION_SPLIT,
-            mean=mean,
-            scale=scale,
-            device=device,
-            inference_batch_size=inference_batch_size,
-            logit_clip=loss_logit_clip,
-        )
-        history["training_loss"].append(accumulated / epoch_steps)
-        history["validation_loss"].append(validation_loss)
-        history["learning_rate"].append(float(optimizer.param_groups[0]["lr"]))
-        print(
-            f"member={slot} attempt={attempt} epoch={epoch + 1}/{maximum_epochs} "
-            f"train={history['training_loss'][-1]:.7g} validation={validation_loss:.7g} "
-            f"lr={history['learning_rate'][-1]:.3g}",
-            flush=True,
-        )
-        if validation_loss < best_loss - 1.0e-7:
-            best_loss = validation_loss
-            best_state = {
-                name: value.detach().cpu().clone()
-                for name, value in model.state_dict().items()
-            }
-            epochs_without_improvement = 0
-        else:
-            epochs_without_improvement += 1
+        signal_draw = _draw_absolute_weighted(
+            rng, signal_indices, signal_cumulative, size=half_batch)
+        background_draw = _draw_absolute_weighted(
+            rng, background_indices, background_cumulative, size=half_batch)
+        signal_draw.sort()
+        background_draw.sort()
+        signal_tensor = _scaled_tensor(
+            np.asarray(cache["signal"].features[signal_draw]), mean, scale, device)
+        background_tensor = _scaled_tensor(
+            np.asarray(cache["background"].features[background_draw]), mean, scale, device)
+        signal_coefficients = torch.from_numpy(np.asarray(
+            np.sign(cache["signal"].weights[signal_draw]) * signal_coefficient_scale,
+            dtype=np.float32)).to(device)
+        background_coefficients = torch.from_numpy(np.asarray(
+            np.sign(cache["background"].weights[background_draw]) * background_coefficient_scale,
+            dtype=np.float32)).to(device)
+        optimizer.zero_grad(set_to_none=True)
+        # Preserve the signed empirical BCE and its existing finite logit domain.
+        signal_logits = torch.clamp(model(signal_tensor).reshape(-1),
+                                     min=-loss_logit_clip, max=loss_logit_clip)
+        background_logits = torch.clamp(model(background_tensor).reshape(-1),
+                                         min=-loss_logit_clip, max=loss_logit_clip)
+        signal_loss = functional.binary_cross_entropy_with_logits(
+            signal_logits, torch.ones_like(signal_logits), reduction="none")
+        background_loss = functional.binary_cross_entropy_with_logits(
+            background_logits, torch.zeros_like(background_logits), reduction="none")
+        loss = 0.5 * (torch.mean(signal_loss * signal_coefficients)
+                      + torch.mean(background_loss * background_coefficients))
+        regularization = regularization_value()
+        if not torch.isfinite(loss) or not math.isfinite(regularization):
+            raise RuntimeError(f"member {slot} produced a non-finite training objective")
+        # Coupled L2 is applied by NAdam; do not add its gradient a second time.
+        loss.backward()
+        optimizer.step()
         scheduler.step()
-        if epochs_without_improvement >= patience:
+        accumulated_bce += float(loss.detach().cpu())
+        accumulated_regularization += regularization
+        accumulated_steps += 1
+        completed_steps = step
+        if step != 1 and step % validation_interval != 0 and step != planned_steps:
+            continue
+
+        validation_loss, _, _, _ = evaluate()
+        training_loss = accumulated_bce / accumulated_steps
+        regularization_loss = accumulated_regularization / accumulated_steps
+        history["optimizer_step"].append(step)
+        history["epoch"].append(step / epoch_steps)
+        history["training_loss"].append(training_loss)
+        history["validation_loss"].append(validation_loss)
+        history["regularization_loss"].append(regularization_loss)
+        history["objective_loss"].append(training_loss + regularization_loss)
+        history["learning_rate"].append(float(optimizer.param_groups[0]["lr"]))
+        print(f"member={slot} attempt={attempt} step={step}/{planned_steps} "
+              f"epoch={step / epoch_steps:.6g} train={training_loss:.7g} "
+              f"regularization={regularization_loss:.7g} validation={validation_loss:.7g} "
+              f"lr={history['learning_rate'][-1]:.3g}", flush=True)
+        # Always retain the true best checkpoint. A separate reference makes
+        # patience insensitive to a series of numerically tiny improvements.
+        if validation_loss < best_loss:
+            best_loss = validation_loss
+            best_state = snapshot()
+            best_step = step
+        if validation_loss < patience_reference_loss - minimum_delta:
+            patience_reference_loss = validation_loss
+            checks_without_improvement = 0
+        else:
+            checks_without_improvement += 1
+        accumulated_bce = accumulated_regularization = 0.0
+        accumulated_steps = 0
+        if checks_without_improvement >= patience:
+            stop_reason = "validation_patience"
             break
 
-    if best_state is None:
-        raise RuntimeError(f"member {slot} did not produce a usable checkpoint")
     model.load_state_dict(best_state)
     model.to(device)
-    validation_loss, score_mean, score_std, saturated_fraction = _evaluate_member(
-        model,
-        cache,
-        split_code=VALIDATION_SPLIT,
-        mean=mean,
-        scale=scale,
-        device=device,
-        inference_batch_size=inference_batch_size,
-        logit_clip=loss_logit_clip,
-    )
+    validation_loss, score_mean, score_std, saturated_fraction = evaluate()
+    baseline = math.log(2.0)
+    summary = {
+        "initial_validation_loss": initial_validation_loss,
+        "constant_baseline_loss": baseline,
+        "selected_optimizer_step": best_step,
+        "selected_epoch": best_step / epoch_steps,
+        "selected_validation_loss": validation_loss,
+        "stop_reason": stop_reason,
+        "optimizer_steps_completed": completed_steps,
+        "planned_optimizer_steps": planned_steps,
+        "epoch_steps": int(epoch_steps),
+        "effective_validation_interval_steps": validation_interval,
+        "requested_validation_interval_steps": validation_cap,
+        "validation_min_delta": minimum_delta,
+        "baseline_tolerance": baseline_tolerance,
+        "improved_over_constant": bool(validation_loss < baseline - minimum_delta),
+        "within_baseline_tolerance": bool(validation_loss <= baseline + baseline_tolerance),
+        "initial_checkpoint_selected": best_step == 0,
+        "trainable_parameters": sum(parameter.numel() for parameter in model.parameters()
+                                     if parameter.requires_grad),
+        "target_fit_entries": int(signal_indices.size),
+        "reference_fit_entries": int(background_indices.size),
+        "target_draws_per_fit_event": completed_steps * half_batch / signal_indices.size,
+        "reference_draws_per_fit_event": completed_steps * half_batch / background_indices.size,
+        "draw_reuse_definition": "mean draws per nonzero fit row; individual reuse follows absolute weights",
+        "weight_decay": weight_decay,
+        "regularization_definition": "weight_decay / 2 * sum(matrix weights squared); biases excluded",
+        "learning_rate_decay_steps": decay_steps,
+        "learning_rate_history": "rate for the next optimizer update after the recorded completed step",
+        "training_loss_history": "mean sampled signed BCE since previous validation; unavailable at step zero",
+        "patience_validation_checks": patience,
+    }
+    print(f"member={slot} selected_step={best_step} validation={validation_loss:.7g} "
+          f"improved_over_constant={summary['improved_over_constant']} "
+          f"within_baseline_tolerance={summary['within_baseline_tolerance']} "
+          f"stop_reason={stop_reason}", flush=True)
     return MemberResult(
-        slot=slot,
-        attempt=attempt,
-        seed=seed,
-        state_dict=best_state,
-        history=history,
-        validation_loss=validation_loss,
-        validation_score_mean=score_mean,
-        validation_score_std=score_std,
-        validation_saturated_fraction=saturated_fraction,
+        slot=slot, attempt=attempt, seed=seed, state_dict=best_state, history=history,
+        validation_loss=validation_loss, validation_score_mean=score_mean,
+        validation_score_std=score_std, validation_saturated_fraction=saturated_fraction,
+        training_summary=summary,
     )
 
 
 def _bad_members(results: list[MemberResult]) -> list[int]:
     losses = np.asarray([item.validation_loss for item in results], dtype=np.float64)
-    median = float(np.median(losses))
-    mad = float(np.median(np.abs(losses - median)))
-    # Signed BCE values can legitimately be negative.  Either tail can signal
-    # a discrepant member: in particular, an anomalously *low* signed loss can
-    # indicate that subtractive events have driven the member to the bounded
-    # logit edge.  Use a two-sided additive deviation from the robust centre.
+    finite_losses = losses[np.isfinite(losses)]
+    median = float(np.median(finite_losses)) if finite_losses.size else 0.0
+    mad = float(np.median(np.abs(finite_losses - median))) if finite_losses.size else 0.0
     degradation = np.abs(losses - median)
     relative_threshold = 0.05 * max(abs(median), 1.0e-8)
     mad_threshold = 5.0 * max(mad, 1.0e-8)
     bad: list[int] = []
     for index, item in enumerate(results):
+        tolerance = float(item.training_summary.get("baseline_tolerance", 0.01))
+        if not math.isfinite(tolerance) or tolerance < 0.0:
+            raise ValueError("baseline_tolerance must be finite and nonnegative")
         invalid = not np.isfinite(item.validation_loss)
+        worse_than_baseline = item.validation_loss > math.log(2.0) + tolerance
         relative_outlier = degradation[index] > relative_threshold
         mad_outlier = degradation[index] > mad_threshold
-        if invalid or (relative_outlier and mad_outlier):
+        # Signed losses may be negative. Keep the existing two-sided relative
+        # check, plus an absolute check that catches an equally poor ensemble.
+        if invalid or worse_than_baseline or (relative_outlier and mad_outlier):
             bad.append(index)
     return bad
+
+
+def _ensemble_validation_summary(
+    predictions: dict[str, ClassPredictions],
+    cache: dict[str, CachedClass],
+    *,
+    logit_clip: float,
+    baseline_tolerance: float,
+    validation_min_delta: float,
+) -> dict[str, Any]:
+    """Check the actual mean-score ensemble against the constant classifier.
+
+    This is an acceptance diagnostic, never a calibration or ratio rescaling.
+    Signed empirical risk need not preserve a convex-ensemble inequality, so
+    checking each member alone is insufficient.
+    """
+    for name, value in (("baseline_tolerance", baseline_tolerance),
+                        ("validation_min_delta", validation_min_delta)):
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError(f"{name} must be finite and nonnegative")
+    class_losses = []
+    for name, label in (("signal", 1), ("background", 0)):
+        prediction = predictions[name]
+        scores = np.asarray(prediction.ensemble_score, dtype=np.float64)
+        weights = np.asarray(cache[name].weights[prediction.indices], dtype=np.float64)
+        if (scores.shape != weights.shape or np.any(~np.isfinite(scores))
+                or np.any((scores < 0.0) | (scores > 1.0))
+                or np.any(~np.isfinite(weights))):
+            raise ValueError("ensemble validation predictions/weights must be finite and aligned")
+        total = float(np.sum(weights, dtype=np.float64))
+        if not np.isfinite(total) or total <= 0.0:
+            raise ValueError("ensemble validation class must have positive net signed yield")
+        logits = np.clip(stable_logit(scores, logit_clip=logit_clip),
+                         -abs(logit_clip), abs(logit_clip))
+        loss = np.logaddexp(0.0, -logits if label else logits)
+        class_losses.append(float(np.sum(weights * loss, dtype=np.float64) / total))
+    validation_loss = 0.5 * sum(class_losses)
+    baseline = math.log(2.0)
+    if not np.isfinite(validation_loss) or validation_loss > baseline + baseline_tolerance:
+        raise RuntimeError(
+            "raw mean-score ensemble fails the constant-classifier validation baseline: "
+            f"signed BCE={validation_loss:.8g}, limit={baseline + baseline_tolerance:.8g}. "
+            "Inspect data reuse and training histories or reduce capacity/learning rate; "
+            "no output calibration or unity fallback was applied.")
+    improved = validation_loss < baseline - validation_min_delta
+    if not improved:
+        warnings.warn(
+            "The raw mean-score ensemble is within the constant-classifier tolerance but "
+            "does not meaningfully improve its validation BCE. This can indicate a "
+            "near-unity ratio or insufficient learned discrimination; inspect held-out "
+            "reliability and closure. No unity ratio was substituted.",
+            RuntimeWarning, stacklevel=2)
+    return {
+        "validation_loss": validation_loss, "constant_baseline_loss": baseline,
+        "baseline_tolerance": baseline_tolerance, "validation_min_delta": validation_min_delta,
+        "improved_over_constant": bool(improved), "within_baseline_tolerance": True,
+    }
 
 
 def _predict_split(
@@ -948,6 +1062,16 @@ def train(args: argparse.Namespace) -> Path:
         0.0 < args.learning_rate_decay <= 1.0
     ):
         raise ValueError("learning-rate decay must be finite and lie in (0, 1]")
+    if not np.isfinite(args.weight_decay) or args.weight_decay < 0.0:
+        raise ValueError("weight decay must be finite and nonnegative")
+    for name in ("validation_interval_steps", "learning_rate_decay_steps"):
+        value = getattr(args, name)
+        if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
+    if not np.isfinite(args.validation_min_delta) or args.validation_min_delta < 0.0:
+        raise ValueError("validation minimum improvement must be finite and nonnegative")
+    if not np.isfinite(args.baseline_tolerance) or args.baseline_tolerance < 0.0:
+        raise ValueError("baseline tolerance must be finite and nonnegative")
     if args.max_retries < 0:
         raise ValueError("maximum retries cannot be negative")
     maximum_seed = int(np.iinfo(np.uint32).max)
@@ -1155,11 +1279,21 @@ def train(args: argparse.Namespace) -> Path:
                 "sampling": "with_replacement_proportional_to_absolute_weight",
                 "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
                 "dropout": 0.0,
-                "weight_decay": 0.0,
+                "weight_decay": args.weight_decay,
+                "regularization": "coupled L2 on weight matrices; biases excluded",
                 "optimizer": "NAdam",
                 "learning_rate": args.learning_rate,
-                "learning_rate_schedule": "ExponentialLR",
+                "learning_rate_schedule": "exponential_per_optimizer_step",
                 "learning_rate_decay": args.learning_rate_decay,
+                "learning_rate_decay_steps": args.learning_rate_decay_steps,
+                "validation_interval_steps": args.validation_interval_steps,
+                "validation_interval_policy": (
+                    "min(requested, ceil(smaller nonzero fit class / half batch))"
+                ),
+                "validation_min_delta": args.validation_min_delta,
+                "baseline_tolerance": args.baseline_tolerance,
+                "validation_loss": "unpenalized balanced signed-weight BCE",
+                "checkpoint_policy": "best validation loss including untrained step zero",
                 "batch_size": args.batch_size,
                 "steps_per_epoch": effective_steps_per_epoch,
                 "steps_per_epoch_policy": (
@@ -1169,6 +1303,7 @@ def train(args: argparse.Namespace) -> Path:
                 ),
                 "maximum_epochs": args.maximum_epochs,
                 "early_stopping_patience": args.patience,
+                "early_stopping_patience_unit": "validation_checks",
             }
 
             results: list[MemberResult] = []
@@ -1195,7 +1330,8 @@ def train(args: argparse.Namespace) -> Path:
                 if not bad:
                     break
                 print(
-                    f"Retrying discrepant ensemble slots {bad} (round {retry_round})...",
+                    f"Retrying ensemble slots {bad} that failed baseline or "
+                    f"ensemble-quality checks (round {retry_round})...",
                     flush=True,
                 )
                 for index in bad:
@@ -1217,7 +1353,8 @@ def train(args: argparse.Namespace) -> Path:
             remaining_bad = _bad_members(results)
             if remaining_bad:
                 raise RuntimeError(
-                    f"ensemble slots {remaining_bad} remain discrepant after "
+                    f"ensemble slots {remaining_bad} fail baseline or "
+                    f"ensemble-quality checks after "
                     f"{args.max_retries} retries"
                 )
 
@@ -1231,6 +1368,13 @@ def train(args: argparse.Namespace) -> Path:
                 scale=scaler_scale,
                 device=device,
                 inference_batch_size=args.inference_batch_size,
+            )
+            ensemble_validation = _ensemble_validation_summary(
+                validation,
+                cache,
+                logit_clip=args.logit_clip,
+                baseline_tolerance=args.baseline_tolerance,
+                validation_min_delta=args.validation_min_delta,
             )
             print("Predicting the untouched closure bank...", flush=True)
             closure = _predict_split(
@@ -1263,11 +1407,13 @@ def train(args: argparse.Namespace) -> Path:
                             result.validation_saturated_fraction
                         ),
                         "history": result.history,
+                        "training_summary": result.training_summary,
                     }
                 )
 
             manifest: dict[str, Any] = {
                 "format_version": ARTIFACT_FORMAT_VERSION,
+                "training_policy_version": 1,
                 "model_kind": MODEL_KIND_BACKGROUND_REMOVAL,
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "tree_name": TREE_NAME,
@@ -1349,11 +1495,14 @@ def train(args: argparse.Namespace) -> Path:
                     "size": len(results),
                     "minimum_size": 4,
                     "outlier_rule": (
-                        "validation loss is nonfinite, or differs from the median by "
+                        "validation loss is nonfinite, exceeds log(2) plus "
+                        "baseline_tolerance, or differs from the median by "
                         "both >5% and >5 MAD"
                     ),
+                    "baseline_tolerance": args.baseline_tolerance,
                     "maximum_retries_per_slot": args.max_retries,
                 },
+                "ensemble_validation": ensemble_validation,
                 "members": member_entries,
                 "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                 "toolkit": {
@@ -1452,9 +1601,20 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--neurons", type=int, default=1024)
     parser.add_argument("--batch-size", type=int, default=8192)
     parser.add_argument("--maximum-epochs", type=int, default=100)
-    parser.add_argument("--patience", type=int, default=12)
+    parser.add_argument("--patience", type=int, default=12,
+                        help="Validation checks without a meaningful improvement")
     parser.add_argument("--learning-rate", type=float, default=3.0e-4)
     parser.add_argument("--learning-rate-decay", type=float, default=0.98)
+    parser.add_argument("--weight-decay", type=float, default=1.0e-4,
+                        help="Coupled L2 on weight matrices; validation uses unpenalized signed BCE")
+    parser.add_argument("--validation-interval-steps", type=int, default=25,
+                        help="Maximum optimizer steps between validation checks")
+    parser.add_argument("--learning-rate-decay-steps", type=int, default=100,
+                        help="Optimizer steps per learning-rate decay factor")
+    parser.add_argument("--validation-min-delta", type=float, default=1.0e-5,
+                        help="Minimum validation improvement that resets patience")
+    parser.add_argument("--baseline-tolerance", type=float, default=0.01,
+                        help="Maximum accepted validation BCE excess above log(2)")
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--split-seed", type=int, default=DEFAULT_SEED + 1)

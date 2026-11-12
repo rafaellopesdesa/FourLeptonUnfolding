@@ -236,6 +236,11 @@ class CorrectionDataTest(unittest.TestCase):
         self.assertEqual(args.hidden_layers, 4)
         self.assertEqual(args.neurons, 1024)
         self.assertEqual(args.weight_branch, "weight")
+        self.assertEqual(args.weight_decay, 1.0e-4)
+        self.assertEqual(args.validation_interval_steps, 25)
+        self.assertEqual(args.learning_rate_decay_steps, 100)
+        self.assertEqual(args.validation_min_delta, 1.0e-5)
+        self.assertEqual(args.baseline_tolerance, 0.01)
 
 
 if __name__ == "__main__":

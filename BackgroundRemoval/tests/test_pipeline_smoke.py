@@ -113,7 +113,9 @@ def _fake_predict_split(cache, results, *, split_code, **kwargs):
     for class_name, arrays in cache.items():
         indices = np.flatnonzero(arrays.splits == split_code)
         raw = np.asarray(arrays.features[indices], dtype=np.float64)
-        central = 0.5 + 0.12 * np.tanh(raw[:, 0])
+        # These fixtures have no learned separation: use a near-null score
+        # that honestly passes the constant-classifier validation guard.
+        central = 0.5 + 0.005 * np.tanh(raw[:, 0])
         member_scores = np.clip(
             central[:, np.newaxis] + offsets[np.newaxis, :], 0.05, 0.95
         ).astype(np.float32)
@@ -216,6 +218,8 @@ class PipelineSmokeTest(unittest.TestCase):
             self.assertEqual(correction_manifest["features"], list(FEATURES))
             self.assertEqual(correction_manifest["ratio_estimator"], RAW_RATIO_ESTIMATOR)
             self.assertNotIn("calibration", correction_manifest)
+            self.assertEqual(correction_manifest["training_policy_version"], 1)
+            self.assertTrue(correction_manifest["ensemble_validation"]["within_baseline_tolerance"])
             self.assertEqual(
                 correction_manifest["selections"]["mass_window_gev"],
                 {
@@ -282,6 +286,8 @@ class PipelineSmokeTest(unittest.TestCase):
             )
             self.assertEqual(background_manifest["ratio_estimator"], RAW_RATIO_ESTIMATOR)
             self.assertNotIn("calibration", background_manifest)
+            self.assertEqual(background_manifest["training_policy_version"], 1)
+            self.assertTrue(background_manifest["ensemble_validation"]["within_baseline_tolerance"])
             self.assertEqual(
                 background_manifest["selections"]["mass_window_gev"],
                 {

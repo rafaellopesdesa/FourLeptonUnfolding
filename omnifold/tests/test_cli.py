@@ -105,6 +105,9 @@ class OmniFoldCLITest(unittest.TestCase):
         settings = dict(ensemble_size=5, hidden_layers=2, neurons=16, batch_size=64,
                         maximum_epochs=3, patience=2, learning_rate=.0007,
                         learning_rate_decay=.9, max_retries=1, seed=91, logit_clip=12.,
+                        weight_decay=2e-4, validation_interval_steps=7,
+                        learning_rate_decay_steps=40, validation_min_delta=3e-5,
+                        baseline_tolerance=.015,
                         inference_batch_size=128, steps_per_epoch=2, device="cpu")
         flags = [value for name, setting in settings.items()
                  for value in ("--" + name.replace("_", "-"), setting)]
@@ -119,6 +122,23 @@ class OmniFoldCLITest(unittest.TestCase):
             "truth_weight_branch": "weight"})
         np.testing.assert_array_equal(session._data.weights, [162., -2., 96.])
         self.reports.assert_not_called()
+
+    def test_previous_raw_policy_can_report_but_cli_resume_requires_new_campaign(self):
+        session = self.create_from_api()
+        path = self.run_dir / "session.json"
+        manifest = json.loads(path.read_text())
+        manifest.pop("training_policy_version")
+        path.write_text(json.dumps(manifest))
+        record_path = session.iterations[0].root / "iteration.json"
+        record = json.loads(record_path.read_text())
+        record["session_sha256"] = sha256_file(path)
+        record_path.write_text(json.dumps(record))
+        self.success("report", "--run-dir", self.run_dir)
+        self.success("likelihood", "--run-dir", self.run_dir)
+        code, _, stderr = self.invoke("resume", "--run-dir", self.run_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("start a new campaign", stderr)
+        self.assertEqual(len(_HistogramRatio.calls), 3)
 
     def test_failed_second_stage_preserves_checkpoint_and_cli_resume_recovers(self):
         session = self.create_from_api()

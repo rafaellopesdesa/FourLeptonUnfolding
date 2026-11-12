@@ -106,11 +106,16 @@ class SignedTrainingSmokeTest(unittest.TestCase):
         split_seed = 24680
 
         def tiny_model(_architecture):
-            return torch.nn.Sequential(
+            model = torch.nn.Sequential(
                 torch.nn.Linear(len(MODEL_FEATURES), 8),
                 torch.nn.SiLU(),
                 torch.nn.Linear(8, 1),
             )
+            # This one-update smoke test starts near the constant classifier;
+            # a random output bias is not evidence of a successful density fit.
+            torch.nn.init.normal_(model[-1].weight, std=1.0e-3)
+            torch.nn.init.zeros_(model[-1].bias)
+            return model
 
         with tempfile.TemporaryDirectory() as directory_name:
             directory = Path(directory_name)
@@ -266,6 +271,11 @@ class SignedTrainingSmokeTest(unittest.TestCase):
             )
             self.assertEqual(manifest["ratio_estimator"], RAW_RATIO_ESTIMATOR)
             self.assertNotIn("calibration", manifest)
+            self.assertEqual(manifest["training_policy_version"], 1)
+            self.assertTrue(manifest["ensemble_validation"]["within_baseline_tolerance"])
+            for member in manifest["members"]:
+                self.assertIn("selected_optimizer_step", member["training_summary"])
+                self.assertEqual(member["training_summary"]["optimizer_steps_completed"], 1)
             diagnostics = output_directory / "diagnostics.pdf"
             self.assertTrue(diagnostics.read_bytes().startswith(b"%PDF"))
 

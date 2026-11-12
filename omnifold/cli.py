@@ -67,6 +67,16 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Fixed event-partition seed (default: 12345)")
     network = train.add_argument_group("Network settings (same defaults as RatioConfig)")
     defaults = RatioConfig()
+    descriptions = {
+        "patience": "Validation checks without sufficient improvement before stopping",
+        "maximum_epochs": "Optimizer-update budget in nominal epochs (maximum_epochs times steps_per_epoch)",
+        "learning_rate_decay": "Learning-rate multiplier per learning_rate_decay_steps optimizer updates",
+        "weight_decay": "L2 regularization coefficient",
+        "validation_interval_steps": "Maximum optimizer updates between validation checks (automatically reduced for the smaller fit bank)",
+        "learning_rate_decay_steps": "Optimizer updates over which learning_rate_decay is applied",
+        "validation_min_delta": "Minimum validation BCE improvement that resets patience",
+        "baseline_tolerance": "Maximum accepted validation BCE excess above ln(2)",
+    }
     for field in fields(RatioConfig):
         if field.name in {"device", "overwrite"}:
             continue
@@ -74,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
         kind = (float if isinstance(default, float) else
                 _nonnegative_int if field.name in {"max_retries", "seed"} else _positive_int)
         network.add_argument("--" + field.name.replace("_", "-"), type=kind, default=default,
-                             help=f"{field.name.replace('_', ' ')} (default: {default})")
+                             help=f"{descriptions.get(field.name, field.name.replace('_', ' '))} (default: {default})")
 
     resume = commands.add_parser("resume", help="Append iterations to a notebook or CLI campaign")
     _runtime_options(resume)

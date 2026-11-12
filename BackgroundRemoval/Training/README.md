@@ -52,6 +52,16 @@ to signal purity. No logistic calibration or empirical ratio normalization is
 fitted. Raw-score reliability and ratio-normalization checks remain diagnostics;
 a failed check is not repaired by an output correction.
 
+This background classifier retains four hidden layers of 1024 neurons and
+batch size 8192. The shared training controls now apply matrix-only NAdam
+weight decay, validation by optimizer update, checkpoint selection with
+validation-check patience, and an absolute `ln(2)` baseline check in addition
+to the relative ensemble filter. See
+[training controls](../README.md#validation-and-optimization-controls) for
+defaults and CLI options. New artifacts record training policy version 1 and
+per-member update/checkpoint histories; earlier raw-odds artifacts remain
+usable for inference.
+
 More precisely, the default Correction branch `weight` and Training branch
 `weight_nominal_pb` differ only by the common `312000 pb^-1` factor written by
 the merger. That factor cancels in both density ratios, so this pair is

@@ -12,6 +12,7 @@ import numpy as np
 from omnifold.diagnostics import (
     FEATURES,
     _histogram,
+    _learning_figure,
     _normalize,
     _ratio,
     _reliability,
@@ -44,6 +45,57 @@ class _ConstantRatio:
 class DiagnosticsTest(unittest.TestCase):
     def tearDown(self):
         plt.close("all")
+
+    def test_learning_plot_uses_irregular_updates_and_preserves_initial_nn(self):
+        history = {"optimizer_step": [0, 3, 7, 8], "epoch": [0, 0.375, 0.875, 1],
+                   "training_loss": [None, 0.69, 0.64, 0.61],
+                   "validation_loss": [0.6932, 0.694, 0.697, 0.699],
+                   "learning_rate": [0.001, 0.0009, 0.0008, 0.0007]}
+        summary = {"selected_optimizer_step": 0, "selected_epoch": 0,
+                   "constant_baseline_loss": np.log(2.0), "initial_validation_loss": 0.6932,
+                   "within_baseline_tolerance": True, "improved_over_constant": False,
+                   "initial_checkpoint_selected": True, "stop_reason": "validation_patience",
+                   "trainable_parameters": 173, "weight_decay": 0.001,
+                   "target_fit_entries": 20, "reference_fit_entries": 30,
+                   "target_draws_per_fit_event": 1.5, "reference_draws_per_fit_event": 1.0,
+                   "optimizer_steps_completed": 8, "planned_optimizer_steps": 24}
+        record = {"slot": 0, "history": history, "training_summary": summary}
+        manifest = {"classes": {"target": {"split_sum_weights": {"fit": 6.0},
+                                            "split_sum_squared_weights": {"fit": 12.0}}}}
+        figure = _learning_figure([record], title="Synthetic", manifest=manifest)
+        for axis in figure.axes:
+            self.assertEqual(axis.get_xlabel(), "Optimizer updates")
+            np.testing.assert_array_equal(axis.lines[0].get_xdata(), [0, 3, 7, 8])
+            self.assertLessEqual(axis.get_xlim()[0], 0.0)
+        self.assertTrue(np.isnan(figure.axes[0].lines[0].get_ydata()[0]))
+        np.testing.assert_allclose(figure.axes[1].lines[0].get_ydata(), history["validation_loss"])
+        np.testing.assert_allclose(figure.axes[1].lines[1].get_ydata(), np.log(2.0))
+        np.testing.assert_allclose(figure.axes[1].collections[0].get_offsets(), [[0, 0.6932]])
+        text = "\n".join(item.get_text() for item in figure.texts)
+        self.assertIn("accepted initial NN; no improvement beyond min delta", text)
+        self.assertIn("selected update 0; stop: validation patience", text)
+        self.assertIn("Parameters/member: 173", text)
+        self.assertIn("Fit entries target/reference: 20/30", text)
+        self.assertIn("Fit effective entries (sumw)^2/sumw2 — target: 3", text)
+        self.assertIn("Mean draws per fit event target/reference: 1.5/1", text)
+
+    def test_learning_plot_labels_failed_safeguard_without_claiming_acceptance(self):
+        record = {"slot": 0, "history": {"optimizer_step": [0, 1],
+                  "training_loss": [None, 0.6], "validation_loss": [0.8, 0.9],
+                  "learning_rate": [0.001, 0.001]},
+                  "training_summary": {"within_baseline_tolerance": False,
+                                       "initial_checkpoint_selected": True}}
+        figure = _learning_figure([record], title="Rejected fixture", manifest={})
+        text = "\n".join(item.get_text() for item in figure.texts)
+        self.assertIn("REJECTED: failed constant-baseline safeguard", text)
+        self.assertNotIn("accepted initial NN", text)
+
+    def test_legacy_learning_plot_uses_epochs_without_requiring_training_summary(self):
+        figure = _learning_figure(_ConstantRatio().history, title="Legacy raw", manifest={})
+        for axis in figure.axes:
+            self.assertEqual(axis.get_xlabel(), "Epoch")
+            np.testing.assert_array_equal(axis.lines[0].get_xdata(), [1, 2])
+        np.testing.assert_allclose(figure.axes[1].lines[1].get_ydata(), np.log(2.0))
 
     def test_histogram_preserves_signed_bins_sumw2_and_flow(self):
         values, variance = _histogram(

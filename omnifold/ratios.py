@@ -26,6 +26,7 @@ from BackgroundRemoval.Training import train_background_ratio as training
 
 
 FORMAT_VERSION = 2
+TRAINING_POLICY_VERSION = 1
 MODEL_KIND = "omnifold_density_ratio"
 FEATURE_ORDER = tuple(name.removeprefix("reco_") for name in common.FEATURES)
 MODEL_FEATURE_ORDER = tuple(name.replace("reco_", "") for name in common.MODEL_FEATURES)
@@ -33,16 +34,21 @@ MODEL_FEATURE_ORDER = tuple(name.replace("reco_", "") for name in common.MODEL_F
 
 @dataclass(frozen=True)
 class RatioConfig:
-    """Defaults match the established background-removal ensemble."""
+    """A compact ensemble with validation scheduled in optimizer updates."""
 
     ensemble_size: int = 4
-    hidden_layers: int = 4
-    neurons: int = 1024
-    batch_size: int = 8192
+    hidden_layers: int = 2
+    neurons: int = 64
+    batch_size: int = 512
     maximum_epochs: int = 100
     patience: int = 12
     learning_rate: float = 3.0e-4
     learning_rate_decay: float = 0.98
+    weight_decay: float = 1.0e-4
+    validation_interval_steps: int = 25
+    learning_rate_decay_steps: int = 100
+    validation_min_delta: float = 1.0e-5
+    baseline_tolerance: float = 0.01
     max_retries: int = 3
     seed: int = 19110907
     logit_clip: float = 30.0
@@ -53,7 +59,8 @@ class RatioConfig:
 
     def validate(self) -> None:
         for name in ("ensemble_size", "hidden_layers", "neurons", "batch_size",
-                     "maximum_epochs", "patience", "inference_batch_size"):
+                     "maximum_epochs", "patience", "inference_batch_size",
+                     "validation_interval_steps", "learning_rate_decay_steps"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
@@ -77,6 +84,10 @@ class RatioConfig:
             raise ValueError("learning_rate_decay must lie in (0, 1]")
         if not np.isfinite(self.logit_clip) or not 0.0 < self.logit_clip <= 100.0:
             raise ValueError("logit_clip must lie in (0, 100]")
+        for name in ("weight_decay", "validation_min_delta", "baseline_tolerance"):
+            value = getattr(self, name)
+            if isinstance(value, (bool, np.bool_)) or not np.isfinite(value) or value < 0.0:
+                raise ValueError(f"{name} must be finite and nonnegative")
 
 
 def _device(name: str):
@@ -256,11 +267,17 @@ class RatioEstimator:
             "class_risk": "sum(w * BCE) / sum(w)",
             "sampling": "with_replacement_proportional_to_absolute_weight",
             "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
-            "dropout": 0.0, "weight_decay": 0.0, "optimizer": "NAdam",
+            "dropout": 0.0, "weight_decay": config.weight_decay, "optimizer": "NAdam",
             "learning_rate": config.learning_rate,
-            "learning_rate_schedule": "ExponentialLR", "learning_rate_decay": config.learning_rate_decay,
+            "learning_rate_schedule": "exponential_per_optimizer_step", "learning_rate_decay": config.learning_rate_decay,
+            "learning_rate_schedule_unit": "optimizer_step",
+            "learning_rate_decay_steps": config.learning_rate_decay_steps,
+            "validation_interval_steps": config.validation_interval_steps,
+            "validation_min_delta": config.validation_min_delta,
+            "baseline_tolerance": config.baseline_tolerance,
             "batch_size": config.batch_size, "steps_per_epoch": effective_steps,
             "maximum_epochs": config.maximum_epochs, "early_stopping_patience": config.patience,
+            "early_stopping_unit": "validation_check",
         }
         shared = dict(architecture=architecture, mean=mean, scale=scale, device=device,
                       inference_batch_size=config.inference_batch_size)
@@ -276,8 +293,16 @@ class RatioEstimator:
                 results[slot] = training._train_member(slot, retry_round, cache, **train_kwargs)
         remaining = training._bad_members(results)
         if remaining:
-            raise RuntimeError(f"ensemble slots {remaining} remain discrepant after {config.max_retries} retries")
+            raise RuntimeError(
+                f"ensemble slots {remaining} fail absolute ln(2) + {config.baseline_tolerance:g} "
+                f"or relative validation checks after {config.max_retries} retries"
+            )
         validation = training._predict_split(cache, results, split_code=common.VALIDATION_SPLIT, **shared)
+        ensemble_validation = training._ensemble_validation_summary(
+            validation, cache, logit_clip=config.logit_clip,
+            baseline_tolerance=config.baseline_tolerance,
+            validation_min_delta=config.validation_min_delta,
+        )
         reference_validation = validation["background"]
         reference_weights_validation = reference.weights[reference_validation.indices]
         validation_outputs = _outputs(reference_validation.member_scores, config.logit_clip, yield_ratio)
@@ -317,9 +342,11 @@ class RatioEstimator:
                     "validation_score_std": result.validation_score_std,
                     "validation_saturated_fraction": result.validation_saturated_fraction,
                     "history": result.history,
+                    "training_summary": result.training_summary,
                 })
             manifest = {
                 "format_version": FORMAT_VERSION, "model_kind": MODEL_KIND,
+                "training_policy_version": TRAINING_POLICY_VERSION,
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "feature_order": list(FEATURE_ORDER), "model_features": list(MODEL_FEATURE_ORDER),
                 "architecture": architecture, "config": asdict(config), "toolkit": runtime,
@@ -330,6 +357,7 @@ class RatioEstimator:
                 "scaler": {"mean": mean.tolist(), "scale": scale.tolist(), "weight_measure": "class-balanced absolute fit weights"},
                 "ratio_estimator": dict(common.RAW_RATIO_ESTIMATOR),
                 "validation_metrics": validation_metrics, "closure_metrics": closure_metrics,
+                "ensemble_validation": ensemble_validation,
                 "split_usage": {"fit": "network optimization and feature scaling",
                                 "validation": "early stopping, retries and raw-ratio diagnostics",
                                 "closure": "diagnostics only; full-sample scalar yield ratio is shared"},
@@ -372,6 +400,23 @@ class RatioEstimator:
                                 ("loss_logit_clip", config.logit_clip), ("activation", "SiLU"), ("output", "logit")):
             if architecture.get(field) != expected:
                 raise ValueError(f"ratio artifact architecture mismatch: {field}")
+        if manifest.get("training_policy_version") == TRAINING_POLICY_VERSION:
+            training_fields = {
+                "weight_decay": "weight_decay", "learning_rate": "learning_rate",
+                "learning_rate_decay": "learning_rate_decay",
+                "learning_rate_decay_steps": "learning_rate_decay_steps",
+                "validation_interval_steps": "validation_interval_steps",
+                "validation_min_delta": "validation_min_delta",
+                "baseline_tolerance": "baseline_tolerance", "batch_size": "batch_size",
+                "maximum_epochs": "maximum_epochs", "early_stopping_patience": "patience",
+            }
+            for field, config_field in training_fields.items():
+                if (config_field not in manifest["config"]
+                        or architecture.get(field) != getattr(config, config_field)):
+                    raise ValueError(f"ratio artifact training policy mismatch: {field}")
+            if (architecture.get("learning_rate_schedule_unit") != "optimizer_step"
+                    or architecture.get("early_stopping_unit") != "validation_check"):
+                raise ValueError("ratio artifact training policy has inconsistent schedule units")
         actual_device = _device(device)
         models, seen = [], set()
         for slot, member in enumerate(members):

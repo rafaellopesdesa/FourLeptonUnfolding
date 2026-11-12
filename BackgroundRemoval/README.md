@@ -169,10 +169,11 @@ Both stages use the same defaults:
 
 - four independent ensemble members by default (configurable with
   `--ensemble-size`, with a minimum of four);
-- four hidden layers with 1024 SiLU cells per layer;
+- four hidden layers with 1024 SiLU cells per layer and batch size 8192;
 - signed BCE with logits bounded to `[-logit-clip, +logit-clip]`, NAdam, and
-  exponential learning-rate decay;
-- no dropout, weight decay, or other explicit regularization;
+  learning-rate decay by optimizer update;
+- weight decay `1e-4` on matrix weights only, implemented as coupled L2 in
+  NAdam; biases are not penalized and there is no dropout;
 - deterministic 60% fit, 15% validation, and 25% untouched
   closure splits;
 - arithmetic-mean probability aggregation;
@@ -181,6 +182,56 @@ Both stages use the same defaults:
 - robust retry of a member whose common validation loss is an outlier in
   either direction;
 - validation of the 312 fb$^{-1}$ input metadata.
+
+These background stages retain their larger architecture. OmniFold uses
+smaller defaults for its three signal-to-signal ratio fits: two hidden layers
+of 64 neurons and batch size 512. The features, signed objective, raw-odds
+inference, and training controls are shared; equal architecture is no longer
+assumed for these different tasks.
+
+### Validation and optimization controls
+
+Validation runs before training, after the first optimizer update, and then
+at most every `--validation-interval-steps 25` updates. The interval is reduced
+for a small fit class so validation does not wait for many repeated draws of
+that class: it is the smaller of the requested interval and
+`max(1, ceil(min(N_target_fit, N_reference_fit) / (batch_size // 2)))`, using
+nonzero-weight fit row counts. The final update is also checked.
+`--patience 12` counts validation checks without a loss improvement of at
+least `--validation-min-delta 1e-5`;
+it does not count epochs. The lowest-loss checked NN state is restored even
+if its improvement is smaller than this patience threshold. The initial
+untrained NN is eligible and is explicitly flagged if selected; it is not
+replaced by a synthetic constant classifier.
+
+The initial learning rate is `3e-4`. `--learning-rate-decay 0.98` and
+`--learning-rate-decay-steps 100` express the decay per 100 optimizer updates,
+independent of epoch boundaries. `--maximum-epochs` remains a budget control:
+the update cap is `maximum_epochs * steps_per_epoch`. By default, an epoch
+contains enough balanced minibatches to match the larger fit class's row
+count; `--steps-per-epoch` overrides that number. Changing that budget knob
+does not change the learning rate at a given optimizer update.
+After `t` updates the learning rate is `eta_t = eta_0 * 0.98**(t / 100)`;
+the first update uses `eta_0`.
+
+Each balanced classifier has constant-score BCE `ln(2)`. A member whose best
+unpenalized validation BCE exceeds that value by more than
+`--baseline-tolerance 0.01` is retrained or rejected, in addition to the
+relative ensemble outlier check. Before publication, the actual ensemble mean
+score must also pass this absolute validation BCE threshold. Each member's
+improvement over the constant classifier is recorded; the ensemble emits a
+warning if its mean score does not improve on that baseline. This does not
+force artificial discrimination or substitute a constant model.
+A near-unity ratio can be the correct result. Inspect the validation and
+closure diagnostics to distinguish that case from an unsuccessful fit.
+
+New artifacts record `training_policy_version: 1`, the effective update and
+validation budgets, and each member's validation history and selected
+checkpoint. Reports include stopping reasons, the constant baseline, fit
+counts, and parameter counts when recorded. Earlier epoch-only raw artifacts
+retain their original learning-curve axis. Existing raw-odds artifacts remain
+valid for inference; changing
+these defaults does not alter their stored models or explicit configurations.
 
 Training is chunked through a temporary memory-mapped cache. Use
 `--cache-directory` to place it on node-local scratch; it is removed after the
@@ -235,6 +286,12 @@ weights increase the uncertainty even when they cancel the central value;
 the corresponding effective count is `W_c^2 / Q_c`. Application preserves
 the original signed event weights exactly. This convention is particularly
 important for the signed unit-weight pseudo-data emitted by the merger.
+The expected-event yield `W_c` is not the number of independent training
+examples. Row counts, unique source events, and the weight-based effective
+count describe different things; bootstrap replicas can increase rows without
+adding independent information. Correction keeps exact replicas in the same
+partition. Assess sample size using these quantities rather than interpreting
+a luminosity-scaled yield as a training count.
 
 Each model directory contains `manifest.json`, one checksummed state file per
 ensemble member (four by default), and `diagnostics.pdf`. The PDF reports
@@ -263,9 +320,9 @@ incompatible raw estimator contract. Metadata-free inputs and custom weight
 branches remain accepted, so retain the model/output provenance as well.
 
 Removing post-training corrections does not establish that a network is
-well calibrated. The NN topology, signed loss, and early-stopping defaults
-are unchanged; use the raw reliability and held-out closure diagnostics to
-assess each training.
+well calibrated. Use the raw reliability and held-out closure diagnostics to
+assess each training under the validation controls above; no output correction
+is fitted when a diagnostic fails.
 
 For Correction, the report shows both `(ZZ+ggH)*C` (the density ratio that was
 learned) and `ZZ*C+ggH` (the prescription that is actually applied). This

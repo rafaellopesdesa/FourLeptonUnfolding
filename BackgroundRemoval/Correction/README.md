@@ -85,6 +85,16 @@ mean probability is converted directly to odds. No logistic calibration,
 intercept adjustment, or empirical ratio-normalization multiplier is fitted.
 The physical target/reference yield ratio remains a separate factor.
 
+Correction retains four hidden layers of 1024 neurons and batch size 8192.
+The shared training controls now apply matrix-only NAdam weight decay,
+validation by optimizer update, checkpoint selection with validation-check
+patience, and an absolute `ln(2)` baseline check in addition to the relative
+ensemble filter. See
+[training controls](../README.md#validation-and-optimization-controls) for
+defaults and CLI options. New artifacts record training policy version 1 and
+per-member update/checkpoint histories; earlier raw-odds artifacts remain
+usable for inference.
+
 The artifact contains one checksummed state file per ensemble member (four by
 default, configurable with `--ensemble-size`, with a minimum of four),
 `manifest.json`, and `diagnostics.pdf`. The manifest stores the strict bounds

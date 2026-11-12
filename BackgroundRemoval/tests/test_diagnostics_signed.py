@@ -14,8 +14,10 @@ from BackgroundRemoval.common import FEATURES, MODEL_KIND_BACKGROUND_REMOVAL
 from BackgroundRemoval.Training.diagnostics import (
     _draw_comparison,
     _histogram,
+    _learning_curve_figure,
     _normalize_histogram_statistics,
     _reliability,
+    _training_audit_lines,
     make_diagnostics_pdf,
 )
 
@@ -23,6 +25,56 @@ from BackgroundRemoval.Training.diagnostics import (
 class SignedDiagnosticsTest(unittest.TestCase):
     def tearDown(self):
         plt.close("all")
+
+    def test_learning_curves_include_initial_checkpoint_and_irregular_updates(self):
+        history = {"optimizer_step": [0, 3, 7, 8], "epoch": [0, 0.375, 0.875, 1],
+                   "training_loss": [None, 0.69, 0.64, 0.61],
+                   "validation_loss": [0.6932, 0.694, 0.697, 0.699]}
+        summary = {"selected_optimizer_step": 0, "selected_epoch": 0,
+                   "constant_baseline_loss": np.log(2.0),
+                   "within_baseline_tolerance": True, "improved_over_constant": False,
+                   "initial_checkpoint_selected": True, "stop_reason": "validation_patience"}
+        member = {"slot": 0, "attempt": 0, "seed": 1,
+                  "history": history, "training_summary": summary}
+        figure = _learning_curve_figure([member])
+        axis = figure.axes[0]
+        lines = {line.get_label(): line for line in axis.lines}
+        self.assertEqual(axis.get_xlabel(), "Optimizer updates")
+        np.testing.assert_array_equal(lines["validation"].get_xdata(), [0, 3, 7, 8])
+        np.testing.assert_allclose(lines["validation"].get_ydata(), history["validation_loss"])
+        self.assertTrue(np.isnan(lines["fit batches"].get_ydata()[0]))
+        np.testing.assert_allclose(lines["Constant score 0.5 (ln 2)"].get_ydata(), np.log(2.0))
+        np.testing.assert_array_equal(lines["Selected: 0"].get_xdata(), [0, 0])
+        np.testing.assert_allclose(axis.collections[0].get_offsets(), [[0, 0.6932]])
+        self.assertIn("Accepted initial NN", axis.get_title())
+        self.assertIn("validation patience", axis.get_title())
+
+    def test_legacy_learning_curves_keep_epoch_coordinates(self):
+        member = {"slot": 0, "attempt": 0, "seed": 1,
+                  "history": {"training_loss": [0.7, 0.6], "validation_loss": [0.71, 0.68]}}
+        axis = _learning_curve_figure([member]).axes[0]
+        self.assertEqual(axis.get_xlabel(), "Epoch")
+        np.testing.assert_array_equal(axis.lines[0].get_xdata(), [1, 2])
+        np.testing.assert_array_equal(axis.lines[1].get_xdata(), [1, 2])
+        self.assertEqual(_training_audit_lines({"members": [member]}), [])
+
+    def test_training_audit_distinguishes_failed_safeguard_and_reports_fit_statistics(self):
+        summary = {"within_baseline_tolerance": False, "initial_checkpoint_selected": True,
+                   "trainable_parameters": 173, "weight_decay": 0.001,
+                   "target_fit_entries": 20, "reference_fit_entries": 30,
+                   "target_draws_per_fit_event": 1.5, "reference_draws_per_fit_event": 1.0,
+                   "selected_optimizer_step": 0, "selected_epoch": 0,
+                   "stop_reason": "validation_patience"}
+        manifest = {"members": [{"slot": 0, "training_summary": summary}],
+                    "classes": {"signal": {"split_sum_weights": {"fit": 6.0},
+                                           "split_sum_squared_weights": {"fit": 12.0}}}}
+        text = "\n".join(_training_audit_lines(manifest))
+        self.assertIn("Rejected: failed constant-baseline safeguard", text)
+        self.assertNotIn("Accepted initial NN", text)
+        self.assertIn("Trainable parameters / weight decay: 173 / 0.001", text)
+        self.assertIn("Fit entries target / reference: 20 / 30", text)
+        self.assertIn("Mean draws per fit event target / reference: 1.5 / 1", text)
+        self.assertIn("signal fit effective entries (sumw)^2/sumw2: 3", text)
 
     def test_report_has_one_raw_reliability_curve_without_calibration_metadata(self):
         scores = {"signal": np.array([0.15, 0.35, 0.85]),

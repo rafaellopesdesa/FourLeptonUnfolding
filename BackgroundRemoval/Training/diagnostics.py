@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+import textwrap
 from typing import Any
 
 import hist
@@ -110,6 +111,111 @@ def _model_outputs(predictions: Any, manifest: dict[str, Any]) -> dict[str, np.n
         yield_ratio=float(yield_ratio),
         logit_clip=float(manifest["architecture"]["loss_logit_clip"]),
     )
+
+
+def _learning_coordinates(history: dict[str, Any], size: int) -> tuple[np.ndarray, str]:
+    """Use recorded update counts, retaining epoch-only artifact support."""
+    for key, label in (("optimizer_step", "Optimizer updates"), ("epoch", "Epoch")):
+        values = np.asarray(history.get(key, []), dtype=float)
+        if values.size == size:
+            return values, label
+    return np.arange(1, size + 1), "Epoch"
+
+
+def _checkpoint_status(summary: dict[str, Any]) -> str:
+    if summary.get("within_baseline_tolerance") is False:
+        return "Rejected: failed constant-baseline safeguard"
+    if summary.get("initial_checkpoint_selected"):
+        return "Accepted initial NN; no improvement beyond min delta"
+    if summary.get("improved_over_constant"):
+        return "Accepted NN; improved over constant baseline"
+    if summary.get("within_baseline_tolerance"):
+        return "Accepted NN; within constant-baseline tolerance"
+    return ""
+
+
+def _audit_value(value: Any) -> str:
+    if isinstance(value, int):
+        return f"{value:,d}"
+    return f"{value:.6g}" if isinstance(value, float) else str(value)
+
+
+def _learning_curve_figure(members: list[dict[str, Any]]) -> Any:
+    columns = 2
+    rows = max(1, math.ceil(len(members) / columns))
+    figure, axes = plt.subplots(rows, columns, figsize=(11.0, 4.9 * rows), squeeze=False)
+    for axis, member in zip(axes.flat, members, strict=False):
+        history = member.get("history", {})
+        summary = member.get("training_summary", {})
+        xlabel = "Epoch"
+        for key, label in (("training_loss", "fit batches"), ("validation_loss", "validation")):
+            values = np.asarray(history.get(key, []), dtype=float)
+            if values.size:
+                coordinates, xlabel = _learning_coordinates(history, values.size)
+                axis.plot(coordinates, values, label=label, marker="." if key == "validation_loss" else None)
+        axis.axhline(float(summary.get("constant_baseline_loss", math.log(2.0))),
+                     color="black", linestyle=":", linewidth=1, label="Constant score 0.5 (ln 2)")
+        selected_key = "selected_optimizer_step" if xlabel == "Optimizer updates" else "selected_epoch"
+        if summary.get(selected_key) is not None:
+            axis.axvline(summary[selected_key], color="#b55220", linestyle="--", linewidth=1,
+                         label=f"Selected: {summary[selected_key]:g}")
+            validation_values = np.asarray(history.get("validation_loss", []), dtype=float)
+            validation_coordinates, _ = _learning_coordinates(history, validation_values.size)
+            matches = np.flatnonzero(np.isclose(validation_coordinates, summary[selected_key]))
+            if matches.size:
+                axis.scatter([summary[selected_key]], [validation_values[matches[0]]],
+                             marker="x", color="#b55220", zorder=4, clip_on=False)
+        title = f"Member {member['slot']} (attempt {member['attempt']}, seed {member['seed']})"
+        status = _checkpoint_status(summary)
+        if status:
+            title += f"\n{status}"
+        if summary.get("stop_reason"):
+            title += f"\nStop: {summary['stop_reason'].replace('_', ' ')}"
+        axis.set_title(title, fontsize=10)
+        axis.set_xlabel(xlabel)
+        axis.set_ylabel("Balanced signed BCE")
+        axis.legend(fontsize=8)
+    for axis in axes.flat[len(members):]:
+        axis.set_visible(False)
+    figure.suptitle("Learning curves and member selection", y=1.0)
+    figure.tight_layout()
+    return figure
+
+
+def _training_audit_lines(manifest: dict[str, Any]) -> list[str]:
+    """Optional fit and safeguard metadata; older raw artifacts remain readable."""
+    summaries = [(member, member.get("training_summary", {})) for member in manifest["members"]]
+    if not any(summary for _, summary in summaries):
+        return []
+    lines = ["The selected checkpoint is the actual NN, including update zero.",
+             "A retained initial NN is distinct from a failed baseline safeguard."]
+    classes = manifest.get("classes", {})
+    for name, statistics in classes.items():
+        sumw = statistics.get("split_sum_weights", {}).get("fit")
+        sumw2 = statistics.get("split_sum_squared_weights", {}).get("fit")
+        if sumw is not None and sumw2 is not None and sumw2 > 0.0:
+            lines.append(f"{name} fit effective entries (sumw)^2/sumw2: {sumw * sumw / sumw2:.6g}")
+    for member, summary in summaries:
+        if not summary:
+            continue
+        lines.extend(["", f"Member {member['slot']}: {_checkpoint_status(summary)}"])
+        if "stop_reason" in summary:
+            lines.append(f"  Stop: {summary['stop_reason'].replace('_', ' ')}")
+        for label, keys in (
+            ("Selected update / epoch", ("selected_optimizer_step", "selected_epoch")),
+            ("Completed / planned updates", ("optimizer_steps_completed", "planned_optimizer_steps")),
+            ("Initial / constant validation BCE", ("initial_validation_loss", "constant_baseline_loss")),
+            ("Fit entries target / reference", ("target_fit_entries", "reference_fit_entries")),
+            ("Mean draws per fit event target / reference", ("target_draws_per_fit_event", "reference_draws_per_fit_event")),
+            ("Trainable parameters / weight decay", ("trainable_parameters", "weight_decay")),
+            ("Validation interval effective / requested", ("effective_validation_interval_steps", "requested_validation_interval_steps")),
+            ("Validation min delta / baseline tolerance", ("validation_min_delta", "baseline_tolerance")),
+            ("Epoch updates / LR decay updates", ("epoch_steps", "learning_rate_decay_steps")),
+        ):
+            if any(key in summary for key in keys):
+                values = [_audit_value(summary.get(key, "not recorded")) for key in keys]
+                lines.append(f"  {label}: {' / '.join(values)}")
+    return lines
 
 
 def _reliability(
@@ -451,7 +557,8 @@ def make_diagnostics_pdf(
                 f"Ensemble: {manifest['ensemble']['size']} arithmetic-mean members",
                 (
                     f"Network: {manifest['architecture']['hidden_layers']} x "
-                    f"{manifest['architecture']['neurons']} SiLU; no dropout/weight decay"
+                    f"{manifest['architecture']['neurons']} SiLU; "
+                    f"weight decay={manifest['architecture'].get('weight_decay', 0.0):g}"
                 ),
             ]
         )
@@ -466,25 +573,18 @@ def make_diagnostics_pdf(
         pdf.savefig(figure)
         plt.close(figure)
 
-        members = manifest["members"]
-        columns = 2
-        rows = math.ceil(len(members) / columns)
-        figure, axes = plt.subplots(rows, columns, figsize=(11.0, 4.1 * rows), squeeze=False)
-        for axis, member in zip(axes.flat, members, strict=False):
-            training_loss = member["history"]["training_loss"]
-            validation_loss = member["history"]["validation_loss"]
-            axis.plot(training_loss, label="fit batches")
-            axis.plot(validation_loss, label="validation")
-            axis.set_title(
-                f"Member {member['slot']} (attempt {member['attempt']}, seed {member['seed']})"
-            )
-            axis.set_xlabel("Epoch")
-            axis.set_ylabel("Balanced BCE")
-            axis.legend(fontsize=9)
-        for axis in axes.flat[len(members):]:
-            axis.set_visible(False)
-        figure.suptitle("Learning curves and member selection", y=1.0)
-        figure.tight_layout()
+        audit_lines = _training_audit_lines(manifest)
+        wrapped_lines = [wrapped for line in audit_lines
+                         for wrapped in (textwrap.wrap(line, width=92) or [""])]
+        for start in range(0, len(wrapped_lines), 49):
+            figure = plt.figure(figsize=(8.3, 11.7))
+            figure.suptitle("Training checkpoints and safeguards", fontsize=16, y=0.97)
+            figure.text(0.06, 0.92, "\n".join(wrapped_lines[start:start + 49]),
+                        va="top", fontfamily="DejaVu Sans Mono", fontsize=9)
+            pdf.savefig(figure)
+            plt.close(figure)
+
+        figure = _learning_curve_figure(manifest["members"])
         pdf.savefig(figure)
         plt.close(figure)
 

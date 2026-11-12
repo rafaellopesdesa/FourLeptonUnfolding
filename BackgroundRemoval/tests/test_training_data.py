@@ -65,6 +65,22 @@ class _FakeCorrectionBundle:
 
 
 class TrainingDataTest(unittest.TestCase):
+    def test_background_training_defaults_keep_topology_with_step_validation_controls(self):
+        args = _parser().parse_args([
+            "--gg-h-root", "gg_H.root",
+            "--zz-root", "ZZ.root",
+            "--correction-model-dir", "correction",
+            "--output-dir", "background",
+        ])
+        self.assertEqual(args.hidden_layers, 4)
+        self.assertEqual(args.neurons, 1024)
+        self.assertEqual(args.batch_size, 8192)
+        self.assertEqual(args.weight_decay, 1.0e-4)
+        self.assertEqual(args.validation_interval_steps, 25)
+        self.assertEqual(args.learning_rate_decay_steps, 100)
+        self.assertEqual(args.validation_min_delta, 1.0e-5)
+        self.assertEqual(args.baseline_tolerance, 0.01)
+
     def test_signed_statistics_keep_net_sum_sumw2_and_absolute_sum_distinct(self):
         statistics = WeightedStatistics()
         weights = np.array([2.0, -1.0, 0.5])

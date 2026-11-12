@@ -355,6 +355,131 @@ def _draw_weighted_histogram(axis: Any, values: np.ndarray, weights: np.ndarray,
     axis.legend(fontsize=9)
 
 
+def _learning_coordinates(history: Mapping[str, Any], size: int) -> tuple[np.ndarray, str]:
+    for key, label in (("optimizer_step", "Optimizer updates"), ("epoch", "Epoch")):
+        values = np.asarray(history.get(key, []), dtype=float)
+        if values.size == size:
+            return values, label
+    return np.arange(1, size + 1), "Epoch"
+
+
+def _checkpoint_status(summary: Mapping[str, Any]) -> str:
+    if summary.get("within_baseline_tolerance") is False:
+        return "REJECTED: failed constant-baseline safeguard"
+    if summary.get("initial_checkpoint_selected"):
+        return "accepted initial NN; no improvement beyond min delta"
+    if summary.get("improved_over_constant"):
+        return "accepted NN; improved over constant baseline"
+    if summary.get("within_baseline_tolerance"):
+        return "accepted NN; within constant-baseline tolerance"
+    return ""
+
+
+def _audit_value(value: Any) -> str:
+    if isinstance(value, int):
+        return f"{value:,d}"
+    return f"{value:.6g}" if isinstance(value, float) else str(value)
+
+
+def _learning_summary_lines(records: Sequence[Mapping[str, Any]],
+                            manifest: Mapping[str, Any]) -> list[str]:
+    lines = []
+    summaries = [record.get("training_summary", {}) for record in records]
+    first = next((summary for summary in summaries if summary), {})
+    common_fields = (
+        ("Parameters/member", "trainable_parameters"),
+        ("Fit entries target/reference", ("target_fit_entries", "reference_fit_entries")),
+        ("Weight decay", "weight_decay"),
+        ("LR decay updates", "learning_rate_decay_steps"),
+        ("Validation updates effective/requested", ("effective_validation_interval_steps", "requested_validation_interval_steps")),
+        ("Min delta", "validation_min_delta"),
+        ("Baseline tolerance", "baseline_tolerance"),
+    )
+    details = []
+    for label, keys in common_fields:
+        keys = (keys,) if isinstance(keys, str) else keys
+        if all(key in first for key in keys):
+            values = [_audit_value(first[key]) for key in keys]
+            details.append(f"{label}: {'/'.join(values)}")
+    if details:
+        lines.extend(["; ".join(details[:4]), "; ".join(details[4:])])
+    effective = []
+    for name, statistics in manifest.get("classes", {}).items():
+        sumw = statistics.get("split_sum_weights", {}).get("fit")
+        sumw2 = statistics.get("split_sum_squared_weights", {}).get("fit")
+        if sumw is not None and sumw2 is not None and sumw2 > 0.0:
+            effective.append(f"{name}: {sumw * sumw / sumw2:.6g}")
+    if effective:
+        lines.append("Fit effective entries (sumw)^2/sumw2 — " + "; ".join(effective))
+    for index, (record, summary) in enumerate(zip(records, summaries)):
+        if not summary:
+            continue
+        details = [f"Member {record.get('slot', index)}: {_checkpoint_status(summary)}"]
+        if "selected_optimizer_step" in summary:
+            details.append(f"selected update {summary['selected_optimizer_step']}")
+        if "stop_reason" in summary:
+            details.append(f"stop: {summary['stop_reason'].replace('_', ' ')}")
+        lines.append("; ".join(details))
+        details = []
+        for label, keys in (
+            ("Updates completed/planned", ("optimizer_steps_completed", "planned_optimizer_steps")),
+            ("Mean draws per fit event target/reference", ("target_draws_per_fit_event", "reference_draws_per_fit_event")),
+            ("Initial validation BCE", ("initial_validation_loss",)),
+        ):
+            if all(key in summary for key in keys):
+                details.append(f"{label}: " + "/".join(_audit_value(summary[key]) for key in keys))
+        if details:
+            lines.append("  " + "; ".join(details))
+    return [line for line in lines if line]
+
+
+def _learning_figure(records: Sequence[Mapping[str, Any]], *, title: str,
+                     manifest: Mapping[str, Any]) -> Figure:
+    summary_lines = _learning_summary_lines(records, manifest)
+    text_height = 0.18 * len(summary_lines)
+    height = 4.4 + text_height
+    figure, axes = plt.subplots(1, 3, figsize=(16, height), sharex=True)
+    figure.subplots_adjust(left=0.065, right=0.985, top=1.0 - 0.55 / height,
+                           bottom=(0.65 + text_height) / height, wspace=0.28)
+    selected_label_used = False
+    for index, record in enumerate(records):
+        history = record.get("history", {})
+        summary = record.get("training_summary", {})
+        for axis, key, label in zip(axes, ("training_loss", "validation_loss", "learning_rate"),
+                                   ("Training signed BCE", "Validation signed BCE", "Learning rate")):
+            values = np.asarray(history.get(key, []), dtype=float)
+            if values.size:
+                coordinates, xlabel = _learning_coordinates(history, values.size)
+                line, = axis.plot(coordinates, values, label=f"Member {record.get('slot', index)}",
+                                  marker="." if key == "validation_loss" else None)
+                if key == "validation_loss":
+                    selected_key = "selected_optimizer_step" if xlabel == "Optimizer updates" else "selected_epoch"
+                    selected = summary.get(selected_key)
+                    if selected is not None:
+                        matches = np.flatnonzero(np.isclose(coordinates, selected))
+                        if matches.size:
+                            axis.scatter([selected], [values[matches[0]]], s=65, marker="x",
+                                         color=line.get_color(), zorder=4,
+                                         label=None if selected_label_used else "Selected checkpoint")
+                            selected_label_used = True
+                axis.set_xlabel(xlabel)
+            else:
+                axis.set_xlabel("Epoch")
+            axis.set_ylabel(label)
+            if key == "learning_rate" and values.size and np.all(values > 0):
+                axis.set_yscale("log")
+    # The balanced constant classifier is a reference, never a fitted correction.
+    axes[1].axhline(np.log(2.0), color="black", linestyle=":", linewidth=1,
+                   label="Constant score 0.5 (ln 2)")
+    if axes[0].lines:
+        axes[0].legend(fontsize=8)
+    axes[1].legend(fontsize=8)
+    if summary_lines:
+        figure.text(0.065, 0.04, "\n".join(summary_lines), fontsize=9, va="bottom")
+    figure.suptitle(f"{title} — optimization histories", y=1.0 - 0.12 / height)
+    return figure
+
+
 def plot_ratio_diagnostics(model: Any, target_features: Any, target_weights: Any,
                            reference_features: Any, reference_weights: Any, *,
                            target_splits: Any, reference_splits: Any, title: str = "",
@@ -363,7 +488,8 @@ def plot_ratio_diagnostics(model: Any, target_features: Any, target_weights: Any
     """Return closure, signed reliability, score, ensemble and learning figures.
 
     ``model`` supplies ``predict(features)`` and optionally ``history`` (member
-    records with training_loss/validation_loss/learning_rate histories).  The
+    records with training_loss/validation_loss/learning_rate histories, recorded
+    optimizer_step coordinates and optional training_summary safeguards).  The
     fitted full ratio, including its learned yield convention, is used as-is.
     Held-out target and reference yields are never forced to agree here.
     Use ``shared_events=True`` when both classes reweight the same ordered
@@ -430,23 +556,8 @@ def plot_ratio_diagnostics(model: Any, target_features: Any, target_weights: Any
     if records is None:
         records = getattr(model, "manifest", {}).get("members", [])
     if records and any(record.get("history") for record in records):
-        learning_figure, axes = plt.subplots(1, 3, figsize=(16, 4), layout="constrained")
-        for index, record in enumerate(records):
-            history = record.get("history", {})
-            for axis, key, label in zip(axes, ("training_loss", "validation_loss", "learning_rate"),
-                                       ("Training signed BCE", "Validation signed BCE", "Learning rate")):
-                values = np.asarray(history.get(key, []), dtype=float)
-                if values.size:
-                    axis.plot(np.arange(1, values.size + 1), values,
-                              label=f"Member {record.get('slot', index)}")
-                axis.set_xlabel("Epoch")
-                axis.set_ylabel(label)
-                if key == "learning_rate" and values.size and np.all(values > 0):
-                    axis.set_yscale("log")
-        if axes[0].lines:
-            axes[0].legend(fontsize=8)
-        learning_figure.suptitle(f"{title} — optimization histories")
-        figures["learning"] = learning_figure
+        figures["learning"] = _learning_figure(
+            records, title=title, manifest=getattr(model, "manifest", {}))
     return figures
 
 

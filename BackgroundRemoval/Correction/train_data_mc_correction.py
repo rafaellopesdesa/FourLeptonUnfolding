@@ -46,6 +46,7 @@ from BackgroundRemoval.Training.train_background_ratio import (
     SelectedChunk,
     WeightedStatistics,
     _bad_members,
+    _ensemble_validation_summary,
     _install_artifact,
     _load_cache,
     _predict_split,
@@ -398,6 +399,16 @@ def _validate_args(args: argparse.Namespace) -> tuple[Path, Path, Path, Path, An
         0.0 < args.learning_rate_decay <= 1.0
     ):
         raise ValueError("learning-rate decay must be finite and lie in (0, 1]")
+    if not np.isfinite(args.weight_decay) or args.weight_decay < 0.0:
+        raise ValueError("weight decay must be finite and nonnegative")
+    for name in ("validation_interval_steps", "learning_rate_decay_steps"):
+        value = getattr(args, name)
+        if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
+    if not np.isfinite(args.validation_min_delta) or args.validation_min_delta < 0.0:
+        raise ValueError("validation minimum improvement must be finite and nonnegative")
+    if not np.isfinite(args.baseline_tolerance) or args.baseline_tolerance < 0.0:
+        raise ValueError("baseline tolerance must be finite and nonnegative")
     if args.max_retries < 0:
         raise ValueError("maximum retries cannot be negative")
     maximum_seed = int(np.iinfo(np.uint32).max)
@@ -550,11 +561,21 @@ def train(args: argparse.Namespace) -> Path:
                 "sampling": "with_replacement_proportional_to_absolute_weight",
                 "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
                 "dropout": 0.0,
-                "weight_decay": 0.0,
+                "weight_decay": args.weight_decay,
+                "regularization": "coupled L2 on weight matrices; biases excluded",
                 "optimizer": "NAdam",
                 "learning_rate": args.learning_rate,
-                "learning_rate_schedule": "ExponentialLR",
+                "learning_rate_schedule": "exponential_per_optimizer_step",
                 "learning_rate_decay": args.learning_rate_decay,
+                "learning_rate_decay_steps": args.learning_rate_decay_steps,
+                "validation_interval_steps": args.validation_interval_steps,
+                "validation_interval_policy": (
+                    "min(requested, ceil(smaller nonzero fit class / half batch))"
+                ),
+                "validation_min_delta": args.validation_min_delta,
+                "baseline_tolerance": args.baseline_tolerance,
+                "validation_loss": "unpenalized balanced signed-weight BCE",
+                "checkpoint_policy": "best validation loss including untrained step zero",
                 "batch_size": args.batch_size,
                 "steps_per_epoch": effective_steps_per_epoch,
                 "steps_per_epoch_policy": (
@@ -564,6 +585,7 @@ def train(args: argparse.Namespace) -> Path:
                 ),
                 "maximum_epochs": args.maximum_epochs,
                 "early_stopping_patience": args.patience,
+                "early_stopping_patience_unit": "validation_checks",
             }
 
             results: list[MemberResult] = []
@@ -590,7 +612,8 @@ def train(args: argparse.Namespace) -> Path:
                 if not bad:
                     break
                 print(
-                    f"Retrying discrepant ensemble slots {bad} (round {retry_round})...",
+                    f"Retrying ensemble slots {bad} that failed baseline or "
+                    f"ensemble-quality checks (round {retry_round})...",
                     flush=True,
                 )
                 for index in bad:
@@ -612,7 +635,8 @@ def train(args: argparse.Namespace) -> Path:
             remaining_bad = _bad_members(results)
             if remaining_bad:
                 raise RuntimeError(
-                    f"ensemble slots {remaining_bad} remain discrepant after "
+                    f"ensemble slots {remaining_bad} fail baseline or "
+                    f"ensemble-quality checks after "
                     f"{args.max_retries} retries"
                 )
 
@@ -625,6 +649,13 @@ def train(args: argparse.Namespace) -> Path:
                 scale=scaler_scale,
                 device=device,
                 inference_batch_size=args.inference_batch_size,
+            )
+            ensemble_validation = _ensemble_validation_summary(
+                validation,
+                cache,
+                logit_clip=args.logit_clip,
+                baseline_tolerance=args.baseline_tolerance,
+                validation_min_delta=args.validation_min_delta,
             )
             closure = _predict_split(
                 cache,
@@ -656,11 +687,13 @@ def train(args: argparse.Namespace) -> Path:
                             result.validation_saturated_fraction
                         ),
                         "history": result.history,
+                        "training_summary": result.training_summary,
                     }
                 )
 
             manifest: dict[str, Any] = {
                 "format_version": ARTIFACT_FORMAT_VERSION,
+                "training_policy_version": 1,
                 "model_kind": MODEL_KIND_DATA_MC_CORRECTION,
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "tree_name": TREE_NAME,
@@ -764,11 +797,14 @@ def train(args: argparse.Namespace) -> Path:
                     "size": len(results),
                     "minimum_size": 4,
                     "outlier_rule": (
-                        "validation loss is nonfinite, or differs from the median by "
+                        "validation loss is nonfinite, exceeds log(2) plus "
+                        "baseline_tolerance, or differs from the median by "
                         "both >5% and >5 MAD"
                     ),
+                    "baseline_tolerance": args.baseline_tolerance,
                     "maximum_retries_per_slot": args.max_retries,
                 },
+                "ensemble_validation": ensemble_validation,
                 "members": member_entries,
                 "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                 "toolkit": {
@@ -835,9 +871,20 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--neurons", type=int, default=1024)
     parser.add_argument("--batch-size", type=int, default=8192)
     parser.add_argument("--maximum-epochs", type=int, default=100)
-    parser.add_argument("--patience", type=int, default=12)
+    parser.add_argument("--patience", type=int, default=12,
+                        help="Validation checks without a meaningful improvement")
     parser.add_argument("--learning-rate", type=float, default=3.0e-4)
     parser.add_argument("--learning-rate-decay", type=float, default=0.98)
+    parser.add_argument("--weight-decay", type=float, default=1.0e-4,
+                        help="Coupled L2 on weight matrices; validation uses unpenalized signed BCE")
+    parser.add_argument("--validation-interval-steps", type=int, default=25,
+                        help="Maximum optimizer steps between validation checks")
+    parser.add_argument("--learning-rate-decay-steps", type=int, default=100,
+                        help="Optimizer steps per learning-rate decay factor")
+    parser.add_argument("--validation-min-delta", type=float, default=1.0e-5,
+                        help="Minimum validation improvement that resets patience")
+    parser.add_argument("--baseline-tolerance", type=float, default=0.01,
+                        help="Maximum accepted validation BCE excess above log(2)")
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--split-seed", type=int, default=DEFAULT_SEED + 1)

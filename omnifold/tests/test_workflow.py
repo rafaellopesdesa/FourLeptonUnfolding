@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 import tempfile
@@ -11,7 +12,7 @@ from unittest.mock import patch
 import numpy as np
 import uproot
 
-from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, TREE_NAME
+from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, TREE_NAME, sha256_file
 from omnifold.workflow import OmniFoldSession, TRUTH_FEATURES
 
 
@@ -36,6 +37,7 @@ class _HistogramRatio:
             "target_splits": np.array(target_splits, copy=True),
             "reference_splits": np.array(reference_splits, copy=True),
             "metadata": dict(metadata),
+            "config": asdict(config),
         }
         cls.calls.append(call)
         if metadata["stage"] == cls.fail_stage:
@@ -381,6 +383,49 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(_HistogramRatio.calls, [])
         path.write_text(json.dumps(original))
         self.assertEqual(OmniFoldSession.load(session.run_dir).manifest["ratio_estimator"], original["ratio_estimator"])
+
+    def test_shared_compact_config_reaches_all_three_stages(self):
+        session = self.create()
+        self.assertEqual(session.manifest["training_policy_version"], 1)
+        session.step()
+        for call in _HistogramRatio.calls:
+            config = call["config"]
+            self.assertEqual((config["hidden_layers"], config["neurons"], config["batch_size"]), (2, 64, 512))
+            self.assertEqual(config["weight_decay"], 1e-4)
+            self.assertEqual(config["validation_interval_steps"], 25)
+            self.assertEqual(config["baseline_tolerance"], .01)
+
+    def test_previous_raw_training_policy_allows_inference_but_requires_new_campaign(self):
+        session = self.create()
+        result = session.step()
+        expected_history = session.history()
+        expected_likelihood = session.evaluate_likelihood()
+        path = session.run_dir / "session.json"
+        manifest = json.loads(path.read_text())
+        manifest.pop("training_policy_version")
+        for name in ("weight_decay", "validation_interval_steps", "learning_rate_decay_steps",
+                     "validation_min_delta", "baseline_tolerance"):
+            manifest["config"].pop(name)
+        path.write_text(json.dumps(manifest))
+        record_path = result.root / "iteration.json"
+        record = json.loads(record_path.read_text())
+        record["session_sha256"] = sha256_file(path)
+        record_path.write_text(json.dumps(record))
+        restored = OmniFoldSession.load(session.run_dir)
+        self.assertEqual(restored.history(), expected_history)
+        self.assertEqual(restored.evaluate_likelihood(), expected_likelihood)
+        with self.assertRaisesRegex(ValueError, "start a new campaign"):
+            restored.step()
+        self.assertEqual(len(_HistogramRatio.calls), 3)
+        self.assertFalse((session.run_dir / ".training.lock").exists())
+
+    def test_live_training_policy_changes_require_new_campaign(self):
+        session = self.create()
+        session.config = replace(session.config, weight_decay=0.0)
+        with self.assertRaisesRegex(ValueError, "Training settings changed"):
+            session.step()
+        self.assertEqual(_HistogramRatio.calls, [])
+        self.assertFalse((session.run_dir / ".training.lock").exists())
 
     def test_closure_cannot_use_selected_mixed_data_as_truth(self):
         data, mc, _, _ = _inputs(self.root)

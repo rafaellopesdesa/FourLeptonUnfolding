@@ -23,7 +23,7 @@ from BackgroundRemoval.common import (
     ANALYSIS_MASS_WINDOW, FEATURES, TREE_NAME, RAW_RATIO_ESTIMATOR, capture_file_provenance,
     assert_file_unchanged, deterministic_split, row_fingerprint_ids, sha256_file,
 )
-from .ratios import RatioConfig, RatioEstimator
+from .ratios import TRAINING_POLICY_VERSION, RatioConfig, RatioEstimator
 from .inputs import validate_background_weight_metadata
 
 TRUTH_FEATURES = tuple(name.replace("reco_", "truth_", 1) for name in FEATURES)
@@ -220,6 +220,7 @@ class OmniFoldSession:
             if inputs["truth"]["path"] in {inputs["data"]["path"], inputs["mc"]["path"]}:
                 raise ValueError("Closure requires a separate full signal-only Herwig sample")
         manifest = {"format_version": FORMAT_VERSION, "kind": "omnifold_session",
+                    "training_policy_version": TRAINING_POLICY_VERSION,
                     "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                     "created_utc": datetime.now(timezone.utc).isoformat(), "inputs": inputs,
                     "config": asdict(config), "features_reco": list(FEATURES),
@@ -255,6 +256,7 @@ class OmniFoldSession:
         if manifest.get("ratio_estimator") != RAW_RATIO_ESTIMATOR or "calibration" in manifest:
             raise ValueError("OmniFold session must use raw NN odds without calibration or empirical normalization")
         config = RatioConfig(**manifest["config"])
+        config.validate()
         if device is not None:
             config = replace(config, device=device)
         session = cls(run_dir, manifest, config)
@@ -302,6 +304,15 @@ class OmniFoldSession:
 
     def step(self) -> IterationResult:
         """Train and commit exactly one iteration; previous truth weights are replaced."""
+        if self.manifest.get("training_policy_version") != TRAINING_POLICY_VERSION:
+            raise ValueError(
+                "This raw-odds campaign uses an earlier or unsupported training policy. "
+                "Existing iterations remain available for inference and reports; start a new "
+                "campaign in a new run directory to train with the current policy."
+            )
+        saved_config = RatioConfig(**self.manifest["config"])
+        if replace(self.config, device=saved_config.device) != saved_config:
+            raise ValueError("Training settings changed; start a new campaign to change its training policy")
         # A kernel restart/concurrent notebook must never overwrite another run.
         index = len(self.iterations) + 1
         destination = self.run_dir / "iterations" / f"iteration_{index:04d}"
