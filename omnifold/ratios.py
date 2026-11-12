@@ -1,7 +1,8 @@
-"""Calibrated target/reference density ratios for either OmniFold level.
+"""Raw neural-network target/reference ratios for either OmniFold level.
 
-The neural training and signed-weight calibration are shared with the existing
-background-removal workflow.  Artifacts here have a generic ratio contract:
+Signed-weight training is shared with the background-removal workflow.
+Scores receive no fitted calibration or empirical ratio normalization.
+Artifacts here have a generic ratio contract:
 ``full_ratio = yield_ratio * shape_ratio``.  No purity factor is introduced.
 """
 
@@ -24,7 +25,7 @@ from BackgroundRemoval import common
 from BackgroundRemoval.Training import train_background_ratio as training
 
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 MODEL_KIND = "omnifold_density_ratio"
 FEATURE_ORDER = tuple(name.removeprefix("reco_") for name in common.FEATURES)
 MODEL_FEATURE_ORDER = tuple(name.replace("reco_", "") for name in common.MODEL_FEATURES)
@@ -45,8 +46,6 @@ class RatioConfig:
     max_retries: int = 3
     seed: int = 19110907
     logit_clip: float = 30.0
-    calibration_scale_min: float = 0.1
-    calibration_scale_max: float = 5.0
     inference_batch_size: int = 65536
     steps_per_epoch: int | None = None
     device: str = "auto"
@@ -78,12 +77,6 @@ class RatioConfig:
             raise ValueError("learning_rate_decay must lie in (0, 1]")
         if not np.isfinite(self.logit_clip) or not 0.0 < self.logit_clip <= 100.0:
             raise ValueError("logit_clip must lie in (0, 100]")
-        if not (
-            np.isfinite(self.calibration_scale_min)
-            and np.isfinite(self.calibration_scale_max)
-            and 0.0 < self.calibration_scale_min <= 1.0 <= self.calibration_scale_max
-        ):
-            raise ValueError("calibration scale bounds must be finite, positive and contain one")
 
 
 def _device(name: str):
@@ -158,33 +151,29 @@ def _scaler(cache):
     return mean, scale
 
 
-def _outputs(member_scores, calibration, yield_ratio):
-    scores = np.asarray(member_scores, dtype=np.float64)
-    raw = np.mean(scores, axis=1, dtype=np.float64)
-    bound = float(calibration["logit_clip"])
-    log_ratio = np.clip(
-        float(calibration["scale"]) * common.stable_logit(raw, logit_clip=bound)
-        + float(calibration["bias"]), -bound, bound,
+def _outputs(member_scores, logit_clip, yield_ratio):
+    """Use the raw ensemble odds, with only numerical logit protection."""
+    outputs = common.ratio_outputs(
+        member_scores, yield_ratio=yield_ratio, logit_clip=logit_clip,
     )
-    shape = np.exp(log_ratio)
-    # Do not clip the physical ratio: the event yield is a separate factor.
-    full = float(yield_ratio) * shape
-    if not np.all(np.isfinite(full)):
-        raise RuntimeError("full density ratio is not finite")
     return {
-        "shape_ratio": shape,
-        "full_ratio": full,
-        "score_raw": raw,
-        "score_calibrated": common.stable_sigmoid(log_ratio),
-        "ensemble_std": np.std(scores, axis=1),
+        "shape_ratio": outputs["shape_ratio"],
+        "full_ratio": outputs["physical_ratio"],
+        "score_raw": outputs["raw_score"],
+        "ensemble_std": outputs["signal_score_ensemble_std"],
     }
 
 
 def _read_manifest(path: Path) -> dict[str, Any]:
     with (path / "manifest.json").open(encoding="utf-8") as stream:
         result = json.load(stream)
+    if result.get("model_kind") == MODEL_KIND and result.get("format_version") == 1:
+        raise ValueError("Legacy calibrated OmniFold ratio artifact; retrain in a new campaign "
+                         "to use raw NN odds without calibration corrections")
     if result.get("model_kind") != MODEL_KIND or result.get("format_version") != FORMAT_VERSION:
         raise ValueError(f"not a supported OmniFold ratio artifact: {path}")
+    if result.get("ratio_estimator") != common.RAW_RATIO_ESTIMATOR or "calibration" in result:
+        raise ValueError("ratio artifact must declare raw NN odds without calibration or empirical normalization")
     return result
 
 
@@ -211,7 +200,7 @@ def _publish(staging: Path, destination: Path, overwrite: bool):
 
 
 class RatioEstimator:
-    """A persisted, calibrated ensemble with an explicit physical yield ratio."""
+    """A persisted raw-score ensemble with an explicit physical yield ratio."""
 
     def __init__(self, root, manifest, models, device):
         self.root = Path(root)
@@ -226,7 +215,7 @@ class RatioEstimator:
     @classmethod
     def fit(cls, target_features, target_weights, reference_features, reference_weights, *,
             target_splits, reference_splits, output_dir, config: RatioConfig, metadata=None):
-        """Fit on split 0, calibrate/normalize on split 1, report split 2.
+        """Fit on split 0, validate on split 1, report split 2.
 
         The caller owns event identity and supplies stable split codes.  When
         target and reference are the same ordered events (the truth update),
@@ -289,32 +278,21 @@ class RatioEstimator:
         if remaining:
             raise RuntimeError(f"ensemble slots {remaining} remain discrepant after {config.max_retries} retries")
         validation = training._predict_split(cache, results, split_code=common.VALIDATION_SPLIT, **shared)
-        scores, labels, weights = training._balanced_calibration_arrays(validation, cache)
-        calibration_scale, original_bias = training.fit_logit_calibrator(
-            scores, labels, weights, logit_clip=config.logit_clip,
-            minimum_scale=config.calibration_scale_min, maximum_scale=config.calibration_scale_max,
-        )
         reference_validation = validation["background"]
         reference_weights_validation = reference.weights[reference_validation.indices]
-        bias, before = training._normalization_bias(
-            reference_validation.ensemble_score, reference_weights_validation,
-            scale=calibration_scale, initial_bias=original_bias, logit_clip=config.logit_clip,
-        )
-        calibration = {
-            "scale": calibration_scale, "bias": bias,
-            "bias_before_normalization": original_bias, "logit_clip": config.logit_clip,
-            "reference_shape_mean_before_normalization": before,
-            "reference_shape_mean_after_normalization": 1.0, "split": "validation",
+        validation_outputs = _outputs(reference_validation.member_scores, config.logit_clip, yield_ratio)
+        # These are diagnostics, not fitted corrections. Departures from one
+        # remain visible and do not rescale the learned ratio.
+        validation_metrics = {
+            "reference_shape_mean": float(np.sum(reference_weights_validation * validation_outputs["shape_ratio"])
+                                          / np.sum(reference_weights_validation)),
+            "reference_full_ratio_weighted_sum": float(np.sum(reference_weights_validation * validation_outputs["full_ratio"])),
+            "target_sum_weights": float(np.sum(target.weights[validation["signal"].indices])),
+            "uses_full_sample_yield_ratio": True,
         }
-        normalized = _outputs(reference_validation.member_scores, calibration, yield_ratio)["shape_ratio"]
-        checked_mean = float(np.sum(reference_weights_validation * normalized, dtype=np.float64)
-                             / np.sum(reference_weights_validation, dtype=np.float64))
-        if not np.isclose(checked_mean, 1.0, rtol=1.0e-9, atol=1.0e-11):
-            raise RuntimeError("serialized inference rule does not preserve validation ratio normalization")
-        calibration["reference_shape_mean_after_normalization"] = checked_mean
         closure = training._predict_split(cache, results, split_code=common.CLOSURE_SPLIT, **shared)
         closure_reference_weights = reference.weights[closure["background"].indices]
-        closure_outputs = _outputs(closure["background"].member_scores, calibration, yield_ratio)
+        closure_outputs = _outputs(closure["background"].member_scores, config.logit_clip, yield_ratio)
         closure_metrics = {
             "reference_shape_mean": float(np.sum(closure_reference_weights * closure_outputs["shape_ratio"])
                                           / np.sum(closure_reference_weights)),
@@ -322,7 +300,7 @@ class RatioEstimator:
             "target_sum_weights": float(np.sum(target.weights[closure["signal"].indices])),
             "uses_full_sample_yield_ratio": True,
         }
-        # Training and calibration finish before opening the publication stage;
+        # Training and diagnostics finish before opening the publication stage;
         # a failed run cannot modify an existing artifact.
         destination.parent.mkdir(parents=True, exist_ok=True)
         staging = Path(tempfile.mkdtemp(prefix=f".{destination.name}.training-", dir=destination.parent))
@@ -350,9 +328,10 @@ class RatioEstimator:
                 "ratio_definition": "full_ratio = yield_ratio * shape_ratio",
                 "ensemble_aggregation": "arithmetic_mean_of_member_probabilities",
                 "scaler": {"mean": mean.tolist(), "scale": scale.tolist(), "weight_measure": "class-balanced absolute fit weights"},
-                "calibration": calibration, "closure_metrics": closure_metrics,
+                "ratio_estimator": dict(common.RAW_RATIO_ESTIMATOR),
+                "validation_metrics": validation_metrics, "closure_metrics": closure_metrics,
                 "split_usage": {"fit": "network optimization and feature scaling",
-                                "validation": "early stopping, retries, calibration and shape normalization",
+                                "validation": "early stopping, retries and raw-ratio diagnostics",
                                 "closure": "diagnostics only; full-sample scalar yield ratio is shared"},
                 "members": members, "metadata": metadata,
             }
@@ -386,11 +365,8 @@ class RatioEstimator:
         if (mean.shape != (len(MODEL_FEATURE_ORDER),) or scale.shape != mean.shape
                 or not np.all(np.isfinite(mean)) or not np.all(np.isfinite(scale)) or np.any(scale <= 0.0)):
             raise ValueError("ratio artifact scaler is invalid")
-        calibration = manifest["calibration"]
-        if (not np.isfinite(calibration["scale"]) or calibration["scale"] <= 0.0
-                or not np.isfinite(calibration["bias"]) or calibration["logit_clip"] != config.logit_clip
-                or not np.isfinite(manifest["yield_ratio"]) or manifest["yield_ratio"] <= 0.0):
-            raise ValueError("ratio artifact calibration/yield contract is invalid")
+        if not np.isfinite(manifest["yield_ratio"]) or manifest["yield_ratio"] <= 0.0:
+            raise ValueError("ratio artifact yield contract is invalid")
         architecture = manifest["architecture"]
         for field, expected in (("hidden_layers", config.hidden_layers), ("neurons", config.neurons),
                                 ("loss_logit_clip", config.logit_clip), ("activation", "SiLU"), ("output", "logit")):
@@ -452,4 +428,4 @@ class RatioEstimator:
                 model.cpu()
         if not np.all(np.isfinite(scores)):
             raise RuntimeError("ratio model predictions are not finite")
-        return _outputs(scores, self.manifest["calibration"], self.yield_ratio)
+        return _outputs(scores, bound, self.yield_ratio)

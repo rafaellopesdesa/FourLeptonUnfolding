@@ -1,4 +1,4 @@
-"""Three calibrated ratios per iteration, with a fixed original MC reference.
+"""Three raw neural-network ratios per iteration, with a fixed original MC reference.
 
 The truth push is fitted on reconstructed fiducial MC, then applied to every
 fiducial MC event. Its target/reference selection efficiencies cancel at fixed
@@ -20,13 +20,14 @@ import numpy as np
 import uproot
 
 from BackgroundRemoval.common import (
-    ANALYSIS_MASS_WINDOW, FEATURES, TREE_NAME, capture_file_provenance,
+    ANALYSIS_MASS_WINDOW, FEATURES, TREE_NAME, RAW_RATIO_ESTIMATOR, capture_file_provenance,
     assert_file_unchanged, deterministic_split, row_fingerprint_ids, sha256_file,
 )
 from .ratios import RatioConfig, RatioEstimator
+from .inputs import validate_background_weight_metadata
 
 TRUTH_FEATURES = tuple(name.replace("reco_", "truth_", 1) for name in FEATURES)
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 
 def _json_write(path: Path, payload: dict[str, Any]) -> None:
@@ -84,6 +85,7 @@ def _read_sample(path: Path, *, kind: str, weight_branch: str, seed: int,
         missing = required - available
         if missing:
             raise KeyError(f"{path} is missing {sorted(missing)}")
+        validate_background_weight_metadata(root_file, weight_branch=weight_branch, path=path)
         if "luminosity_fb" in available:
             required.add("luminosity_fb")
         for raw_arrays in tree.iterate(sorted(required), step_size=step_size, library="np", how=dict):
@@ -218,6 +220,7 @@ class OmniFoldSession:
             if inputs["truth"]["path"] in {inputs["data"]["path"], inputs["mc"]["path"]}:
                 raise ValueError("Closure requires a separate full signal-only Herwig sample")
         manifest = {"format_version": FORMAT_VERSION, "kind": "omnifold_session",
+                    "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                     "created_utc": datetime.now(timezone.utc).isoformat(), "inputs": inputs,
                     "config": asdict(config), "features_reco": list(FEATURES),
                     "features_truth": list(TRUTH_FEATURES),
@@ -244,8 +247,13 @@ class OmniFoldSession:
         run_dir = Path(run_dir).expanduser().resolve()
         with (run_dir / "session.json").open(encoding="utf-8") as stream:
             manifest = json.load(stream)
+        if manifest.get("kind") == "omnifold_session" and manifest.get("format_version") == 1:
+            raise ValueError("Legacy calibrated OmniFold campaign cannot be resumed with raw NN odds; "
+                             "retrain from the first iteration in a new run directory")
         if manifest.get("kind") != "omnifold_session" or manifest.get("format_version") != FORMAT_VERSION:
             raise ValueError("Unsupported OmniFold session")
+        if manifest.get("ratio_estimator") != RAW_RATIO_ESTIMATOR or "calibration" in manifest:
+            raise ValueError("OmniFold session must use raw NN odds without calibration or empirical normalization")
         config = RatioConfig(**manifest["config"])
         if device is not None:
             config = replace(config, device=device)

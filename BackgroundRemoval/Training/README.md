@@ -29,7 +29,7 @@ pixi run --locked --manifest-path BackgroundRemoval/pixi.toml train \
 Training defaults to `weight_nominal_pb`. Because the inputs share the same
 luminosity, its yield ratio is equivalent to using the luminosity-scaled
 `weight` branch. Finite negative base weights are retained and enter the BCE,
-yield totals, calibration, and closure diagnostics with their original sign.
+yield totals and closure diagnostics with their original sign.
 The Correction factor multiplying `ZZ` must remain finite and positive; it
 does not replace or erase the sign of the underlying `ZZ` event weight.
 
@@ -43,19 +43,18 @@ Fit events are sampled with probability proportional to `abs(weight)` and
 receive the corresponding signed importance coefficient. This is an unbiased
 minibatch estimator of `sum(w * BCE)/sum(w)`, not an absolute-weight loss.
 Only the numerical input scaler uses class-balanced absolute-weight moments;
-calibration, ratios, yields, and closure central values remain signed.
-Affine-logit calibration uses deterministic starts spanning its bounded
-parameter box and keeps the converged solution with the lowest signed BCE;
-this prevents a stationary saddle from being mistaken for a calibrated fit.
+yield and closure central values remain signed.
 The BCE is evaluated after bounding network logits by `--logit-clip`. This
 bounds the signed empirical objective without modifying any event weight.
-The final shape normalization is accepted only when its signed reference
-moment is positive, numerically stable, and achievable by one common
-multiplier without output clipping.
+The density ratio is the direct odds of the ensemble mean probability. It is
+multiplied only by the physical target/reference yield ratio before conversion
+to signal purity. No logistic calibration or empirical ratio normalization is
+fitted. Raw-score reliability and ratio-normalization checks remain diagnostics;
+a failed check is not repaired by an output correction.
 
 More precisely, the default Correction branch `weight` and Training branch
 `weight_nominal_pb` differ only by the common `312000 pb^-1` factor written by
-the merger. That factor cancels in both calibrated ratios, so this pair is
+the merger. That factor cancels in both density ratios, so this pair is
 known-compatible and needs no override. Any custom or unknown branch pairing,
 including two same-named custom branches, is accepted only with
 `--allow-weight-measure-mismatch` after its normalization semantics have been
@@ -72,11 +71,16 @@ intentional workflow whose files cannot remain byte-stable.
 The output contains one checksummed state file per ensemble member (four by
 default, configurable with `--ensemble-size`, with a minimum of four),
 `manifest.json`, and `diagnostics.pdf`. The manifest records the strict
-analysis window, class and component yields, feature order, calibration, input
-provenance, and the exact Correction-manifest SHA-256. The PDF uses the
-untouched closure split for learned-shape and calibration tests in every model
-variable. The scalar yield factor is intentionally computed from the full
-selected totals, so the absolute-yield closure shares that one scalar input.
+analysis window, class and component yields, feature order, the raw-odds
+inference contract, input provenance, and the exact Correction-manifest SHA-256.
+The PDF uses the untouched closure split for learned-shape tests in every
+model variable and raw-score reliability. Validation is used for early stopping
+and ensemble retries, with no fitted output correction. The scalar yield factor
+is intentionally computed from the full selected totals, so the absolute-yield closure shares that one scalar input.
+
+New models use artifact format 4. Older calibrated models are rejected; train
+this stage with a newly trained raw-odds Correction and then redecorate the
+original merged inputs. Keep earlier artifacts and outputs in separate directories.
 
 An existing output directory is rejected unless `--overwrite` is supplied.
 For safety, overwrite is limited to a recognized background-removal artifact

@@ -49,8 +49,8 @@ truth variables never enter data-to-MC training or choose an iteration.
 
 Let $w_i^0$ be the original MC event weight, $T_0(z)=1$, and $A$ denote MC
 events passing both the fiducial and detector selections. Every fitted ratio
-has a shape part $r=p_{\mathrm{target}}/p_{\mathrm{reference}}$ and a yield
-part $K=\sum w_{\mathrm{target}}/\sum w_{\mathrm{reference}}$; its full
+has a shape part $r$ estimating $p_{\mathrm{target}}/p_{\mathrm{reference}}$
+and a yield part $K=\sum w_{\mathrm{target}}/\sum w_{\mathrm{reference}}$; its full
 intensity ratio is $R=Kr$. Both sums retain negative event weights.
 
 For iteration $n$:
@@ -79,31 +79,46 @@ unobserved truth region with zero selection efficiency cannot be constrained
 by these data. Dependence on omitted response variables, including production
 kinematics, should be checked with closure tests.
 
-## Network, calibration, and diagnostics
+## Network and raw-score diagnostics
 
 `RatioConfig` defaults match BackgroundRemoval: four hidden layers of 1024
 neurons with swish activation, the pinned NSBI toolkit
 `DensityRatioLightning` model, four ensemble members, NAdam, batch size 8192,
 initial learning rate $3\times10^{-4}$ with exponential factor 0.98,
 100 maximum epochs, and patience 12. Logits are bounded at 30. The same
-signed BCE, ensemble checks, affine-logit calibration, and shape-preserving
-normalization procedure are reused.
+signed BCE and ensemble checks are reused. The shape ratio is computed
+from the raw mean probability of the ensemble:
 
-Negative weights remain signed in the loss, calibration, physical yields,
+$$
+s(x)=\frac{1}{M}\sum_{m=1}^{M}s_m(x),\qquad
+r(x)=\frac{s(x)}{1-s(x)},\qquad R(x)=K\,r(x).
+$$
+
+Numerical logit bounds remain in place. There is no fitted logistic or
+temperature calibration, intercept adjustment, or empirical multiplier forcing
+$\langle r\rangle_{\mathrm{reference}}=1$. The physical yield factor $K$
+is retained. The empirical ratio mean and raw-score reliability are measured
+as diagnostics; training must produce a reliable density-ratio estimate.
+Consequently, finite-sample reweighted yields need not match the target exactly.
+Removing post-training corrections does not itself fix overfitting: the
+architecture, loss, and early-stopping defaults are unchanged.
+
+Negative weights remain signed in the loss, physical yields,
 and diagnostics. Absolute weights are used only for the stable input scaler
 and importance-sampling proposal. A finite positive net yield is required
 for each normalized class/split. Statistical variances use $\sum w^2$.
 
-Fit, validation/calibration, and closure partitions are kept fixed across
-iterations. Copies of a source event in the target and reference must share
-their partition. The validation partition calibrates each ratio; the closure
-partition supplies its reweighting and calibration diagnostics. This local
+Fit, validation, and closure partitions are kept fixed across iterations.
+Copies of a source event in the target and reference must share their partition.
+Validation controls early stopping and ensemble retries. The closure partition
+supplies reweighting and raw-score reliability diagnostics; no output correction
+is fitted on either held-out partition. This local
 closure split is a diagnostic of that ratio fit, not an independent dataset
 for estimating the statistical uncertainty of the entire adaptive unfolding.
 
-The notebook and CLI reports expose learning curves, calibration, ensemble
-spread, and per-variable weighted closure for each stage. Reconstructed and
-truth comparison figures show absolute expected-event yields by default;
+The notebook and CLI reports expose learning curves, one raw-score reliability
+panel per ratio, ensemble spread, and per-variable weighted closure for each
+stage. Reconstructed and truth comparison figures show absolute expected-event yields by default;
 set notebook `SHAPE_ONLY=True` or CLI `--shape-only` for normalized
 comparisons. This plotting option does not change training or fitted yield
 ratios. The Herwig truth curve is an independent diagnostic target, not a
@@ -203,7 +218,6 @@ Training options are the hyphenated `RatioConfig` names, except that model
 overwrite is not exposed: `--ensemble-size`, `--hidden-layers`, `--neurons`,
 `--batch-size`, `--maximum-epochs`, `--patience`, `--learning-rate`,
 `--learning-rate-decay`, `--max-retries`, `--seed`, `--logit-clip`,
-`--calibration-scale-min`, `--calibration-scale-max`,
 `--inference-batch-size`, `--steps-per-epoch`, and `--device`.
 `--seed` controls the ratio-model randomness; `--split-seed` separately
 controls the fixed data partitions. `--data-weight-branch`,
@@ -293,10 +307,37 @@ The statistical limitations of these weighted objectives are discussed below.
    override can be passed as `device="cpu"` or `device="cuda"`.
 6. Run the export cell when the desired iteration sequence is complete.
 
-The same resume instructions apply to a campaign created with the CLI.
-Conversely, `python -m omnifold resume --run-dir RUN_DIR --iterations N`
-continues a notebook-created campaign. No conversion or copied model files
+The same resume instructions apply to a campaign created with the CLI using
+this raw-odds artifact format. Conversely,
+`python -m omnifold resume --run-dir RUN_DIR --iterations N` continues a notebook-created campaign. No conversion or copied model files
 are needed.
+
+### Moving from calibrated campaigns
+
+New ratio artifacts use format 2 and new sessions use format 2, with an explicit
+raw-ensemble-odds contract. Legacy calibrated ratio artifacts and format-1
+sessions are rejected with a retraining message. Their cumulative weights were
+computed using the old corrections, so removing those corrections cannot be
+done by resuming that sequence or changing its manifest.
+
+Start a fresh run directory. For the entire chain to use raw NN outputs,
+retrain BackgroundRemoval Correction and Training (new artifact format 4),
+redecorate the original merged inputs, and use those new files for OmniFold.
+Keep old campaigns and outputs separately for comparison. A pre-existing ROOT
+weight branch can still contain a legacy correction; its values alone cannot
+reveal how it was produced. Retain the corresponding model/output provenance.
+
+With the default `weight_background_removed` input, including its
+`weight * background_removal_weight` fallback, OmniFold checks the embedded
+`background_removal_metadata` object when present. Its raw-ensemble-odds
+contract must match the current estimator; missing, incompatible, or malformed
+metadata content requires retraining BackgroundRemoval and regenerating the
+decorated files. Inputs without that metadata object and explicitly selected
+custom weight branches remain accepted, so this check does not establish the
+history of every input file.
+
+The removed `--calibration-scale-min` and `--calibration-scale-max` options are
+not accepted, including the corresponding `RatioConfig` fields.
 
 The original ROOT inputs must remain unchanged during a campaign. Use a new
 run directory for different input files, selections, or model settings.

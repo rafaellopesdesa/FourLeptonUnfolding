@@ -25,7 +25,7 @@ The workflow is split into:
   signal-purity training, and consistent frozen-model decoration of nominal
   data, pseudo-experiments, and Pythia samples;
 - [`omnifold/`](omnifold/) for notebook or command-line unfolding,
-  calibrated reco/truth/reco ratios per iteration, fiducial closure,
+  raw NN reco/truth/reco density ratios per iteration, fiducial closure,
   saved PDF diagnostics, fixed-reference likelihood objectives, and
   pseudo-experiment decoration; both interfaces share resumable campaigns.
 

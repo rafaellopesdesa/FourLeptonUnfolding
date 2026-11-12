@@ -30,6 +30,7 @@ from BackgroundRemoval.common import (
     MODEL_KIND_BACKGROUND_REMOVAL,
     MODEL_KIND_DATA_MC_CORRECTION,
     MODEL_FEATURES,
+    RAW_RATIO_ESTIMATOR,
     SPLIT_NAMES,
     SUPPORTED_ARTIFACT_FORMAT_VERSIONS,
     TREE_NAME,
@@ -41,8 +42,6 @@ from BackgroundRemoval.common import (
     deterministic_split,
     known_weight_measures_compatible,
     sha256_file,
-    stable_logit,
-    stable_sigmoid,
     toolkit_runtime_provenance,
     transformed_features,
     validate_manifest_mass_window,
@@ -344,7 +343,7 @@ def _scan_inputs(
             # The scaler is only a numerical preconditioner.  Absolute weights
             # give it a positive measure even when generator events carry a
             # sign; the signed weights themselves are retained everywhere in
-            # the physics loss, yields, calibration, and diagnostics.
+            # the physics loss, yields, and diagnostics.
             weights = np.abs(chunk.weights[fit])
             moment_sum[chunk.class_name] += np.sum(
                 transformed * weights[:, np.newaxis], axis=0, dtype=np.float64
@@ -853,306 +852,6 @@ def _predict_split(
     return output
 
 
-def _balanced_calibration_arrays(
-    predictions: dict[str, ClassPredictions], cache: dict[str, CachedClass]
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    signal = predictions["signal"]
-    background = predictions["background"]
-    signal_weights = np.asarray(
-        cache["signal"].weights[signal.indices], dtype=np.float64
-    )
-    background_weights = np.asarray(
-        cache["background"].weights[background.indices], dtype=np.float64
-    )
-    signal_sum = float(np.sum(signal_weights, dtype=np.float64))
-    background_sum = float(np.sum(background_weights, dtype=np.float64))
-    if not np.isfinite(signal_sum) or signal_sum <= 0.0:
-        raise ValueError("signal calibration split has non-positive net signed yield")
-    if not np.isfinite(background_sum) or background_sum <= 0.0:
-        raise ValueError("background calibration split has non-positive net signed yield")
-    weights = np.concatenate(
-        [
-            0.5 * signal_weights / signal_sum,
-            0.5 * background_weights / background_sum,
-        ]
-    )
-    scores = np.concatenate([signal.ensemble_score, background.ensemble_score])
-    labels = np.concatenate(
-        [np.ones(signal.indices.size), np.zeros(background.indices.size)]
-    )
-    return scores, labels, weights
-
-
-def fit_logit_calibrator(
-    scores: np.ndarray,
-    labels: np.ndarray,
-    weights: np.ndarray,
-    *,
-    logit_clip: float,
-    minimum_scale: float = 0.1,
-    maximum_scale: float = 5.0,
-    maximum_iterations: int = 1000,
-) -> tuple[float, float]:
-    """Fit a bounded affine-logit calibrator with signed weighted BCE.
-
-    With signed weights the BCE Hessian need not be positive semidefinite, so
-    the Newton solve appropriate for nonnegative weights is not reliable.  We
-    instead use an absolute-weight Fisher matrix only as a local
-    preconditioner, with projected Armijo steps evaluated against the actual
-    signed objective.  A deterministic box-spanning multistart is used for
-    signed samples because their objective can have saddles and distinct local
-    minima.  This retains every weight sign while avoiding both saddle-point
-    acceptance and the very slow global step size that broad classifier logits
-    would otherwise impose.
-    """
-
-    logits = stable_logit(scores, logit_clip=logit_clip)
-    labels = np.asarray(labels, dtype=np.float64)
-    weights = np.asarray(weights, dtype=np.float64)
-    if logits.shape != labels.shape or labels.shape != weights.shape:
-        raise ValueError("calibration arrays must have identical shapes")
-    if logits.size == 0:
-        raise ValueError("calibration arrays cannot be empty")
-    if not (
-        np.all(np.isfinite(logits))
-        and np.all(np.isfinite(labels))
-        and np.all(np.isfinite(weights))
-    ):
-        raise ValueError("calibration arrays must be finite")
-    if not np.all((labels == 0.0) | (labels == 1.0)):
-        raise ValueError("calibration labels must be zero or one")
-    if float(np.sum(weights, dtype=np.float64)) <= 0.0:
-        raise ValueError("calibration weights must have positive net signed sum")
-    if not (0.0 < minimum_scale <= 1.0 <= maximum_scale):
-        raise ValueError("calibration scale bounds must be positive and contain one")
-    if maximum_iterations < 1:
-        raise ValueError("maximum calibration iterations must be positive")
-    design = np.column_stack([logits, np.ones_like(logits)])
-    lower_bounds = np.array([minimum_scale, -logit_clip], dtype=np.float64)
-    upper_bounds = np.array([maximum_scale, logit_clip], dtype=np.float64)
-    gradient_tolerance = 1.0e-7
-
-    def objective_and_gradient(candidate: np.ndarray) -> tuple[float, np.ndarray]:
-        prediction = design @ candidate
-        objective = float(
-            np.sum(
-                weights
-                * (
-                    np.maximum(prediction, 0.0)
-                    - labels * prediction
-                    + np.log1p(np.exp(-np.abs(prediction)))
-                ),
-                dtype=np.float64,
-            )
-        )
-        probability = stable_sigmoid(prediction)
-        gradient = design.T @ (weights * (probability - labels))
-        return objective, gradient
-
-    def optimize_from(initial: np.ndarray) -> tuple[np.ndarray, float, float]:
-        parameters = np.clip(
-            np.asarray(initial, dtype=np.float64), lower_bounds, upper_bounds
-        )
-        for _ in range(maximum_iterations):
-            prediction = design @ parameters
-            probability = stable_sigmoid(prediction)
-            old_objective, gradient = objective_and_gradient(parameters)
-
-            # This projected-gradient mapping is the KKT stationarity measure
-            # for the box and remains well behaved near a bound.  It avoids
-            # relying on a brittle exact-distance active-set test.
-            projected_gradient = parameters - np.clip(
-                parameters - gradient, lower_bounds, upper_bounds
-            )
-            free = np.abs(projected_gradient) > gradient_tolerance
-            if not np.any(free):
-                break
-
-            # Positive absolute-weight curvature is deliberately *not* the
-            # objective Hessian; it is a well-conditioned metric for a descent
-            # direction of the signed gradient.
-            curvature = np.abs(weights) * probability * (1.0 - probability)
-            fisher = design.T @ (design * curvature[:, np.newaxis])
-            ridge = 1.0e-10 * max(float(np.trace(fisher)), 1.0)
-            fisher.flat[::3] += ridge
-            direction = np.zeros_like(parameters)
-            try:
-                direction[free] = -np.linalg.solve(
-                    fisher[np.ix_(free, free)], gradient[free]
-                )
-            except np.linalg.LinAlgError:
-                direction[free] = -gradient[free]
-
-            # Check the local direction itself, not only a fully projected
-            # unit step: clipping can make a unit step look descending even
-            # when every sufficiently small step is ascending.
-            if float(gradient @ direction) >= 0.0:
-                diagonal = np.maximum(np.diag(fisher), ridge)
-                direction.fill(0.0)
-                direction[free] = -gradient[free] / diagonal[free]
-
-            fraction = 1.0
-            accepted = False
-            while fraction >= 1.0e-12:
-                candidate = np.clip(
-                    parameters + fraction * direction,
-                    lower_bounds,
-                    upper_bounds,
-                )
-                displacement = candidate - parameters
-                if float(np.max(np.abs(displacement))) < 1.0e-12:
-                    break
-                # Armijo descent remains valid for a non-convex signed
-                # objective.
-                candidate_objective, _ = objective_and_gradient(candidate)
-                if candidate_objective <= old_objective + 1.0e-4 * float(
-                    gradient @ displacement
-                ) + 1.0e-14 * max(1.0, abs(old_objective)):
-                    parameters = candidate
-                    accepted = True
-                    break
-                fraction *= 0.5
-            if not accepted:
-                break
-
-        if not np.all(np.isfinite(parameters)) or parameters[0] <= 0.0:
-            return parameters, math.inf, math.inf
-        final_objective, final_gradient = objective_and_gradient(parameters)
-        final_projected_gradient = parameters - np.clip(
-            parameters - final_gradient, lower_bounds, upper_bounds
-        )
-        maximum_projected_gradient = float(
-            np.max(np.abs(final_projected_gradient))
-        )
-        return parameters, final_objective, maximum_projected_gradient
-
-    # A nonnegative-weight logistic objective is convex, so the identity start
-    # is sufficient.  Signed BCE is a difference of convex functions: a point
-    # with zero gradient can be a saddle, and different starts can reach
-    # distinct local minima.  Cover the signed parameter box deterministically
-    # and retain the converged solution with the lowest *signed* objective.
-    starts = [np.array([1.0, 0.0], dtype=np.float64)]
-    if np.any(weights < 0.0):
-        middle_scale = 0.5 * (minimum_scale + maximum_scale)
-        for start_scale in (minimum_scale, middle_scale, maximum_scale):
-            for start_bias in (-logit_clip, 0.0, logit_clip):
-                candidate = np.array([start_scale, start_bias], dtype=np.float64)
-                if not any(np.array_equal(candidate, start) for start in starts):
-                    starts.append(candidate)
-
-    solutions = [optimize_from(start) for start in starts]
-    converged = [
-        solution
-        for solution in solutions
-        if np.isfinite(solution[1])
-        and solution[2] <= gradient_tolerance
-    ]
-    if not converged:
-        best_projected_gradient = min(solution[2] for solution in solutions)
-        raise RuntimeError(
-            "signed affine-logit calibration did not converge from any "
-            "deterministic start; minimum maximum projected gradient="
-            f"{best_projected_gradient:.6g}"
-        )
-    parameters, _, _ = min(converged, key=lambda solution: solution[1])
-    return float(parameters[0]), float(parameters[1])
-
-
-def _normalization_bias(
-    background_scores: np.ndarray,
-    background_weights: np.ndarray,
-    *,
-    scale: float,
-    initial_bias: float,
-    logit_clip: float,
-) -> tuple[float, float]:
-    if not np.isfinite(scale) or scale <= 0.0:
-        raise ValueError("normalization scale must be finite and positive")
-    if not np.isfinite(initial_bias):
-        raise ValueError("normalization initial bias must be finite")
-    if not np.isfinite(logit_clip) or not (0.0 < logit_clip <= 100.0):
-        raise ValueError("normalization logit clip must be finite and lie in (0, 100]")
-    logits = stable_logit(background_scores, logit_clip=logit_clip)
-    scaled_logits = scale * logits
-    if not np.all(np.isfinite(scaled_logits)):
-        raise RuntimeError("calibration logits overflow during ratio normalization")
-
-    background_weights = np.asarray(background_weights, dtype=np.float64)
-    if background_weights.shape != logits.shape:
-        raise ValueError("normalization scores and weights must have identical shapes")
-    if not np.all(np.isfinite(background_weights)):
-        raise ValueError("normalization weights must be finite")
-    absolute_sum = float(np.sum(np.abs(background_weights), dtype=np.float64))
-    if not np.isfinite(absolute_sum) or absolute_sum <= 0.0:
-        raise ValueError("normalization weights contain no nonzero measure")
-    normalized_weights = background_weights / absolute_sum
-    net_fraction = float(np.sum(normalized_weights, dtype=np.float64))
-    if not np.isfinite(net_fraction) or net_fraction <= 0.0:
-        raise ValueError("normalization weights have non-positive net signed yield")
-
-    # A density-ratio normalization is one common positive multiplier.  Work
-    # in a shifted exponential basis so that signed cancellation is evaluated
-    # without overflow.  If the signed moment is non-positive, no such
-    # multiplier exists; finding a crossing by clipping different events at
-    # different bounds would manufacture a shape-changing "normalization".
-    maximum_logit = float(np.max(scaled_logits))
-    shifted_ratios = np.exp(scaled_logits - maximum_logit)
-    signed_shifted_moment = float(
-        np.sum(normalized_weights * shifted_ratios, dtype=np.float64)
-    )
-    absolute_shifted_moment = float(
-        np.sum(np.abs(normalized_weights) * shifted_ratios, dtype=np.float64)
-    )
-    if not np.isfinite(absolute_shifted_moment) or absolute_shifted_moment <= 0.0:
-        raise RuntimeError("ratio normalization has no finite weighted measure")
-    cancellation_ratio = signed_shifted_moment / absolute_shifted_moment
-    if not np.isfinite(cancellation_ratio) or cancellation_ratio <= 1.0e-12:
-        raise RuntimeError(
-            "the signed reference ratio moment is non-positive or numerically "
-            "cancelled; no stable positive density normalization exists"
-        )
-
-    log_mean_ratio = (
-        maximum_logit
-        + math.log(signed_shifted_moment)
-        - math.log(net_fraction)
-    )
-    normalized_bias = -log_mean_ratio
-    before_log = log_mean_ratio + initial_bias
-    try:
-        before = math.exp(before_log)
-    except OverflowError as error:
-        raise RuntimeError(
-            "the pre-normalization signed ratio moment overflows"
-        ) from error
-    if not np.isfinite(before) or before <= 0.0:
-        raise RuntimeError("the pre-normalization signed ratio moment is invalid")
-
-    normalized_logits = scaled_logits + normalized_bias
-    clip_tolerance = 1.0e-12 * max(1.0, abs(logit_clip))
-    if np.any(normalized_logits < -logit_clip - clip_tolerance) or np.any(
-        normalized_logits > logit_clip + clip_tolerance
-    ):
-        raise RuntimeError(
-            "density normalization would require clipping calibrated ratios and "
-            "therefore change their shape; increase --logit-clip or inspect the "
-            "signed-weight cancellation"
-        )
-    normalized_ratios = np.exp(
-        np.clip(normalized_logits, -logit_clip, logit_clip)
-    )
-    normalized_mean = float(
-        np.sum(normalized_weights * normalized_ratios, dtype=np.float64)
-        / net_fraction
-    )
-    if not np.isclose(normalized_mean, 1.0, rtol=1.0e-9, atol=1.0e-11):
-        raise RuntimeError(
-            "failed to normalize the calibrated density ratio: "
-            f"E_B[r]={normalized_mean:.12g}"
-        )
-    return normalized_bias, before
-
-
 def _install_artifact(
     temporary: Path,
     destination: Path,
@@ -1260,12 +959,6 @@ def train(args: argparse.Namespace) -> Path:
         raise ValueError("expected luminosity must be finite and positive")
     if not np.isfinite(args.logit_clip) or not (0.0 < args.logit_clip <= 100.0):
         raise ValueError("logit clip must be finite and lie in (0, 100]")
-    if not np.isfinite(args.calibration_scale_min) or not np.isfinite(
-        args.calibration_scale_max
-    ) or not (
-        0.0 < args.calibration_scale_min <= 1.0 <= args.calibration_scale_max
-    ):
-        raise ValueError("calibration scale bounds must be positive and contain one")
     if args.inference_batch_size < 1:
         raise ValueError("inference batch size must be positive")
     if args.steps_per_epoch is not None and args.steps_per_epoch < 1:
@@ -1528,7 +1221,7 @@ def train(args: argparse.Namespace) -> Path:
                     f"{args.max_retries} retries"
                 )
 
-            print("Predicting the held-out validation/calibration bank...", flush=True)
+            print("Predicting the held-out validation bank...", flush=True)
             validation = _predict_split(
                 cache,
                 results,
@@ -1539,29 +1232,6 @@ def train(args: argparse.Namespace) -> Path:
                 device=device,
                 inference_batch_size=args.inference_batch_size,
             )
-            calibration_scores, calibration_labels, calibration_weights = (
-                _balanced_calibration_arrays(validation, cache)
-            )
-            calibration_scale, calibration_bias = fit_logit_calibrator(
-                calibration_scores,
-                calibration_labels,
-                calibration_weights,
-                logit_clip=args.logit_clip,
-                minimum_scale=args.calibration_scale_min,
-                maximum_scale=args.calibration_scale_max,
-            )
-            background_validation_weights = np.asarray(
-                cache["background"].weights[validation["background"].indices],
-                dtype=np.float64,
-            )
-            normalized_bias, normalization_before = _normalization_bias(
-                validation["background"].ensemble_score,
-                background_validation_weights,
-                scale=calibration_scale,
-                initial_bias=calibration_bias,
-                logit_clip=args.logit_clip,
-            )
-
             print("Predicting the untouched closure bank...", flush=True)
             closure = _predict_split(
                 cache,
@@ -1685,26 +1355,7 @@ def train(args: argparse.Namespace) -> Path:
                     "maximum_retries_per_slot": args.max_retries,
                 },
                 "members": member_entries,
-                "calibration": {
-                    "method": (
-                        "bounded_multistart_fisher_preconditioned_affine_logit_then_"
-                        "shape_preserving_signed_density_normalization"
-                    ),
-                    "fit_split": "validation",
-                    "weight_semantics": "signed class-balanced weights",
-                    "scale": calibration_scale,
-                    "scale_bounds": [
-                        args.calibration_scale_min,
-                        args.calibration_scale_max,
-                    ],
-                    "bias_before_normalization": calibration_bias,
-                    "normalization_before": normalization_before,
-                    "bias_after_normalization": normalized_bias,
-                    "normalization_condition": (
-                        "signed E_background[r_shape] = 1"
-                    ),
-                    "logit_clip": args.logit_clip,
-                },
+                "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                 "toolkit": {
                     "repository": "https://github.com/iris-hep/nsbi-lhc-toolkit",
                     **toolkit_provenance,
@@ -1768,7 +1419,7 @@ def train(args: argparse.Namespace) -> Path:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Train a calibrated NSBI-toolkit BCE ensemble for reconstructed "
+            "Train a raw-odds NSBI-toolkit BCE ensemble for reconstructed "
             "fiducial ggH versus reconstructed contamination"
         )
     )
@@ -1808,8 +1459,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--split-seed", type=int, default=DEFAULT_SEED + 1)
     parser.add_argument("--logit-clip", type=float, default=30.0)
-    parser.add_argument("--calibration-scale-min", type=float, default=0.1)
-    parser.add_argument("--calibration-scale-max", type=float, default=5.0)
     parser.add_argument("--step-size", default="200 MB")
     parser.add_argument("--inference-batch-size", type=int, default=65536)
     parser.add_argument(

@@ -105,7 +105,6 @@ class OmniFoldCLITest(unittest.TestCase):
         settings = dict(ensemble_size=5, hidden_layers=2, neurons=16, batch_size=64,
                         maximum_epochs=3, patience=2, learning_rate=.0007,
                         learning_rate_decay=.9, max_retries=1, seed=91, logit_clip=12.,
-                        calibration_scale_min=.2, calibration_scale_max=3.,
                         inference_batch_size=128, steps_per_epoch=2, device="cpu")
         flags = [value for name, setting in settings.items()
                  for value in ("--" + name.replace("_", "-"), setting)]
@@ -314,6 +313,8 @@ class OmniFoldCLITest(unittest.TestCase):
         ]
         bad_arguments = [command + ["--iterations", count] for command in commands for count in (0, -1)]
         bad_arguments.extend([
+            commands[0] + ["--calibration-scale-min", .1],
+            commands[0] + ["--calibration-scale-max", 5.],
             ["resume", "--run-dir", self.run_dir, "--neurons", 32],
             ["resume", "--run-dir", self.run_dir, "--split-seed", 44],
             ["report", "--run-dir", self.run_dir, "--iteration", 0],

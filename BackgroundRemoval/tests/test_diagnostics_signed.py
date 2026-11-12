@@ -2,20 +2,75 @@ from __future__ import annotations
 
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 import numpy as np
 
+from BackgroundRemoval.common import FEATURES, MODEL_KIND_BACKGROUND_REMOVAL
 from BackgroundRemoval.Training.diagnostics import (
     _draw_comparison,
     _histogram,
     _normalize_histogram_statistics,
     _reliability,
+    make_diagnostics_pdf,
 )
 
 
 class SignedDiagnosticsTest(unittest.TestCase):
+    def tearDown(self):
+        plt.close("all")
+
+    def test_report_has_one_raw_reliability_curve_without_calibration_metadata(self):
+        scores = {"signal": np.array([0.15, 0.35, 0.85]),
+                  "background": np.array([0.25, 0.55, 0.75])}
+        weights = {"signal": np.array([1.0, 2.0, 3.0]),
+                   "background": np.array([2.0, 3.0, 2.0])}
+        predictions = {name: SimpleNamespace(
+            member_scores=np.repeat(score[:, None], 4, axis=1),
+            indices=np.arange(3),
+        ) for name, score in scores.items()}
+        cache = {name: SimpleNamespace(weights=weight,
+                                      features=np.zeros((3, len(FEATURES))))
+                 for name, weight in weights.items()}
+        manifest = {
+            "model_kind": MODEL_KIND_BACKGROUND_REMOVAL,
+            "yields": {"signal": 6.0, "background": 7.0,
+                       "signal_to_background": 6.0 / 7.0, "units": "events"},
+            "luminosity_fb": 312.0,
+            "toolkit": {"pinned_commit": "fixture"},
+            "ensemble": {"size": 4},
+            "architecture": {"hidden_layers": 1, "neurons": 8, "loss_logit_clip": 30.0},
+            "members": [{"slot": 0, "attempt": 0, "seed": 1,
+                         "history": {"training_loss": [0.7], "validation_loss": [0.71]}}],
+        }
+        figures = []
+        with patch("BackgroundRemoval.Training.diagnostics.PdfPages") as pdf, patch(
+            "BackgroundRemoval.Training.diagnostics._draw_comparison",
+            return_value={"chi2": 0.0, "covariance_rank": 1},
+        ):
+            pdf.return_value.__enter__.return_value.savefig.side_effect = figures.append
+            metrics = make_diagnostics_pdf(Path("unused.pdf"), manifest=manifest,
+                                           cache=cache, validation=predictions, closure=predictions)
+        reliability_axis = next(axis for figure in figures for axis in figure.axes
+                                if axis.get_title() == "Raw balanced-prior reliability (closure)")
+        self.assertEqual(len(reliability_axis.containers), 1)
+        line = reliability_axis.containers[0].lines[0]
+        expected = _reliability(scores["signal"], scores["background"],
+                                weights["signal"], weights["background"])
+        valid = np.isfinite(expected[0]) & np.isfinite(expected[1])
+        np.testing.assert_allclose(line.get_xdata(), expected[0][valid])
+        np.testing.assert_allclose(line.get_ydata(), expected[1][valid])
+        self.assertEqual(set(metrics["reliability"]), {"closure_raw"})
+        self.assertNotIn("calibration", metrics)
+        expected_mean = np.average(scores["background"] / (1.0 - scores["background"]),
+                                   weights=weights["background"])
+        self.assertNotAlmostEqual(expected_mean, 1.0)
+        self.assertAlmostEqual(metrics["ratio_normalization"]["closure"]["forward"], expected_mean)
+
     def test_normalized_histogram_propagates_denominator_covariance(self):
         normalized, covariance, jacobian = _normalize_histogram_statistics(
             np.array([30.0, 70.0]),

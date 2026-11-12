@@ -1,7 +1,7 @@
 [workspace]
 name = "four-lepton-omnifold"
 version = "0.1.0"
-description = "Notebook and command-line signed-weight OmniFold with calibrated density ratios"
+description = "Notebook and command-line signed-weight OmniFold with raw NN density ratios"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 requires-pixi = ">=0.40,<1"

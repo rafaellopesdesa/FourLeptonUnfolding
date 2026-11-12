@@ -9,8 +9,11 @@ import unittest
 import numpy as np
 import uproot
 
-from BackgroundRemoval.common import FEATURES, sha256_file
+from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, sha256_file
 from omnifold.application import MANIFEST_NAME, TRUTH_FEATURES, decorate_files
+
+
+_BACKGROUND_METADATA = {"keep_me": True, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR)}
 
 
 class _Ratio:
@@ -42,7 +45,7 @@ def _iterations():
 
 
 def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False,
-            overrides=None, with_lhe=False, with_born=False):
+            overrides=None, with_lhe=False, with_born=False, with_background_metadata=True):
     arrays = {
         "event_id": np.arange(5, dtype=np.uint64),
         "weight": np.array([2.0, -0.5, 3.0, 4.0, 5.0]),
@@ -85,7 +88,8 @@ def _sample(path: Path, *, with_truth=True, with_weight=True, fallback=False,
     arrays.update(overrides or {})
     with uproot.recreate(path) as root_file:
         root_file.mktree("Analysis", arrays)
-        root_file["background_removal_metadata"] = json.dumps({"keep_me": True})
+        if with_background_metadata:
+            root_file["background_removal_metadata"] = json.dumps(_BACKGROUND_METADATA)
         if with_lhe:
             root_file["lhe_metadata"] = json.dumps({
                 "schema_version": 1,
@@ -133,7 +137,7 @@ class ApplicationTest(unittest.TestCase):
                 np.testing.assert_allclose(arrays["omnifold_weight"][1], [-0.125, -0.125])
                 np.testing.assert_array_equal(arrays["omnifold_reco_pull_valid"], [1, 1, 0, 0, 1])
                 self.assertTrue(np.isnan(arrays["omnifold_reco_pull"][2:4]).all())
-                self.assertEqual(json.loads(str(file["background_removal_metadata"])), {"keep_me": True})
+                self.assertEqual(json.loads(str(file["background_removal_metadata"])), _BACKGROUND_METADATA)
                 metadata = json.loads(str(file["omnifold_metadata"]))
                 self.assertTrue(metadata["data_truth_is_diagnostic_only"])
                 self.assertEqual(metadata["source_provenance"]["sha256"], before)
@@ -175,6 +179,39 @@ class ApplicationTest(unittest.TestCase):
                 np.testing.assert_allclose(arrays["omnifold_weight"][1], [-0.125, -0.125])
                 metadata = json.loads(str(file["omnifold_metadata"]))
                 self.assertEqual(metadata["weight_expression"], "weight * background_removal_weight")
+
+    def test_legacy_background_weights_cannot_enter_toy_decoration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "toy.root"
+            for fallback in (False, True):
+                with self.subTest(fallback=fallback):
+                    _sample(source, fallback=fallback)
+                    with uproot.update(source) as file:
+                        file["background_removal_metadata"] = json.dumps({"format_version": 1})
+                    destination = root / "rejected"
+                    with self.assertRaisesRegex(ValueError, "regenerate/redecorate"):
+                        decorate_files([source], destination, _iterations())
+                    self.assertFalse(destination.exists())
+
+    def test_metadata_free_custom_and_original_mc_weights_remain_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "toy.root"
+            _sample(source, with_background_metadata=False)
+            decorate_files([source], root / "no_metadata", _iterations())
+            with uproot.update(source) as file:
+                file["background_removal_metadata"] = json.dumps({"format_version": 1})
+            paths = decorate_files(
+                [source], root / "custom", _iterations(), data_weight_branch="weight"
+            )
+            with uproot.open(paths[0]) as file:
+                weights = file["Analysis"]["omnifold_weight"].array(library="np")
+                np.testing.assert_allclose(weights[1], [-.5, -.5])
+            decorate_files([], root / "original_mc", _iterations(), mc_path=source)
+            with self.assertRaisesRegex(ValueError, "regenerate/redecorate"):
+                decorate_files([], root / "legacy_mc", _iterations(), mc_path=source,
+                               mc_weight_branch="weight_background_removed")
 
     def test_failed_campaign_leaves_no_partial_output_and_overwrite_is_restricted(self):
         with tempfile.TemporaryDirectory() as directory:

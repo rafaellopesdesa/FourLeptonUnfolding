@@ -13,7 +13,7 @@ import uproot
 
 import BackgroundRemoval.Correction.train_data_mc_correction as correction_training
 import BackgroundRemoval.Training.train_background_ratio as background_training
-from BackgroundRemoval.common import FEATURES, TOOLKIT_COMMIT, sha256_file
+from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, TOOLKIT_COMMIT, sha256_file
 
 
 def _write_sample(
@@ -214,6 +214,8 @@ class PipelineSmokeTest(unittest.TestCase):
                 (correction_path / "manifest.json").read_text(encoding="utf-8")
             )
             self.assertEqual(correction_manifest["features"], list(FEATURES))
+            self.assertEqual(correction_manifest["ratio_estimator"], RAW_RATIO_ESTIMATOR)
+            self.assertNotIn("calibration", correction_manifest)
             self.assertEqual(
                 correction_manifest["selections"]["mass_window_gev"],
                 {
@@ -278,6 +280,8 @@ class PipelineSmokeTest(unittest.TestCase):
             background_manifest = json.loads(
                 (background_path / "manifest.json").read_text(encoding="utf-8")
             )
+            self.assertEqual(background_manifest["ratio_estimator"], RAW_RATIO_ESTIMATOR)
+            self.assertNotIn("calibration", background_manifest)
             self.assertEqual(
                 background_manifest["selections"]["mass_window_gev"],
                 {

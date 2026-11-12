@@ -1,7 +1,7 @@
 [workspace]
 name = "four-lepton-background-removal"
 version = "0.1.0"
-description = "Calibrated density-ratio background removal for H to four leptons"
+description = "Raw NN density-ratio background removal for H to four leptons"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 requires-pixi = ">=0.40,<1"

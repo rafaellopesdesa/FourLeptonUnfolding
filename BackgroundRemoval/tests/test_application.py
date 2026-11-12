@@ -14,7 +14,12 @@ from BackgroundRemoval.Application.apply_background_ratio import (
     decorate,
     load_application_models,
 )
-from BackgroundRemoval.common import FEATURES, sha256_file, weight_measure_contract
+from BackgroundRemoval.common import (
+    FEATURES,
+    RAW_RATIO_ESTIMATOR,
+    sha256_file,
+    weight_measure_contract,
+)
 
 
 class _FakeBundle:
@@ -54,7 +59,7 @@ class _FakeBundle:
         self.predicted_rows.append(raw_features.copy())
         size = raw_features.shape[0]
         return {
-            "calibrated_score": np.full(size, 0.4),
+            "raw_score": np.full(size, 0.4),
             "score_ensemble_std": np.full(size, 0.01),
             "shape_ratio": np.full(size, 1.25),
             "physical_ratio": np.full(size, self.value),
@@ -214,6 +219,7 @@ class ApplicationTest(unittest.TestCase):
                         arrays["analysis_region"].dtype, np.dtype(np.uint8)
                     )
                     self.assertEqual(metadata["predicted_entries"], sum(predicted_rows))
+                    self.assertEqual(metadata["ratio_estimator"], RAW_RATIO_ESTIMATOR)
                     self.assertEqual(
                         sum(x.shape[0] for x in models.background.predicted_rows),
                         predicted_rows[0],

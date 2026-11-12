@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from BackgroundRemoval.common import (
     ARTIFACT_FORMAT_VERSION,
+    RAW_RATIO_ESTIMATOR,
     FEATURES,
     MODEL_FEATURES,
     MODEL_KIND_BACKGROUND_REMOVAL,
@@ -61,6 +62,7 @@ def _write_artifact(
     manifest = {
         "format_version": format_version,
         "model_kind": model_kind,
+        "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
         "features": list(FEATURES),
         "model_features": list(MODEL_FEATURES),
         "toolkit": {"pinned_commit": TOOLKIT_COMMIT},
@@ -152,23 +154,32 @@ class ArtifactContractTest(unittest.TestCase):
                     expected_model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
                 )
 
-    def test_loader_retains_legacy_v2_artifact_support(self):
-        with tempfile.TemporaryDirectory() as directory_name:
-            root = Path(directory_name) / "artifact"
-            _write_artifact(
-                root,
-                model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
-                format_version=2,
-            )
-            bundle = self._load(
-                root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL
-            )
-            self.assertEqual(bundle.manifest["format_version"], 2)
-            self.assertNotIn(
-                "loss_logit_clip", bundle.manifest["architecture"]
-            )
+    def test_loader_rejects_legacy_calibrated_artifacts(self):
+        for version in (2, 3):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as directory_name:
+                root = Path(directory_name) / "artifact"
+                _write_artifact(root, model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
+                                format_version=version)
+                with self.assertRaisesRegex(ValueError, "retrain"):
+                    self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
 
-    def test_v3_loader_requires_versioned_inference_logit_bound(self):
+    def test_loader_requires_raw_ratio_contract_and_rejects_calibration_parameters(self):
+        mutations = (
+            lambda manifest: manifest.pop("ratio_estimator"),
+            lambda manifest: manifest["ratio_estimator"].update(method="affine_logit"),
+            lambda manifest: manifest["ratio_estimator"].update(empirical_normalization=True),
+            lambda manifest: manifest.update(calibration={"scale": 1.0, "bias": 0.0}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate), tempfile.TemporaryDirectory() as directory_name:
+                root = Path(directory_name) / "artifact"
+                manifest = _write_artifact(root, model_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+                mutate(manifest)
+                (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "ratio|calibration"):
+                    self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+
+    def test_loader_requires_versioned_inference_logit_bound(self):
         with tempfile.TemporaryDirectory() as directory_name:
             root = Path(directory_name) / "artifact"
             manifest = _write_artifact(
@@ -199,6 +210,7 @@ def _write_replacement_manifest(root: Path) -> dict:
     return {
         "format_version": ARTIFACT_FORMAT_VERSION,
         "model_kind": MODEL_KIND_BACKGROUND_REMOVAL,
+        "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
         "features": list(FEATURES),
         "model_features": list(MODEL_FEATURES),
         "toolkit": {"pinned_commit": TOOLKIT_COMMIT},

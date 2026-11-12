@@ -27,6 +27,7 @@ from BackgroundRemoval.common import (
     assert_file_unchanged,
     capture_file_provenance,
 )
+from .inputs import validate_background_weight_metadata
 
 
 TRUTH_FEATURES = tuple(name.replace("reco_", "truth_", 1) for name in FEATURES)
@@ -179,6 +180,7 @@ def _decorate_one(
         missing = needed - branches
         if missing:
             raise KeyError(f"missing required branches in {source}: {sorted(missing)}")
+        validate_background_weight_metadata(root_file, weight_branch=weight_branch, path=source)
         has_truth = (set(TRUTH_FEATURES) | {"fiducial"}).issubset(branches)
         metadata = _root_metadata(root_file)
         schema = _schema(tree)

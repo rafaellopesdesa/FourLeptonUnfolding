@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train the calibrated sideband data-to-Pythia correction ensemble."""
+"""Train the raw-odds sideband data-to-Pythia correction ensemble."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from BackgroundRemoval.common import (
     MASS_BRANCH,
     MODEL_FEATURES,
     MODEL_KIND_DATA_MC_CORRECTION,
+    RAW_RATIO_ESTIMATOR,
     SPLIT_NAMES,
     SUPPORTED_ARTIFACT_FORMAT_VERSIONS,
     TREE_NAME,
@@ -45,13 +46,10 @@ from BackgroundRemoval.Training.train_background_ratio import (
     SelectedChunk,
     WeightedStatistics,
     _bad_members,
-    _balanced_calibration_arrays,
     _install_artifact,
     _load_cache,
-    _normalization_bias,
     _predict_split,
     _train_member,
-    fit_logit_calibrator,
 )
 
 
@@ -411,12 +409,6 @@ def _validate_args(args: argparse.Namespace) -> tuple[Path, Path, Path, Path, An
         raise ValueError("expected luminosity must be finite and positive")
     if not np.isfinite(args.logit_clip) or not (0.0 < args.logit_clip <= 100.0):
         raise ValueError("logit clip must be finite and lie in (0, 100]")
-    if not np.isfinite(args.calibration_scale_min) or not np.isfinite(
-        args.calibration_scale_max
-    ) or not (
-        0.0 < args.calibration_scale_min <= 1.0 <= args.calibration_scale_max
-    ):
-        raise ValueError("calibration scale bounds must be positive and contain one")
     if args.inference_batch_size < 1:
         raise ValueError("inference batch size must be positive")
     if args.steps_per_epoch is not None and args.steps_per_epoch < 1:
@@ -634,28 +626,6 @@ def train(args: argparse.Namespace) -> Path:
                 device=device,
                 inference_batch_size=args.inference_batch_size,
             )
-            calibration_scores, calibration_labels, calibration_weights = (
-                _balanced_calibration_arrays(validation, cache)
-            )
-            calibration_scale, calibration_bias = fit_logit_calibrator(
-                calibration_scores,
-                calibration_labels,
-                calibration_weights,
-                logit_clip=args.logit_clip,
-                minimum_scale=args.calibration_scale_min,
-                maximum_scale=args.calibration_scale_max,
-            )
-            reference_validation_weights = np.asarray(
-                cache[_REFERENCE_KEY].weights[validation[_REFERENCE_KEY].indices],
-                dtype=np.float64,
-            )
-            normalized_bias, normalization_before = _normalization_bias(
-                validation[_REFERENCE_KEY].ensemble_score,
-                reference_validation_weights,
-                scale=calibration_scale,
-                initial_bias=calibration_bias,
-                logit_clip=args.logit_clip,
-            )
             closure = _predict_split(
                 cache,
                 results,
@@ -732,7 +702,7 @@ def train(args: argparse.Namespace) -> Path:
                     "target_data": target_yield,
                     "reference_mc": reference_yield,
                     "target_to_reference": yield_ratio,
-                    # Compatibility aliases used by the common calibrated-ratio
+                    # Compatibility aliases used by the common raw-odds ratio
                     # diagnostic machinery.  Their target/reference semantics
                     # are made explicit by model_kind and ratio_convention.
                     "signal": target_yield,
@@ -800,26 +770,7 @@ def train(args: argparse.Namespace) -> Path:
                     "maximum_retries_per_slot": args.max_retries,
                 },
                 "members": member_entries,
-                "calibration": {
-                    "method": (
-                        "bounded_multistart_fisher_preconditioned_affine_logit_then_"
-                        "shape_preserving_signed_density_normalization"
-                    ),
-                    "fit_split": "validation",
-                    "weight_semantics": "signed class-balanced weights",
-                    "scale": calibration_scale,
-                    "scale_bounds": [
-                        args.calibration_scale_min,
-                        args.calibration_scale_max,
-                    ],
-                    "bias_before_normalization": calibration_bias,
-                    "normalization_before": normalization_before,
-                    "bias_after_normalization": normalized_bias,
-                    "normalization_condition": (
-                        "signed E_reference_MC[r_shape] = 1"
-                    ),
-                    "logit_clip": args.logit_clip,
-                },
+                "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                 "toolkit": {
                     "repository": "https://github.com/iris-hep/nsbi-lhc-toolkit",
                     **toolkit_provenance,
@@ -867,7 +818,7 @@ def train(args: argparse.Namespace) -> Path:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Train a calibrated data-to-Pythia density ratio in the strict "
+            "Train a raw-odds data-to-Pythia density ratio in the strict "
             "130 < reco_m_ZZ < 160 GeV correction sideband"
         )
     )
@@ -891,8 +842,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--split-seed", type=int, default=DEFAULT_SEED + 1)
     parser.add_argument("--logit-clip", type=float, default=30.0)
-    parser.add_argument("--calibration-scale-min", type=float, default=0.1)
-    parser.add_argument("--calibration-scale-max", type=float, default=5.0)
     parser.add_argument("--step-size", default="200 MB")
     parser.add_argument("--inference-batch-size", type=int, default=65536)
     parser.add_argument(

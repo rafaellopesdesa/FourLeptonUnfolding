@@ -1,4 +1,4 @@
-"""Signed ratio semantics, held-out calibration and artifact round trips."""
+"""Signed raw-odds semantics, diagnostics and artifact round trips."""
 
 from dataclasses import replace
 import importlib.util
@@ -61,11 +61,22 @@ class RatioContractTests(unittest.TestCase):
         self.assertTrue(np.all(scale > 0))
 
     def test_full_ratio_is_exact_yield_times_shape_even_for_large_yield(self):
-        calibration = {"scale": 1.0, "bias": 0.0, "logit_clip": 2.0}
-        predictions = ratios._outputs(np.array([[0.5] * 4, [0.8] * 4]), calibration, 1.0e8)
+        predictions = ratios._outputs(np.array([[0.5] * 4, [0.8] * 4]), 2.0, 1.0e8)
         np.testing.assert_allclose(predictions["shape_ratio"], [1.0, 4.0])
         np.testing.assert_allclose(predictions["full_ratio"], 1.0e8 * predictions["shape_ratio"])
-        self.assertEqual(set(predictions), {"shape_ratio", "full_ratio", "score_raw", "score_calibrated", "ensemble_std"})
+        self.assertEqual(set(predictions), {"shape_ratio", "full_ratio", "score_raw", "ensemble_std"})
+
+    def test_raw_odds_use_mean_probability_without_rescaling_or_batch_dependence(self):
+        scores = np.array([[.1, .2, .3, .4], [.7, .8, .9, .8]])
+        outputs = ratios._outputs(scores, 30.0, 2.0)
+        raw = scores.mean(axis=1)
+        np.testing.assert_allclose(outputs["score_raw"], raw)
+        np.testing.assert_allclose(outputs["shape_ratio"], raw / (1.0 - raw))
+        self.assertNotAlmostEqual(outputs["shape_ratio"].mean(), 1.0)
+        for index in range(len(scores)):
+            alone = ratios._outputs(scores[index:index + 1], 30.0, 2.0)
+            self.assertEqual(outputs["shape_ratio"][index], alone["shape_ratio"][0])
+        self.assertNotAlmostEqual(outputs["shape_ratio"][0], np.mean(scores[0] / (1.0 - scores[0])))
 
     def test_configuration_matches_existing_training_defaults(self):
         config = ratios.RatioConfig()
@@ -122,11 +133,16 @@ class RatioTrainingTests(unittest.TestCase):
         cls.temporary.cleanup()
         torch.set_num_threads(cls.threads)
 
-    def test_real_signed_training_calibration_normalization_and_round_trip(self):
+    def test_real_signed_training_raw_odds_diagnostics_and_round_trip(self):
         prediction = self.model.predict(self.features)
         validation = self.splits == 1
         normalization = np.sum(self.weights[validation] * prediction["shape_ratio"][validation]) / np.sum(self.weights[validation])
-        self.assertAlmostEqual(normalization, 1.0, places=8)
+        raw_odds = prediction["score_raw"] / (1.0 - prediction["score_raw"])
+        np.testing.assert_allclose(prediction["shape_ratio"], raw_odds, rtol=1e-12)
+        self.assertNotAlmostEqual(normalization, 1.0, places=5)
+        self.assertAlmostEqual(self.model.manifest["validation_metrics"]["reference_shape_mean"], normalization)
+        self.assertNotIn("calibration", self.model.manifest)
+        self.assertEqual(self.model.manifest["ratio_estimator"], ratios.common.RAW_RATIO_ESTIMATOR)
         self.assertAlmostEqual(self.model.yield_ratio, 3.0)
         self.assertEqual(self.model.manifest["classes"]["target"]["negative_weight_entries"], 3)
         self.assertEqual(self.model.manifest["metadata"], {"stage": "truth", "iteration": 1})
@@ -140,7 +156,7 @@ class RatioTrainingTests(unittest.TestCase):
         empty = restored.predict(self.features[:0])
         self.assertTrue(all(value.shape == (0,) for value in empty.values()))
 
-    def test_closure_features_do_not_change_fitted_network_or_calibration(self):
+    def test_closure_features_do_not_change_fitted_network_or_raw_odds(self):
         changed = self.features.copy()
         changed[self.splits == 2, 6:] += 400.0
         second = ratios.RatioEstimator.fit(
@@ -148,7 +164,7 @@ class RatioTrainingTests(unittest.TestCase):
             target_splits=self.splits, reference_splits=self.splits,
             output_dir=self.root / "altered-closure", config=self.config,
         )
-        self.assertEqual(self.model.manifest["calibration"], second.manifest["calibration"])
+        self.assertEqual(self.model.manifest["validation_metrics"], second.manifest["validation_metrics"])
         self.assertEqual([entry["history"] for entry in self.model.history],
                          [entry["history"] for entry in second.history])
         np.testing.assert_array_equal(self.model.predict(self.features)["shape_ratio"],
@@ -194,6 +210,22 @@ class RatioTrainingTests(unittest.TestCase):
         (corrupt / "manifest.json").write_text(json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, "feature order"):
             ratios.RatioEstimator.load(corrupt, device="cpu")
+
+    def test_legacy_calibrated_artifacts_and_injected_corrections_are_rejected(self):
+        destination = self.root / "legacy-or-tampered"
+        shutil.copytree(self.model.root, destination)
+        manifest_path = destination / "manifest.json"
+        original = json.loads(manifest_path.read_text())
+        cases = [
+            ({**original, "format_version": 1, "calibration": {"scale": .5, "bias": .2}}, "Legacy calibrated"),
+            ({**original, "calibration": {"scale": 1., "bias": 0.}}, "without calibration"),
+            ({**original, "ratio_estimator": {**original["ratio_estimator"], "empirical_normalization": True}}, "without calibration"),
+        ]
+        for manifest, message in cases:
+            with self.subTest(manifest=manifest["ratio_estimator"]):
+                manifest_path.write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, message):
+                    ratios.RatioEstimator.load(destination, device="cpu")
 
     def test_overwrite_requires_recognized_artifact_and_failed_publication_restores_old(self):
         with self.assertRaises(FileExistsError):

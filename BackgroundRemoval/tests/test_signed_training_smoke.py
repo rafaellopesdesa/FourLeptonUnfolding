@@ -12,6 +12,8 @@ import uproot
 
 import BackgroundRemoval.Training.train_background_ratio as training
 from BackgroundRemoval.common import (
+    ARTIFACT_FORMAT_VERSION,
+    RAW_RATIO_ESTIMATOR,
     CORRECTION_MASS_WINDOW,
     FEATURES,
     MODEL_FEATURES,
@@ -98,7 +100,7 @@ class _UnitCorrection:
 
 @unittest.skipUnless(TORCH_AVAILABLE, "real signed-loss smoke test requires PyTorch")
 class SignedTrainingSmokeTest(unittest.TestCase):
-    def test_signed_training_calibration_and_diagnostics_pipeline(self):
+    def test_signed_training_raw_odds_and_diagnostics_pipeline(self):
         import torch
 
         split_seed = 24680
@@ -133,7 +135,8 @@ class SignedTrainingSmokeTest(unittest.TestCase):
             )
 
             correction_manifest: dict[str, object] = {
-                "format_version": 2,
+                "format_version": ARTIFACT_FORMAT_VERSION,
+                "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                 "model_kind": MODEL_KIND_DATA_MC_CORRECTION,
                 "created_utc": "test",
                 "luminosity_fb": 312.0,
@@ -231,6 +234,14 @@ class SignedTrainingSmokeTest(unittest.TestCase):
                         ]
                     )
                 predictions = bundle.predict(raw_features, batch_size=3)
+                member_scores = bundle.predict_member_scores(raw_features, batch_size=3)
+                raw_score = member_scores.mean(axis=1)
+                expected_odds = raw_score / (1.0 - raw_score)
+                np.testing.assert_allclose(predictions["raw_score"], raw_score)
+                np.testing.assert_allclose(predictions["shape_ratio"], expected_odds)
+                expected_full = bundle.manifest["yields"]["signal_to_background"] * expected_odds
+                np.testing.assert_allclose(predictions["physical_ratio"], expected_full)
+                np.testing.assert_allclose(predictions["target_purity"], expected_full / (1.0 + expected_full))
                 for values in predictions.values():
                     self.assertTrue(np.all(np.isfinite(values)))
 
@@ -253,10 +264,8 @@ class SignedTrainingSmokeTest(unittest.TestCase):
             self.assertEqual(
                 manifest["scaler"]["type"], "balanced_absolute_weight_standard"
             )
-            self.assertEqual(
-                manifest["calibration"]["weight_semantics"],
-                "signed class-balanced weights",
-            )
+            self.assertEqual(manifest["ratio_estimator"], RAW_RATIO_ESTIMATOR)
+            self.assertNotIn("calibration", manifest)
             diagnostics = output_directory / "diagnostics.pdf"
             self.assertTrue(diagnostics.read_bytes().startswith(b"%PDF"))
 

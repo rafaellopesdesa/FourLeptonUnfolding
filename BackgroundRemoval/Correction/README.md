@@ -1,6 +1,6 @@
 # Sideband data-to-MC Correction
 
-This stage trains a calibrated target-to-reference density ratio in the
+This stage trains a target-to-reference density ratio from raw NN outputs in the
 strict upper sideband
 
 ```text
@@ -43,10 +43,10 @@ the common `312000 pb^-1` luminosity factor, which cancels from the ratios.
 A custom Correction branch makes the measure unknown; Training then requires
 its explicit `--allow-weight-measure-mismatch` acknowledgement.
 
-For a calibrated balanced-class score `c_C(x)`, the artifact represents
+For the raw ensemble mean balanced-class score `c_C(x)`, the artifact represents
 
 ```text
-C_shape(x) = p_data(x) / p_Pythia_MC(x) = c_C(x) / (1 - c_C(x))
+C_shape(x) = c_C(x) / (1 - c_C(x))  # estimates p_data(x) / p_Pythia_MC(x)
 C(x)       = [sum(w_data) / sum(w_Pythia_MC)] * C_shape(x).
 ```
 
@@ -67,9 +67,6 @@ Pythia splits use the merged `event_id`.
 
 Signed data and MC weights are accepted in the sideband. The balanced BCE
 uses each signed weight directly, normalized by its class's net signed yield.
-Affine-logit calibration uses deterministic starts spanning its bounded
-parameter box and selects the converged fit with the lowest signed BCE, so a
-stationary saddle is not accepted as the solution.
 Negative entries therefore subtract their loss contribution; they are not
 made positive or silently dropped. Class yields and the factor multiplying
 `C_shape` use net sums `sum(w)`, while statistical variances and histogram
@@ -82,28 +79,28 @@ Minibatches are proposed with probabilities proportional to `abs(weight)` and
 use a signed importance coefficient, so their expected loss remains exactly
 the net-normalized signed BCE. Absolute weights are also used to construct a
 stable feature scaler; they are not used for any physical yield or learned
-density ratio. Calibration and ratio normalization use signed weights.
-Network logits are bounded by `--logit-clip`, which makes the signed
-finite-sample BCE bounded without altering event weights. Ratio normalization
-uses one shape-preserving positive multiplier and stops clearly if the signed
-reference moment is non-positive, cancellation-dominated, or would require
-per-event output clipping.
+density ratio. Network logits are bounded by `--logit-clip`, which makes the
+signed finite-sample BCE bounded without altering event weights. The ensemble
+mean probability is converted directly to odds. No logistic calibration,
+intercept adjustment, or empirical ratio-normalization multiplier is fitted.
+The physical target/reference yield ratio remains a separate factor.
 
 The artifact contains one checksummed state file per ensemble member (four by
 default, configurable with `--ensemble-size`, with a minimum of four),
 `manifest.json`, and `diagnostics.pdf`. The manifest stores the strict bounds
 under `selections.mass_window_gev`, the target/reference and component yields,
-the sideband `ggH` fraction, feature order, calibration, and checksummed input
-provenance. It also records the weight branch, normalization family, units,
-and conversion to pb when known; custom units are recorded as arbitrary. The
-PDF includes learning curves, raw and calibrated reliability,
-ratio normalization, ensemble spread, and two data-versus-MC yield closures
+the sideband `ggH` fraction, feature order, the raw-odds inference contract,
+and checksummed input provenance. It also records the weight branch,
+normalization family, units, and conversion to pb when known; custom units are recorded as arbitrary. The
+PDF includes learning curves, raw-score reliability, observed
+ratio-normalization checks, ensemble spread, and two data-versus-MC yield closures
 for all eight inputs: the learned `(ZZ+ggH)*C` ratio and the requested
 downstream `ZZ*C+ggH` prescription. Their difference makes the `ZZ`-dominance
 approximation visible rather than hiding it. The network is fit on 60%;
-calibration and shape normalization use the 15% validation split, and both are
-evaluated on the untouched 25% closure split. The scalar yield factor
-intentionally uses the full selected totals, so absolute-yield closure shares
+the 15% validation split controls early stopping and ensemble retries. Raw
+reliability and closure are evaluated on the untouched 25% closure split;
+they do not fit a correction or force the empirical ratio mean to one. The
+scalar yield factor intentionally uses the full selected totals, so absolute-yield closure shares
 that scalar information.
 
 Train this artifact only from nominal `data.root`. It is frozen when Training
@@ -117,6 +114,10 @@ Input SHA-256 checksums are recorded by default and are used by Training and
 directory Application to enforce a single campaign. Use
 `--skip-input-checksums` only when byte-level provenance is intentionally
 unavailable; doing so disables the corresponding downstream match checks.
+
+New artifacts use format 4. Older calibrated models are rejected. Retrain
+Correction in a new model directory, then retrain background removal and
+redecorate the original merged files; retain earlier outputs separately.
 
 An existing output directory is rejected unless `--overwrite` is supplied.
 For safety, overwrite is limited to a recognized Correction artifact of the

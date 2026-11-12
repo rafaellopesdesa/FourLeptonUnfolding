@@ -11,7 +11,7 @@ from unittest.mock import patch
 import numpy as np
 import uproot
 
-from BackgroundRemoval.common import FEATURES, TREE_NAME
+from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, TREE_NAME
 from omnifold.workflow import OmniFoldSession, TRUTH_FEATURES
 
 
@@ -149,6 +149,61 @@ class WorkflowTest(unittest.TestCase):
         self.data, self.mc, self.truth, self.counts = _inputs(self.root, **input_options)
         return OmniFoldSession.create(data_path=self.data, mc_path=self.mc,
                                       truth_path=self.truth, run_dir=self.root / "run")
+
+    def test_background_metadata_guard_accepts_raw_and_generic_weighted_inputs(self):
+        cases = [
+            (None, "weight_background_removed"),
+            ({"ratio_estimator": dict(RAW_RATIO_ESTIMATOR)}, "weight_background_removed"),
+            ({"format_version": 1}, "weight"),
+        ]
+        for direct in (False, True):
+            for index, (metadata, branch) in enumerate(cases):
+                with self.subTest(direct=direct, metadata=metadata, branch=branch):
+                    data, mc, _, _ = _inputs(self.root, direct_data_weight=direct)
+                    if metadata is not None:
+                        with uproot.update(data) as file:
+                            file["background_removal_metadata"] = json.dumps(metadata)
+                    # Original MC weights do not consume this historical decoration.
+                    with uproot.update(mc) as file:
+                        file["background_removal_metadata"] = json.dumps({"format_version": 1})
+                    session = OmniFoldSession.create(
+                        data_path=data, mc_path=mc, data_weight_branch=branch,
+                        run_dir=self.root / f"accepted_{direct}_{index}",
+                    )
+                    expected = np.array([81., -1., 48.]) * (2 if branch == "weight" else 1)
+                    np.testing.assert_array_equal(session._data.weights, expected)
+                    np.testing.assert_array_equal(OmniFoldSession.load(session.run_dir)._data.weights, expected)
+
+    def test_known_legacy_background_weights_rejected_before_training(self):
+        metadata_cases = [
+            json.dumps({"format_version": 1}),
+            json.dumps({"ratio_estimator": {**RAW_RATIO_ESTIMATOR, "posthoc_calibration": True}}),
+            json.dumps({"ratio_estimator": {**RAW_RATIO_ESTIMATOR, "empirical_normalization": True}}),
+            "not JSON", "null",
+        ]
+        for direct in (False, True):
+            for metadata in metadata_cases:
+                with self.subTest(direct=direct, metadata=metadata):
+                    data, mc, _, _ = _inputs(self.root, direct_data_weight=direct)
+                    with uproot.update(data) as file:
+                        file["background_removal_metadata"] = metadata
+                    run_dir = self.root / "rejected"
+                    with self.assertRaisesRegex(ValueError, "Retrain.*regenerate/redecorate"):
+                        OmniFoldSession.create(data_path=data, mc_path=mc, run_dir=run_dir)
+                    self.assertFalse(run_dir.exists())
+        self.assertEqual(_HistogramRatio.calls, [])
+
+    def test_frozen_likelihood_rejects_known_legacy_toy_background_weights(self):
+        session = self.create()
+        session.step()
+        toy_dir = self.root / "toys"
+        toy_dir.mkdir()
+        toy, _, _, _ = _inputs(toy_dir)
+        with uproot.update(toy) as file:
+            file["background_removal_metadata"] = json.dumps({"format_version": 1})
+        with self.assertRaisesRegex(ValueError, "regenerate/redecorate"):
+            session.evaluate_likelihood(toy)
+        self.assertEqual(len(_HistogramRatio.calls), 3)
 
     def test_inefficient_response_two_updates_resume_and_fixed_reference(self):
         session = self.create()
@@ -307,6 +362,25 @@ class WorkflowTest(unittest.TestCase):
                 self.assertFalse((session.run_dir / ".training.lock").exists())
                 path.write_bytes(original)
         self.assertEqual(len(_HistogramRatio.calls), 3)
+
+    def test_legacy_campaign_and_nonraw_estimator_cannot_resume(self):
+        session = self.create()
+        path = session.run_dir / "session.json"
+        original = json.loads(path.read_text())
+        self.assertEqual(original["format_version"], 2)
+        self.assertFalse(original["ratio_estimator"]["posthoc_calibration"])
+        for modified, message in [
+            ({**original, "format_version": 1}, "Legacy calibrated"),
+            ({**original, "ratio_estimator": {**original["ratio_estimator"], "posthoc_calibration": True}}, "without calibration"),
+            ({**original, "calibration": {}}, "without calibration"),
+        ]:
+            with self.subTest(message=message):
+                path.write_text(json.dumps(modified))
+                with self.assertRaisesRegex(ValueError, message):
+                    OmniFoldSession.load(session.run_dir)
+        self.assertEqual(_HistogramRatio.calls, [])
+        path.write_text(json.dumps(original))
+        self.assertEqual(OmniFoldSession.load(session.run_dir).manifest["ratio_estimator"], original["ratio_estimator"])
 
     def test_closure_cannot_use_selected_mixed_data_as_truth(self):
         data, mc, _, _ = _inputs(self.root)

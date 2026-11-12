@@ -37,7 +37,6 @@ class _ConstantRatio:
         return {
             "shape_ratio": np.ones(size), "full_ratio": np.full(size, 2.0),
             "score_raw": np.full(size, 0.5),
-            "score_calibrated": np.full(size, 0.5),
             "ensemble_std": np.zeros(size),
         }
 
@@ -143,6 +142,36 @@ class DiagnosticsTest(unittest.TestCase):
         self.assertTrue(all(axis.get_yscale() == "linear" for axis in figures["closure"].axes))
         self.assertEqual(figures["learning"].axes[0].get_yscale(), "linear")
         self.assertEqual(figures["learning"].axes[0].lines[0].get_ydata()[1], -0.1)
+
+    def test_reliability_and_scores_show_only_unchanged_raw_predictions(self):
+        class RawRatio:
+            def predict(self, features):
+                scores = features[:, 0]
+                odds = scores / (1.0 - scores)
+                return {"score_raw": scores, "shape_ratio": odds,
+                        "full_ratio": 2.0 * odds, "ensemble_std": np.zeros(len(scores))}
+
+        features = np.array([[0.15], [0.35], [0.65], [0.85]])
+        target_weights = np.array([1.0, 3.0, 2.0, 1.0])
+        reference_weights = np.array([2.0, 2.0, 1.0, 3.0])
+        figures = plot_ratio_diagnostics(
+            RawRatio(), features, target_weights, features, reference_weights,
+            target_splits=np.full(4, 2), reference_splits=np.full(4, 2),
+        )
+        expected = _reliability(features[:, 0], features[:, 0], target_weights, reference_weights)
+        self.assertEqual(len(figures["reliability"].axes), 1)
+        axis = figures["reliability"].axes[0]
+        self.assertEqual(len(axis.containers), 1)
+        point_line = axis.containers[0].lines[0]
+        np.testing.assert_allclose(point_line.get_xdata(), expected["centers"], equal_nan=True)
+        np.testing.assert_allclose(point_line.get_ydata(), expected["fractions"], equal_nan=True)
+        self.assertEqual([axis.get_xlabel() for axis in figures["scores"].axes],
+                         ["Raw score", "log(shape ratio)"])
+        expected_mean = np.average(features[:, 0] / (1.0 - features[:, 0]),
+                                   weights=reference_weights)
+        self.assertNotAlmostEqual(expected_mean, 1.0)
+        self.assertAlmostEqual(figures["closure"].ratio_normalization["reference_shape_mean"],
+                               expected_mean)
 
     def test_distribution_default_is_absolute_and_pdf_is_saved(self):
         features = np.array([[0.25], [0.75]])

@@ -25,6 +25,7 @@ from BackgroundRemoval.common import (
     MODEL_KIND_BACKGROUND_REMOVAL,
     MODEL_KIND_DATA_MC_CORRECTION,
     PRIMARY_OUTPUT_BRANCH,
+    RAW_RATIO_ESTIMATOR,
     TREE_NAME,
     ModelBundle,
     assert_file_unchanged,
@@ -538,7 +539,7 @@ def decorate(
                         if write_diagnostic_branches:
                             diagnostic_sources = {
                                 "signal_score_balanced": (
-                                    "calibrated_score",
+                                    "raw_score",
                                     "signal_score_balanced",
                                 ),
                                 "signal_score_ensemble_std": (
@@ -606,6 +607,7 @@ def decorate(
                         models.correction_manifest_sha256
                     ),
                     "features": list(FEATURES),
+                    "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                     "written_branches": list(written_branches),
                     "entries": entry_count,
                     "analysis_region_entries": analysis_region_count,

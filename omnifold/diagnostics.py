@@ -2,7 +2,7 @@
 
 All distributions retain signed bin contents and use sum(w**2) uncertainties.
 Absolute expected yields are the default.  Histograms used for visual checks
-do not enter ratio training or calibration.  Ratio-model closure uses only
+do not enter ratio training or change its predictions.  Ratio-model closure uses only
 events with split == 2; these plots must not be used to choose a fitted model.
 """
 
@@ -314,7 +314,7 @@ def _reliability(target_scores: np.ndarray, reference_scores: np.ndarray,
 def _predictions(model: Any, features: np.ndarray) -> dict[str, np.ndarray]:
     predictions = model.predict(features)
     output = {}
-    for key in ("shape_ratio", "full_ratio", "score_raw", "score_calibrated", "ensemble_std"):
+    for key in ("shape_ratio", "full_ratio", "score_raw", "ensemble_std"):
         if key not in predictions:
             raise ValueError(f"model.predict is missing {key!r}")
         value = np.asarray(predictions[key], dtype=np.float64)
@@ -393,22 +393,22 @@ def plot_ratio_diagnostics(model: Any, target_features: Any, target_weights: Any
         "reference_yield": float(np.sum(reference_weights)),
         "reweighted_reference_yield": float(np.sum(reference_weights * reference_prediction["full_ratio"])),
     }
-    reliability_figure, axes = plt.subplots(1, 2, figsize=(12, 4.5), layout="constrained")
-    for axis, key, label in zip(axes, ("score_raw", "score_calibrated"), ("Raw", "Calibrated")):
-        result = _reliability(predictions[0][key], predictions[1][key], target_weights,
-                              reference_weights, shared_events=shared_events)
-        axis.plot([0, 1], [0, 1], "k--", linewidth=1)
-        axis.errorbar(result["centers"], result["fractions"], yerr=result["errors"], fmt="o", markersize=4)
-        axis.set_xlabel("Signed mean classifier score")
-        axis.set_ylabel("Signed target fraction (balanced classes)")
-        axis.set_title(f"{label}; undefined bins: {np.count_nonzero(~result['valid'])}")
-        axis.grid(alpha=0.15)
-    reliability_figure.suptitle(f"{title} — held-out reliability; signed ratios may leave [0, 1]")
+    reliability_figure, axis = plt.subplots(figsize=(6.5, 4.5), layout="constrained")
+    result = _reliability(predictions[0]["score_raw"], predictions[1]["score_raw"],
+                          target_weights, reference_weights, shared_events=shared_events)
+    axis.plot([0, 1], [0, 1], "k--", linewidth=1)
+    axis.errorbar(result["centers"], result["fractions"], yerr=result["errors"], fmt="o", markersize=4)
+    axis.set_xlabel("Signed mean raw classifier score")
+    axis.set_ylabel("Signed target fraction (balanced classes)")
+    axis.set_title(f"Raw; undefined bins: {np.count_nonzero(~result['valid'])}")
+    axis.grid(alpha=0.15)
+    reliability_figure.suptitle(
+        f"{title} — held-out raw-score reliability\nSigned ratios may leave [0, 1]")
     figures["reliability"] = reliability_figure
     normalized_weights = [target_weights / np.sum(target_weights), reference_weights / np.sum(reference_weights)]
-    score_figure, axes = plt.subplots(1, 3, figsize=(16, 4), layout="constrained")
-    for axis, key, label in zip(axes, ("score_raw", "score_calibrated", "shape_ratio"),
-                                ("Raw score", "Calibrated score", "log(shape ratio)")):
+    score_figure, axes = plt.subplots(1, 2, figsize=(11, 4), layout="constrained")
+    for axis, key, label in zip(axes, ("score_raw", "shape_ratio"),
+                                ("Raw score", "log(shape ratio)")):
         values = [np.log(p[key]) if key == "shape_ratio" else p[key] for p in predictions]
         edges = _edges("log_ratio", *values, bins=30) if key == "shape_ratio" else np.linspace(0, 1, 31)
         for value, weight, sample_label, color in zip(values, normalized_weights,

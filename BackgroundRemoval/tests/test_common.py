@@ -122,8 +122,6 @@ class CommonUtilitiesTest(unittest.TestCase):
         member_scores = np.full((3, 4), [[0.2], [0.5], [0.8]])
         outputs = ratio_outputs(
             member_scores,
-            calibration_scale=1.0,
-            calibration_bias=0.0,
             yield_ratio=0.25,
             logit_clip=30.0,
         )
@@ -149,14 +147,38 @@ class CommonUtilitiesTest(unittest.TestCase):
         scores = np.full((1, 4), 0.75)
         outputs = ratio_outputs(
             scores,
-            calibration_scale=1.0,
-            calibration_bias=0.0,
             yield_ratio=2.0,
             logit_clip=30.0,
         )
         self.assertAlmostEqual(outputs["background_shape_ratio"][0], 3.0)
         self.assertAlmostEqual(outputs["signal_to_background_ratio"][0], 6.0)
         self.assertAlmostEqual(outputs["background_removal_weight"][0], 6.0 / 7.0)
+
+    def test_raw_ensemble_odds_are_not_recalibrated_or_mean_normalized(self):
+        scores = np.array([[0.1, 0.2, 0.3, 0.8], [0.2, 0.4, 0.7, 0.9]])
+        outputs = ratio_outputs(scores, yield_ratio=2.5, logit_clip=30.0)
+        mean_score = scores.mean(axis=1)
+        odds_of_mean = mean_score / (1.0 - mean_score)
+        np.testing.assert_array_equal(outputs["raw_score"], mean_score)
+        np.testing.assert_array_equal(outputs["signal_score_balanced"], mean_score)
+        np.testing.assert_allclose(outputs["shape_ratio"], odds_of_mean)
+        np.testing.assert_allclose(outputs["physical_ratio"], 2.5 * odds_of_mean)
+        # This deliberately differs from averaging each member's odds.
+        self.assertFalse(np.allclose(odds_of_mean, (scores / (1.0 - scores)).mean(axis=1)))
+        reference_weights = np.array([2.0, -0.1])
+        observed_mean = np.sum(reference_weights * outputs["shape_ratio"]) / reference_weights.sum()
+        self.assertNotAlmostEqual(float(observed_mean), 1.0, places=5)
+
+    def test_physical_ratio_keeps_large_yield_factor_without_output_rescaling(self):
+        outputs = ratio_outputs(np.full((1, 4), 0.8), yield_ratio=1.0e12, logit_clip=2.0)
+        self.assertAlmostEqual(outputs["shape_ratio"][0], 4.0)
+        self.assertAlmostEqual(outputs["physical_ratio"][0] / 1.0e12, 4.0)
+        np.testing.assert_allclose(outputs["target_purity"], [4.0e12 / (1.0 + 4.0e12)])
+
+    def test_invalid_member_probabilities_are_rejected(self):
+        for value in (-0.01, 1.01, np.nan):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                ratio_outputs(np.full((1, 4), value), yield_ratio=1.0, logit_clip=30.0)
 
     def test_exact_saturated_scores_have_finite_logits(self):
         logits = stable_logit(np.array([0.0, 1.0]), logit_clip=100.0)

@@ -61,10 +61,10 @@ sideband. Its classes are:
 
 The two Pythia components retain their physical relative normalization before
 the target and reference classes are balanced for BCE training. If `c_C(x)`
-is the calibrated balanced-class score, then
+is the raw mean balanced-class score of the ensemble, then
 
 ```text
-C_shape(x) = p_data(x) / p_Pythia(x) = c_C(x) / (1 - c_C(x))
+C_shape(x) = c_C(x) / (1 - c_C(x))  # estimates p_data(x) / p_Pythia(x)
 k_C         = sum(w_data) / [sum(w_ZZ) + sum(w_ggH)]
 C(x)        = k_C * C_shape(x)
 ```
@@ -129,7 +129,7 @@ factor `C(x)`. The nonfiducial `ggH` component is not correction-weighted.
 Their relative yields are preserved before BCE class balancing.
 
 Let `S` be the weighted signal yield and `B` the combined weighted background
-yield after the `ZZ` correction. For the calibrated balanced-class score
+yield after the `ZZ` correction. For the raw mean balanced-class score
 `c_T(x)`, Training constructs
 
 ```text
@@ -173,12 +173,11 @@ Both stages use the same defaults:
 - signed BCE with logits bounded to `[-logit-clip, +logit-clip]`, NAdam, and
   exponential learning-rate decay;
 - no dropout, weight decay, or other explicit regularization;
-- deterministic 60% fit, 15% validation/calibration, and 25% untouched
+- deterministic 60% fit, 15% validation, and 25% untouched
   closure splits;
 - arithmetic-mean probability aggregation;
-- bounded affine-logit calibration followed by validation-split normalization
-  of the shape ratio, `E_reference[r_shape] = 1`; signed samples use a
-  deterministic box-spanning multistart because their BCE can be non-convex;
+- direct odds of the mean probability for the shape ratio, without a fitted
+  score calibration or empirical ratio normalization;
 - robust retry of a member whose common validation loss is an outlier in
   either direction;
 - validation of the 312 fb$^{-1}$ input metadata.
@@ -219,14 +218,16 @@ estimator is exactly `sum(w_i * BCE_i) / sum(w_i)`; the absolute value controls
 only the proposal distribution and never changes the signed objective.
 Feature centering and scaling similarly use class-balanced `abs(w)` moments,
 because preprocessing variances must be nonnegative. The physical loss,
-calibration, ratios, yields, and closures continue to use signed weights.
+yields, and closure sums continue to use signed weights.
 
-Shape normalization is a single positive multiplier. Training requires the
-signed reference moment of the calibrated positive ratio to be positive and
-not cancellation-dominated. It also refuses a normalization that would need
-per-event output clipping, because that would distort the learned shape rather
-than merely normalize it. These are aggregate validity conditions; individual
-negative events remain accepted.
+For ensemble mean probability `s(x)`, inference uses `r_shape(x) = s(x)/(1-s(x))`
+and `R(x) = K * r_shape(x)`, where `K` is the selected target/reference net
+yield ratio. Numerical logit bounds remain part of the inference contract.
+There is no fitted logistic or temperature calibration, intercept adjustment,
+or multiplier enforcing `E_reference[r_shape] = 1`. That empirical mean is
+measured as a diagnostic and can differ from one. Such a discrepancy, like
+poor raw-score reliability, must be addressed by training and validation; it
+is not corrected after training. The physical yield factor `K` is retained.
 
 All weighted yields and histogram contents in the artifacts and diagnostics
 are signed sums. Statistical variances use `Q_c = sum(w_i^2)`, so negative
@@ -237,19 +238,34 @@ important for the signed unit-weight pseudo-data emitted by the merger.
 
 Each model directory contains `manifest.json`, one checksummed state file per
 ensemble member (four by default), and `diagnostics.pdf`. The PDF reports
-learning curves, raw and calibrated reliability, ratio normalization,
-ensemble spread, and held-out
-closure tests for all eight model variables. The learned shape and calibration
-are evaluated on the untouched 25% closure split. The scalar yield ratio is,
-intentionally, computed from the full selected sample, so absolute-yield
+learning curves, raw-score reliability, observed ratio-normalization checks,
+ensemble spread, and held-out closure tests for all eight model variables.
+Reliability is a diagnostic of the NN output, with no correction fitted to
+its curve. The learned ratio and its reliability are evaluated on the
+untouched 25% closure split. The validation split controls early stopping and
+ensemble retries. The scalar yield ratio is intentionally computed from the
+full selected sample, so absolute-yield
 closure is not independent of that one scalar. The binned chi-square values
 are discrepancy summaries, not p-values.
 
-Newly trained model artifacts use format version 3, which makes the bounded
-member-logit inference rule part of the serialized contract. This revision
-still reads legacy format-v2 artifacts with their original unbounded
-member-score behavior. Older repository revisions must not be used to apply a
-format-v3 artifact.
+Newly trained model artifacts use format version 4 and explicitly record the
+raw-ensemble-odds rule. Older calibrated format-v2/v3 artifacts are rejected;
+they are not silently reinterpreted as raw models. Train a new Correction,
+then a new background-removal model using that Correction, and redecorate the
+original merged inputs into a new output directory. Keep old artifacts and
+decorated outputs separately for comparison. To omit post-training score
+corrections throughout the chain, start a fresh OmniFold campaign from these
+newly decorated files; existing ROOT weight branches may still contain earlier calibration
+corrections, and their numerical values alone do not identify that history.
+For its standard background-removed data weight, OmniFold checks the embedded
+`background_removal_metadata` object when present and rejects a missing or
+incompatible raw estimator contract. Metadata-free inputs and custom weight
+branches remain accepted, so retain the model/output provenance as well.
+
+Removing post-training corrections does not establish that a network is
+well calibrated. The NN topology, signed loss, and early-stopping defaults
+are unchanged; use the raw reliability and held-out closure diagnostics to
+assess each training.
 
 For Correction, the report shows both `(ZZ+ggH)*C` (the density ratio that was
 learned) and `ZZ*C+ggH` (the prescription that is actually applied). This

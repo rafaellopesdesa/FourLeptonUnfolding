@@ -19,8 +19,13 @@ import numpy as np
 
 
 TREE_NAME = "Analysis"
-ARTIFACT_FORMAT_VERSION = 3
-SUPPORTED_ARTIFACT_FORMAT_VERSIONS = frozenset({2, ARTIFACT_FORMAT_VERSION})
+ARTIFACT_FORMAT_VERSION = 4
+SUPPORTED_ARTIFACT_FORMAT_VERSIONS = frozenset({ARTIFACT_FORMAT_VERSION})
+RAW_RATIO_ESTIMATOR = {
+    "method": "raw_ensemble_odds",
+    "posthoc_calibration": False,
+    "empirical_normalization": False,
+}
 TOOLKIT_COMMIT = "fc09848fc6540fd32310faebbe9db6eea7ecd17b"
 
 MASS_BRANCH = "reco_m_ZZ"
@@ -136,7 +141,7 @@ def weight_measure_contract(
 
     ``weight`` and ``weight_nominal_pb`` differ only by the common integrated
     luminosity factor written by the merge step.  That constant cancels from
-    each calibrated density ratio, so those two branches are a known-compatible
+    each density ratio, so those two branches are a known-compatible
     pair.  Any other branch is deliberately classified as custom rather than
     guessing its units or normalization semantics.
     """
@@ -360,50 +365,47 @@ def stable_logit(probabilities: np.ndarray, *, logit_clip: float) -> np.ndarray:
 def ratio_outputs(
     member_scores: np.ndarray,
     *,
-    calibration_scale: float,
-    calibration_bias: float,
     yield_ratio: float,
     logit_clip: float,
 ) -> dict[str, np.ndarray]:
-    """Turn balanced member scores into shape, physical-odds, and purity terms."""
+    """Use raw ensemble odds, with the physical yield factor kept separate.
+
+    There is no fitted score transformation or empirical rescaling of the
+    density ratio. The existing logit bound only protects numerical endpoints.
+    Departure of the reference mean ratio from one is a diagnostic of the fit.
+    """
 
     scores = np.asarray(member_scores, dtype=np.float64)
     if scores.ndim != 2 or scores.shape[1] == 0:
         raise ValueError("member scores must have shape (events, ensemble members)")
-    if not np.all(np.isfinite(scores)):
-        raise ValueError("ensemble predictions contain non-finite values")
+    if not np.all(np.isfinite(scores)) or np.any((scores < 0.0) | (scores > 1.0)):
+        raise ValueError("ensemble predictions must be finite probabilities in [0, 1]")
     if not np.isfinite(yield_ratio) or yield_ratio <= 0.0:
         raise ValueError("yield ratio must be finite and positive")
-    if not np.isfinite(calibration_scale) or calibration_scale <= 0.0:
-        raise ValueError("calibration scale must be finite and positive")
-    if not np.isfinite(calibration_bias):
-        raise ValueError("calibration bias must be finite")
     if not np.isfinite(logit_clip) or not (0.0 < logit_clip <= 100.0):
         raise ValueError("logit clip must be finite and lie in (0, 100]")
 
     raw_score = np.mean(scores, axis=1)
-    raw_logit = stable_logit(raw_score, logit_clip=logit_clip)
     log_shape_ratio = np.clip(
-        calibration_scale * raw_logit + calibration_bias,
+        stable_logit(raw_score, logit_clip=logit_clip),
         -abs(logit_clip),
         abs(logit_clip),
     )
     shape_ratio = np.exp(log_shape_ratio)
-    log_physical_ratio = np.clip(
-        log_shape_ratio + math.log(yield_ratio),
-        -2.0 * abs(logit_clip),
-        2.0 * abs(logit_clip),
-    )
-    physical_ratio = np.exp(log_physical_ratio)
+    log_physical_ratio = log_shape_ratio + math.log(yield_ratio)
+    with np.errstate(over="ignore"):
+        physical_ratio = float(yield_ratio) * shape_ratio
+    if not np.all(np.isfinite(physical_ratio)):
+        raise RuntimeError("full density ratio is not finite")
     result = {
         "raw_score": raw_score,
-        "signal_score_balanced": stable_sigmoid(log_shape_ratio),
+        "signal_score_balanced": raw_score,
         "signal_score_ensemble_std": np.std(scores, axis=1),
         "background_shape_ratio": shape_ratio,
         "signal_to_background_ratio": physical_ratio,
         "background_removal_weight": stable_sigmoid(log_physical_ratio),
     }
-    # Generic names make the same calibrated estimator usable both for
+    # Generic names make the same raw estimator usable both for
     # target/reference data-MC correction and for signal/background purity.
     result["shape_ratio"] = result["background_shape_ratio"]
     result["physical_ratio"] = result["signal_to_background_ratio"]
@@ -469,8 +471,17 @@ class ModelBundle:
             or format_version not in SUPPORTED_ARTIFACT_FORMAT_VERSIONS
         ):
             raise ValueError(
-                f"unsupported model format {format_version!r}; expected one of "
-                f"{sorted(SUPPORTED_ARTIFACT_FORMAT_VERSIONS)}"
+                f"unsupported model format {format_version!r}; expected raw-odds "
+                f"format {ARTIFACT_FORMAT_VERSION}. Older calibrated artifacts "
+                "must be retrained in a new directory; do not change their version manually."
+            )
+        if (
+            manifest.get("ratio_estimator") != RAW_RATIO_ESTIMATOR
+            or "calibration" in manifest
+        ):
+            raise ValueError(
+                "model artifact must use raw ensemble odds without calibration "
+                "or empirical normalization"
             )
         model_kind = manifest.get("model_kind")
         if model_kind not in {
@@ -490,17 +501,14 @@ class ModelBundle:
         architecture = manifest.get("architecture")
         if not isinstance(architecture, Mapping):
             raise ValueError("model artifact has no valid architecture contract")
-        if format_version >= 3:
-            loss_logit_clip = architecture.get("loss_logit_clip")
-            if (
-                isinstance(loss_logit_clip, bool)
-                or not isinstance(loss_logit_clip, (int, float))
-                or not np.isfinite(loss_logit_clip)
-                or not (0.0 < float(loss_logit_clip) <= 100.0)
-            ):
-                raise ValueError(
-                    "format-v3 model artifact has no valid inference logit bound"
-                )
+        loss_logit_clip = architecture.get("loss_logit_clip")
+        if (
+            isinstance(loss_logit_clip, bool)
+            or not isinstance(loss_logit_clip, (int, float))
+            or not np.isfinite(loss_logit_clip)
+            or not (0.0 < float(loss_logit_clip) <= 100.0)
+        ):
+            raise ValueError("model artifact has no valid inference logit bound")
         if manifest.get("toolkit", {}).get("pinned_commit") != TOOLKIT_COMMIT:
             raise ValueError("model toolkit revision is incompatible with this application")
         ratio_convention = manifest.get("ratio_convention")
@@ -588,19 +596,9 @@ class ModelBundle:
         if batch_size < 1:
             raise ValueError("inference batch size must be positive")
         standardized = (transformed - mean) / scale
-        # The member-logit bound became part of the serialized inference
-        # contract in format v3.  A legacy v2 artifact must retain its original
-        # unbounded inference semantics even if its free-form architecture
-        # mapping happens to contain a similarly named field.
-        loss_logit_clip = (
-            self.manifest["architecture"].get("loss_logit_clip")
-            if self.manifest["format_version"] >= 3
-            else None
-        )
-        if loss_logit_clip is not None:
-            loss_logit_clip = float(loss_logit_clip)
-            if not np.isfinite(loss_logit_clip) or loss_logit_clip <= 0.0:
-                raise ValueError("model loss-logit clip must be finite and positive")
+        loss_logit_clip = float(self.manifest["architecture"]["loss_logit_clip"])
+        if not np.isfinite(loss_logit_clip) or not (0.0 < loss_logit_clip <= 100.0):
+            raise ValueError("model loss-logit clip must be finite and lie in (0, 100]")
         predictions = np.empty(
             (standardized.shape[0], len(self.models)), dtype=np.float64
         )
@@ -610,12 +608,9 @@ class ModelBundle:
                 tensor = torch.from_numpy(standardized[start:stop]).to(self.device)
                 for member_index, model in enumerate(self.models):
                     logits = model(tensor).reshape(-1)
-                    if loss_logit_clip is not None:
-                        logits = torch.clamp(
-                            logits,
-                            min=-loss_logit_clip,
-                            max=loss_logit_clip,
-                        )
+                    logits = torch.clamp(
+                        logits, min=-loss_logit_clip, max=loss_logit_clip,
+                    )
                     predictions[start:stop, member_index] = (
                         torch.sigmoid(logits).detach().cpu().numpy()
                     )
@@ -625,7 +620,6 @@ class ModelBundle:
         self, raw_features: np.ndarray, *, batch_size: int = 65536
     ) -> dict[str, np.ndarray]:
         scores = self.predict_member_scores(raw_features, batch_size=batch_size)
-        calibration = self.manifest["calibration"]
         yields = self.manifest["yields"]
         yield_ratio = yields.get(
             "target_to_reference", yields.get("signal_to_background")
@@ -634,8 +628,6 @@ class ModelBundle:
             raise ValueError("model manifest does not define a target/reference yield ratio")
         return ratio_outputs(
             scores,
-            calibration_scale=float(calibration["scale"]),
-            calibration_bias=float(calibration["bias_after_normalization"]),
             yield_ratio=float(yield_ratio),
-            logit_clip=float(calibration["logit_clip"]),
+            logit_clip=float(self.manifest["architecture"]["loss_logit_clip"]),
         )

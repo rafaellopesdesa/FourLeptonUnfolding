@@ -1,5 +1,12 @@
 # Application
 
+Application requires the new format-4 raw-ensemble-odds models. Legacy calibrated
+model artifacts are rejected rather than reinterpreted. Retrain Correction,
+then Training using that new Correction, and redecorate the original merged
+inputs into a fresh output directory. Retain older decorated files separately;
+their existing weight values do not establish whether output corrections were
+used when they were produced.
+
 Application writes two compact branches while preserving the input tree,
 entry order, original signed weights, fixed-size arrays, and string metadata:
 
@@ -115,8 +122,9 @@ diagnostic branches are written back only when `--write-diagnostic-branches`
 is also supplied.
 
 The embedded `background_removal_metadata` object records the pre-decoration
-source path, size, modification time, and SHA-256. This also preserves useful
-provenance when the explicitly requested `--overwrite` operation is in-place.
+source path, size, modification time, SHA-256, and raw-ensemble-odds estimator
+contract. This preserves provenance when the explicitly requested
+`--overwrite` operation is in-place.
 
 Add `--write-diagnostic-branches` only for event-level debugging. It writes
 scores, ratios, ensemble spread, and the convenience branch

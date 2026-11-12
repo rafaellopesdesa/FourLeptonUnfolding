@@ -101,17 +101,14 @@ def _normalize_histogram_statistics(
 
 
 def _model_outputs(predictions: Any, manifest: dict[str, Any]) -> dict[str, np.ndarray]:
-    calibration = manifest["calibration"]
     yields = manifest["yields"]
     yield_ratio = yields.get(
         "target_to_reference", yields.get("signal_to_background")
     )
     return ratio_outputs(
         predictions.member_scores,
-        calibration_scale=float(calibration["scale"]),
-        calibration_bias=float(calibration["bias_after_normalization"]),
         yield_ratio=float(yield_ratio),
-        logit_clip=float(calibration["logit_clip"]),
+        logit_clip=float(manifest["architecture"]["loss_logit_clip"]),
     )
 
 
@@ -363,7 +360,7 @@ def make_diagnostics_pdf(
     closure: dict[str, Any],
     reference_is_zz: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """Create the calibration and all-variable closure evidence report."""
+    """Report raw-score reliability and all-variable closure without score corrections."""
 
     validation_outputs = {
         name: _model_outputs(item, manifest) for name, item in validation.items()
@@ -443,11 +440,12 @@ def make_diagnostics_pdf(
         lines.extend(
             [
                 "",
-                "The validation split sets early stopping and calibration.",
+                "The validation split sets early stopping and ensemble selection.",
                 "Learned-shape plots use the untouched 25% closure split.",
                 "The scalar yield ratio uses the full selected totals by definition.",
-                "Signed weights enter BCE/calibration/yields with their original sign.",
+                "Signed weights enter BCE, diagnostics, and yields with their original sign.",
                 "Absolute weights are used only for scaler moments and sampling.",
+                "Raw ensemble odds are used without calibration or ratio rescaling.",
                 "",
                 f"Toolkit pin: {manifest['toolkit']['pinned_commit']}",
                 f"Ensemble: {manifest['ensemble']['size']} arithmetic-mean members",
@@ -505,7 +503,7 @@ def make_diagnostics_pdf(
                     if correction_mode
                     else class_name
                 )
-                values = outputs[class_name]["signal_score_balanced"]
+                values = outputs[class_name]["raw_score"]
                 weights = (
                     validation_weights[class_name]
                     if split_name == "validation"
@@ -527,7 +525,7 @@ def make_diagnostics_pdf(
                     color=color,
                     label=f"{class_label}, {split_name}",
                 )
-        axes[0].set_xlabel("Calibrated balanced-prior score")
+        axes[0].set_xlabel("Raw balanced-prior score")
         axes[0].set_ylabel("Normalized entries")
         all_score_bins = np.concatenate(score_histograms)
         if np.any(all_score_bins < 0.0):
@@ -538,13 +536,13 @@ def make_diagnostics_pdf(
         axes[0].legend(fontsize=8)
         axes[0].set_title("Score stability")
 
-        calibration_summary = {}
+        reliability_summary = {}
         plotted_centers: list[float] = []
         plotted_fractions: list[float] = []
         raw_centers, raw_fractions, raw_errors, raw_nll, raw_brier, raw_ece = (
             _reliability(
-                closure["signal"].ensemble_score,
-                closure["background"].ensemble_score,
+                closure_outputs["signal"]["raw_score"],
+                closure_outputs["background"]["raw_score"],
                 closure_weights["signal"],
                 closure_weights["background"],
             )
@@ -562,35 +560,11 @@ def make_diagnostics_pdf(
             color="#7F7F7F",
             label=f"closure raw: NLL={raw_nll:.3f}, ECE={raw_ece:.3f}",
         )
-        calibration_summary["closure_raw"] = {
+        reliability_summary["closure_raw"] = {
             "nll": raw_nll,
             "brier": raw_brier,
             "ece": raw_ece,
         }
-        for label, predictions, outputs, marker in (
-            ("validation", validation, validation_outputs, "s"),
-            ("closure", closure, closure_outputs, "o"),
-        ):
-            weights = validation_weights if label == "validation" else closure_weights
-            centers, fractions, errors, nll, brier, ece = _reliability(
-                outputs["signal"]["signal_score_balanced"],
-                outputs["background"]["signal_score_balanced"],
-                weights["signal"],
-                weights["background"],
-            )
-            valid = np.isfinite(centers) & np.isfinite(fractions)
-            plotted_centers.extend(centers[valid].tolist())
-            plotted_fractions.extend(fractions[valid].tolist())
-            axes[1].errorbar(
-                centers[valid],
-                fractions[valid],
-                yerr=errors[valid],
-                fmt=marker,
-                markersize=4,
-                capsize=1.5,
-                label=f"{label}: NLL={nll:.3f}, ECE={ece:.3f}",
-            )
-            calibration_summary[label] = {"nll": nll, "brier": brier, "ece": ece}
         # Signed conditional estimates can fluctuate outside [0, 1] in bins
         # with strong cancellation.  Show those fluctuations rather than
         # clipping them out of the calibration evidence.
@@ -610,12 +584,12 @@ def make_diagnostics_pdf(
         axes[1].set_ylabel(
             "Weighted target fraction" if correction_mode else "Weighted signal fraction"
         )
-        axes[1].set_title("Balanced-prior reliability")
+        axes[1].set_title("Raw balanced-prior reliability (closure)")
         axes[1].legend(fontsize=9)
         figure.tight_layout()
         pdf.savefig(figure)
         plt.close(figure)
-        report_metrics["calibration"] = calibration_summary
+        report_metrics["reliability"] = reliability_summary
 
         figure, axes = plt.subplots(1, 2, figsize=(12.0, 5.0))
         split_labels = []
@@ -663,7 +637,7 @@ def make_diagnostics_pdf(
         axes[0].set_xticks(positions, split_labels)
         axes[0].axhline(1.0, color="black", linestyle="--")
         axes[0].set_ylabel("Weighted expectation")
-        axes[0].set_title("Forward and inverse ratio normalization")
+        axes[0].set_title("Observed ratio normalization (not enforced)")
         axes[0].legend(fontsize=9)
         closure_spread = np.concatenate(
             [
