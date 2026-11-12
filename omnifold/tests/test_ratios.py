@@ -16,8 +16,8 @@ from omnifold import ratios
 
 def _sample(seed=19, size=96):
     rng = np.random.default_rng(seed)
-    features = rng.normal(size=(size, 8)).astype(np.float32)
-    features[:, 6:] += (80.0, 30.0)
+    features = rng.normal(size=(size, len(ratios.FEATURE_ORDER))).astype(np.float32)
+    features[:, -2:] += (80.0, 30.0)
     splits = (np.arange(size) % 3).astype(np.uint8)
     weights = rng.uniform(0.8, 1.2, size)
     weights[:3] = -0.2
@@ -39,7 +39,7 @@ class RatioContractTests(unittest.TestCase):
     def test_invalid_features_splits_and_nonfinite_weights_are_rejected(self):
         features, weights, splits = _sample()
         with self.assertRaisesRegex(ValueError, "shape"):
-            ratios._checked_class(features[:, :7], weights, splits, "target")
+            ratios._checked_class(features[:, :-1], weights, splits, "target")
         bad_splits = splits.copy()
         bad_splits[0] = 3
         with self.assertRaisesRegex(ValueError, "splits must contain"):
@@ -265,6 +265,20 @@ class RatioTrainingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "feature order"):
             ratios.RatioEstimator.load(corrupt, device="cpu")
 
+    def test_all_predictions_use_seven_inputs_and_are_even_in_phi_and_psi(self):
+        self.assertEqual(ratios.MODEL_FEATURE_ORDER,
+                         ("cos(Phi)", "cos(Psi)", "cos_theta1", "cos_theta2",
+                          "cos_theta_star", "m_Z1", "m_Z2"))
+        self.assertTrue(all(model[0].in_features == 7 for model in self.model.models))
+        expected = self.model.predict(self.features)
+        for indices in ([0], [1], [0, 1]):
+            with self.subTest(flipped=indices):
+                reflected = self.features.copy()
+                reflected[:, indices] *= -1
+                prediction = self.model.predict(reflected)
+                for name in expected:
+                    np.testing.assert_array_equal(prediction[name], expected[name])
+
     def test_legacy_calibrated_artifacts_and_injected_corrections_are_rejected(self):
         destination = self.root / "legacy-or-tampered"
         shutil.copytree(self.model.root, destination)
@@ -272,6 +286,10 @@ class RatioTrainingTests(unittest.TestCase):
         original = json.loads(manifest_path.read_text())
         cases = [
             ({**original, "format_version": 1, "calibration": {"scale": .5, "bias": .2}}, "Legacy calibrated"),
+            ({**original, "format_version": 2}, "seven cosine-only"),
+            ({**original, "model_features": ["sin(Phi)", "cos(Phi)", "sin(Phi1)",
+                "cos(Phi1)", "sin(Psi)", "cos(Psi)", "cos_theta1", "cos_theta2",
+                "cos_theta_star", "m_Z1", "m_Z2"]}, "feature order"),
             ({**original, "calibration": {"scale": 1., "bias": 0.}}, "without calibration"),
             ({**original, "ratio_estimator": {**original["ratio_estimator"], "empirical_normalization": True}}, "without calibration"),
         ]

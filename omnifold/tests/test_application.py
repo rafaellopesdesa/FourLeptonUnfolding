@@ -9,11 +9,14 @@ import unittest
 import numpy as np
 import uproot
 
-from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, sha256_file
+from BackgroundRemoval.common import FEATURES, MODEL_FEATURES, RAW_RATIO_ESTIMATOR, sha256_file
 from omnifold.application import MANIFEST_NAME, TRUTH_FEATURES, decorate_files
 
 
-_BACKGROUND_METADATA = {"keep_me": True, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR)}
+_BACKGROUND_METADATA = {
+    "keep_me": True, "format_version": 3, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
+    "features": list(FEATURES), "model_features": list(MODEL_FEATURES),
+}
 
 
 class _Ratio:

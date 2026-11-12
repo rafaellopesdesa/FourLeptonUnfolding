@@ -1420,8 +1420,8 @@ def train(args: argparse.Namespace) -> Path:
                 "features": list(FEATURES),
                 "model_features": list(MODEL_FEATURES),
                 "preprocessing": {
-                    "periodic_variables": list(FEATURES[:3]),
-                    "periodic_encoding": "sin_cos",
+                    "periodic_variables": list(FEATURES[:2]),
+                    "periodic_encoding": "cos",
                     "remaining_variables": "identity",
                 },
                 "selections": {

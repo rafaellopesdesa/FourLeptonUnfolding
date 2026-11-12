@@ -27,6 +27,8 @@ class ToolkitSmokeTest(unittest.TestCase):
         }
         model = build_toolkit_model(architecture)
         modules = tuple(model.modules())
+        first_linear = next(module for module in modules if isinstance(module, torch.nn.Linear))
+        self.assertEqual(first_linear.in_features, 7)
         self.assertFalse(any(isinstance(module, torch.nn.Dropout) for module in modules))
         inputs = torch.from_numpy(
             np.zeros((3, len(MODEL_FEATURES)), dtype=np.float32)

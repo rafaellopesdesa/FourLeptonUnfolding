@@ -19,7 +19,7 @@ import numpy as np
 
 
 TREE_NAME = "Analysis"
-ARTIFACT_FORMAT_VERSION = 4
+ARTIFACT_FORMAT_VERSION = 5
 SUPPORTED_ARTIFACT_FORMAT_VERSIONS = frozenset({ARTIFACT_FORMAT_VERSION})
 RAW_RATIO_ESTIMATOR = {
     "method": "raw_ensemble_odds",
@@ -34,12 +34,12 @@ CORRECTION_MASS_WINDOW = (130.0, 160.0)
 MODEL_KIND_BACKGROUND_REMOVAL = "background_removal"
 MODEL_KIND_DATA_MC_CORRECTION = "data_mc_correction"
 
-# Keep this order identical for the correction and background-removal models.
+# Keep this order identical for correction, background removal, and OmniFold.
+# Phi and Psi are read as angles and enter the network only through cosine.
 # reco_m_ZZ is deliberately only a region-selection variable and never enters
-# either neural network.
+# any neural network.
 FEATURES = (
     "reco_Phi",
-    "reco_Phi1",
     "reco_Psi",
     "reco_cos_theta1",
     "reco_cos_theta2",
@@ -48,11 +48,7 @@ FEATURES = (
     "reco_m_Z2",
 )
 MODEL_FEATURES = (
-    "sin(reco_Phi)",
     "cos(reco_Phi)",
-    "sin(reco_Phi1)",
-    "cos(reco_Phi1)",
-    "sin(reco_Psi)",
     "cos(reco_Psi)",
     "reco_cos_theta1",
     "reco_cos_theta2",
@@ -242,7 +238,7 @@ def toolkit_runtime_provenance() -> dict[str, Any]:
 
 
 def transformed_features(raw: np.ndarray) -> np.ndarray:
-    """Apply periodic encoding while using only the eight requested inputs."""
+    """Build the seven NN inputs, retaining only cosines of Phi and Psi."""
 
     raw = np.asarray(raw)
     if raw.ndim != 2 or raw.shape[1] != len(FEATURES):
@@ -253,13 +249,9 @@ def transformed_features(raw: np.ndarray) -> np.ndarray:
     if not np.all(np.isfinite(raw)):
         raise ValueError("model inputs contain non-finite values")
     output = np.empty((raw.shape[0], len(MODEL_FEATURES)), dtype=np.float32)
-    output[:, 0] = np.sin(raw[:, 0])
-    output[:, 1] = np.cos(raw[:, 0])
-    output[:, 2] = np.sin(raw[:, 1])
-    output[:, 3] = np.cos(raw[:, 1])
-    output[:, 4] = np.sin(raw[:, 2])
-    output[:, 5] = np.cos(raw[:, 2])
-    output[:, 6:] = raw[:, 3:]
+    output[:, 0] = np.cos(raw[:, 0])
+    output[:, 1] = np.cos(raw[:, 1])
+    output[:, 2:] = raw[:, 2:]
     return output
 
 
@@ -471,9 +463,10 @@ class ModelBundle:
             or format_version not in SUPPORTED_ARTIFACT_FORMAT_VERSIONS
         ):
             raise ValueError(
-                f"unsupported model format {format_version!r}; expected raw-odds "
-                f"format {ARTIFACT_FORMAT_VERSION}. Older calibrated artifacts "
-                "must be retrained in a new directory; do not change their version manually."
+                f"unsupported model format {format_version!r}; expected seven-input "
+                f"raw-odds format {ARTIFACT_FORMAT_VERSION}. Older artifacts must be "
+                "retrained with the seven-input feature definition in a new directory; "
+                "do not change their version manually."
             )
         if (
             manifest.get("ratio_estimator") != RAW_RATIO_ESTIMATOR
@@ -495,9 +488,15 @@ class ModelBundle:
                 f"{expected_model_kind!r} application"
             )
         if tuple(manifest.get("features", ())) != FEATURES:
-            raise ValueError("model feature order is incompatible with this application")
+            raise ValueError(
+                "model feature order is incompatible with the seven-input definition; "
+                "retrain in a new directory"
+            )
         if tuple(manifest.get("model_features", ())) != MODEL_FEATURES:
-            raise ValueError("model preprocessing schema is incompatible with this application")
+            raise ValueError(
+                "model preprocessing schema is incompatible with the seven-input definition; "
+                "retrain in a new directory"
+            )
         architecture = manifest.get("architecture")
         if not isinstance(architecture, Mapping):
             raise ValueError("model artifact has no valid architecture contract")

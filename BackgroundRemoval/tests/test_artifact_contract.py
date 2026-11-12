@@ -154,13 +154,32 @@ class ArtifactContractTest(unittest.TestCase):
                     expected_model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
                 )
 
-    def test_loader_rejects_legacy_calibrated_artifacts(self):
-        for version in (2, 3):
+    def test_loader_rejects_previous_feature_and_calibrated_artifacts(self):
+        for version in (2, 3, 4):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as directory_name:
                 root = Path(directory_name) / "artifact"
                 _write_artifact(root, model_kind=MODEL_KIND_BACKGROUND_REMOVAL,
                                 format_version=version)
                 with self.assertRaisesRegex(ValueError, "retrain"):
+                    self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+
+    def test_old_eleven_input_feature_contract_cannot_be_relabelled_as_current(self):
+        old_features = [
+            "reco_Phi", "reco_Phi1", "reco_Psi", "reco_cos_theta1",
+            "reco_cos_theta2", "reco_cos_theta_star", "reco_m_Z1", "reco_m_Z2",
+        ]
+        old_model_features = [
+            "sin(reco_Phi)", "cos(reco_Phi)", "sin(reco_Phi1)", "cos(reco_Phi1)",
+            "sin(reco_Psi)", "cos(reco_Psi)", *old_features[3:],
+        ]
+        for features in (old_features, list(FEATURES)):
+            with self.subTest(features=features), tempfile.TemporaryDirectory() as directory_name:
+                root = Path(directory_name) / "artifact"
+                manifest = _write_artifact(root, model_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+                manifest["features"] = features
+                manifest["model_features"] = old_model_features
+                (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "seven-input.*retrain"):
                     self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
 
     def test_loader_requires_raw_ratio_contract_and_rejects_calibration_parameters(self):

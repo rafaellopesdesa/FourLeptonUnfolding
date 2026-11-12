@@ -167,8 +167,8 @@ class TrainingControlTest(unittest.TestCase):
         self.assertIn((1, 0.0), decays)
         self.assertTrue(all(decay == 0.0 for ndim, decay in decays if ndim < 2))
         initial_penalty = 0.5 * 0.2 * len(MODEL_FEATURES) * 0.01 ** 2
-        # The three cosine inputs are one, so initial logits are exactly .03.
-        expected_bce = 0.5 * (np.logaddexp(0.0, -0.03) + np.logaddexp(0.0, 0.03))
+        # The two cosine inputs are one, so initial logits are exactly .02.
+        expected_bce = 0.5 * (np.logaddexp(0.0, -0.02) + np.logaddexp(0.0, 0.02))
         self.assertAlmostEqual(result.history["validation_loss"][0], expected_bce, places=6)
         self.assertAlmostEqual(result.history["regularization_loss"][0], initial_penalty, places=9)
         self.assertAlmostEqual(result.history["objective_loss"][1] - result.history["training_loss"][1], initial_penalty, places=9)

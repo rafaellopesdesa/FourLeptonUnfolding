@@ -16,6 +16,7 @@ from BackgroundRemoval.Application.apply_background_ratio import (
 )
 from BackgroundRemoval.common import (
     FEATURES,
+    MODEL_FEATURES,
     RAW_RATIO_ESTIMATOR,
     sha256_file,
     weight_measure_contract,
@@ -220,6 +221,9 @@ class ApplicationTest(unittest.TestCase):
                     )
                     self.assertEqual(metadata["predicted_entries"], sum(predicted_rows))
                     self.assertEqual(metadata["ratio_estimator"], RAW_RATIO_ESTIMATOR)
+                    self.assertEqual(metadata["format_version"], 3)
+                    self.assertEqual(metadata["features"], list(FEATURES))
+                    self.assertEqual(metadata["model_features"], list(MODEL_FEATURES))
                     self.assertEqual(
                         sum(x.shape[0] for x in models.background.predicted_rows),
                         predicted_rows[0],
@@ -228,6 +232,67 @@ class ApplicationTest(unittest.TestCase):
                         sum(x.shape[0] for x in models.correction.predicted_rows),
                         predicted_rows[1],
                     )
+
+    def test_removed_phi1_is_optional_and_never_sent_to_either_network(self):
+        for sample_kind in ("data", "zz"):
+            for keep_phi1 in (False, True):
+                with self.subTest(sample_kind=sample_kind, keep_phi1=keep_phi1):
+                    with tempfile.TemporaryDirectory() as directory_name:
+                        directory = Path(directory_name)
+                        source, output = directory / "source.root", directory / "output.root"
+                        arrays = _write_sample(
+                            source, reconstructed=np.ones(2, dtype=bool),
+                            masses=np.array([120.0, 125.0]),
+                        )
+                        self.assertNotIn("reco_Phi1", arrays)
+                        if keep_phi1:
+                            arrays["reco_Phi1"] = np.full(2, np.nan, dtype=np.float32)
+                            with uproot.recreate(source) as root_file:
+                                root_file["Analysis"] = arrays
+                        models = _models(directory)
+                        _decorate(source, output, models, sample_kind=sample_kind)
+                        bundle = models.background if sample_kind == "data" else models.correction
+                        received = np.concatenate(bundle.predicted_rows)
+                        self.assertEqual(received.shape, (2, 7))
+                        np.testing.assert_equal(received, np.column_stack([arrays[name] for name in FEATURES]))
+                        with uproot.open(output) as root_file:
+                            self.assertEqual("reco_Phi1" in root_file["Analysis"], keep_phi1)
+                            if keep_phi1:
+                                self.assertTrue(np.isnan(root_file["Analysis"]["reco_Phi1"].array(library="np")).all())
+
+    def test_legacy_decoration_is_recomputed_only_with_explicit_replacement(self):
+        with tempfile.TemporaryDirectory() as directory_name:
+            directory = Path(directory_name)
+            source, output = directory / "old.root", directory / "new.root"
+            arrays = _write_sample(
+                source, reconstructed=np.ones(2, dtype=bool),
+                masses=np.array([120.0, 125.0]),
+            )
+            arrays["background_removal_weight"] = np.full(2, 0.9, dtype=np.float32)
+            arrays["weight_background_removed"] = 0.9 * arrays["weight"]
+            with uproot.recreate(source) as root_file:
+                root_file["Analysis"] = arrays
+                root_file["background_removal_metadata"] = json.dumps({
+                    "format_version": 2, "features": ["reco_Phi", "reco_Phi1"],
+                    "ratio_estimator": RAW_RATIO_ESTIMATOR,
+                })
+            with self.assertRaisesRegex(ValueError, "already decorated"):
+                _decorate(source, output, _models(directory), sample_kind="data")
+            self.assertFalse(output.exists())
+            decorate(
+                source, output, Path("unused-background"), Path("unused-correction"),
+                sample_kind="data", step_size="1 MB", inference_batch_size=10,
+                device="cpu", overwrite=False, replace_existing_branches=True,
+                write_diagnostic_branches=True, models=_models(directory),
+            )
+            with uproot.open(output) as root_file:
+                rewritten = root_file["Analysis"].arrays(library="np", how=dict)
+                stored = json.loads(str(root_file["background_removal_metadata"]))
+                np.testing.assert_allclose(rewritten["background_removal_weight"], 0.25)
+                np.testing.assert_allclose(rewritten["weight_background_removed"], 0.25 * arrays["weight"])
+                self.assertEqual(stored["format_version"], 3)
+                self.assertEqual(stored["features"], list(FEATURES))
+                self.assertEqual(stored["model_features"], list(MODEL_FEATURES))
 
     def test_preserves_weights_vectors_metadata_and_writes_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory_name:

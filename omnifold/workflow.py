@@ -23,11 +23,11 @@ from BackgroundRemoval.common import (
     ANALYSIS_MASS_WINDOW, FEATURES, TREE_NAME, RAW_RATIO_ESTIMATOR, capture_file_provenance,
     assert_file_unchanged, deterministic_split, row_fingerprint_ids, sha256_file,
 )
-from .ratios import TRAINING_POLICY_VERSION, RatioConfig, RatioEstimator
+from .ratios import MODEL_FEATURE_ORDER, TRAINING_POLICY_VERSION, RatioConfig, RatioEstimator
 from .inputs import validate_background_weight_metadata
 
 TRUTH_FEATURES = tuple(name.replace("reco_", "truth_", 1) for name in FEATURES)
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 
 def _json_write(path: Path, payload: dict[str, Any]) -> None:
@@ -225,6 +225,7 @@ class OmniFoldSession:
                     "created_utc": datetime.now(timezone.utc).isoformat(), "inputs": inputs,
                     "config": asdict(config), "features_reco": list(FEATURES),
                     "features_truth": list(TRUTH_FEATURES),
+                    "model_features": list(MODEL_FEATURE_ORDER),
                     "settings": {"seed": seed, "data_weight_branch": data_weight_branch,
                                  "mc_weight_branch": mc_weight_branch, "truth_weight_branch": truth_weight_branch},
                     "semantics": {"truth_push": "cumulative relative to original fiducial signal MC",
@@ -251,10 +252,19 @@ class OmniFoldSession:
         if manifest.get("kind") == "omnifold_session" and manifest.get("format_version") == 1:
             raise ValueError("Legacy calibrated OmniFold campaign cannot be resumed with raw NN odds; "
                              "retrain from the first iteration in a new run directory")
+        if manifest.get("kind") == "omnifold_session" and manifest.get("format_version") == 2:
+            raise ValueError("Legacy OmniFold campaign uses the old angular feature contract; "
+                             "retrain from the first iteration in a new run directory with "
+                             "the seven cosine-only NN inputs")
         if manifest.get("kind") != "omnifold_session" or manifest.get("format_version") != FORMAT_VERSION:
             raise ValueError("Unsupported OmniFold session")
         if manifest.get("ratio_estimator") != RAW_RATIO_ESTIMATOR or "calibration" in manifest:
             raise ValueError("OmniFold session must use raw NN odds without calibration or empirical normalization")
+        if (manifest.get("features_reco") != list(FEATURES)
+                or manifest.get("features_truth") != list(TRUTH_FEATURES)
+                or manifest.get("model_features") != list(MODEL_FEATURE_ORDER)):
+            raise ValueError("OmniFold session feature contract differs from the seven cosine-only "
+                             "NN inputs; retrain in a new run directory")
         config = RatioConfig(**manifest["config"])
         config.validate()
         if device is not None:

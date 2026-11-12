@@ -10,7 +10,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import numpy as np
 
-from BackgroundRemoval.common import FEATURES, MODEL_KIND_BACKGROUND_REMOVAL
+from BackgroundRemoval.common import FEATURES, MODEL_FEATURES, MODEL_KIND_BACKGROUND_REMOVAL
 from BackgroundRemoval.Training.diagnostics import (
     _draw_comparison,
     _histogram,
@@ -103,7 +103,7 @@ class SignedDiagnosticsTest(unittest.TestCase):
         with patch("BackgroundRemoval.Training.diagnostics.PdfPages") as pdf, patch(
             "BackgroundRemoval.Training.diagnostics._draw_comparison",
             return_value={"chi2": 0.0, "covariance_rank": 1},
-        ):
+        ) as comparison:
             pdf.return_value.__enter__.return_value.savefig.side_effect = figures.append
             metrics = make_diagnostics_pdf(Path("unused.pdf"), manifest=manifest,
                                            cache=cache, validation=predictions, closure=predictions)
@@ -118,6 +118,16 @@ class SignedDiagnosticsTest(unittest.TestCase):
         np.testing.assert_allclose(line.get_ydata(), expected[1][valid])
         self.assertEqual(set(metrics["reliability"]), {"closure_raw"})
         self.assertNotIn("calibration", metrics)
+        self.assertEqual(set(metrics["shape_closure"]), set(MODEL_FEATURES))
+        # Raw azimuths are zero in this fixture, so cosine feature plots must
+        # receive ones and use [-1, 1] bins, not draw the excluded signed angles.
+        for feature_index in (0, 1):
+            plotted = comparison.call_args_list[2 * feature_index].kwargs
+            np.testing.assert_allclose(plotted["values_target"], 1.0)
+            np.testing.assert_allclose(plotted["values_estimate"], 1.0)
+            self.assertEqual(plotted["edges"][0], -1.0)
+            self.assertEqual(plotted["edges"][-1], 1.0)
+            self.assertIn(r"\cos", plotted["xlabel"])
         expected_mean = np.average(scores["background"] / (1.0 - scores["background"]),
                                    weights=weights["background"])
         self.assertNotAlmostEqual(expected_mean, 1.0)

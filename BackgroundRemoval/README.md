@@ -21,15 +21,21 @@ is an event-level preprocessing factor in reconstructed phase space.
 
 ## Variables and regions
 
-Both classifiers use the same eight decay observables, in this exact order:
+Both classifiers use exactly seven NN inputs, in this order:
 
 ```text
-reco_Phi, reco_Phi1, reco_Psi,
+cos(reco_Phi), cos(reco_Psi),
 reco_cos_theta1, reco_cos_theta2, reco_cos_theta_star,
 reco_m_Z1, reco_m_Z2
 ```
 
-The three periodic angles are represented internally by sine and cosine.
+The reader takes `reco_Phi` and `reco_Psi` from the ntuple and computes their
+cosines. Each of these angles supplies one input; no sine terms or `Phi1`
+enter any network. The seven components are standardized using the fit split.
+OmniFold uses the same seven inputs at reconstructed or dressed-truth level.
+The other observables remain available in the analysis ntuple, so this change
+does not require event generation, Delphes, or ntuple production to be rerun.
+
 `reco_m_ZZ` is **not** a neural-network input. It defines the following
 strict, open intervals and, in Correction, contributes to the exact-duplicate
 fingerprint used to keep bootstrap replicas in the same data split:
@@ -45,7 +51,7 @@ The Correction is therefore transported in reconstructed four-lepton mass:
 it is learned in the upper sideband but used in the analysis region, and
 Application also evaluates it on reconstructed `ZZ` events outside both
 windows. Because `reco_m_ZZ` is not an input, this assumes that the learned
-eight-dimensional data/MC ratio is transferable in `reco_m_ZZ`. The current
+seven-dimensional data/MC ratio is transferable in `reco_m_ZZ`. The current
 sideband closure report validates the learned domain; it does not by itself
 validate that mass extrapolation.
 
@@ -83,7 +89,7 @@ numbered `data_XXXX.root` pseudo-experiment.
 The merger samples pseudo-data with replacement and assigns new sequential
 `event_id` values. To keep bootstrap copies of the same nominal-data event
 from leaking across fit, validation, and closure, Correction groups exact
-duplicates using a deterministic fingerprint of the eight model inputs plus
+duplicates using a deterministic fingerprint of the seven source branches plus
 `reco_m_ZZ`. Pythia events continue to split by their merged `event_id`.
 
 Train the Correction artifact from the repository root:
@@ -296,7 +302,8 @@ a luminosity-scaled yield as a training count.
 Each model directory contains `manifest.json`, one checksummed state file per
 ensemble member (four by default), and `diagnostics.pdf`. The PDF reports
 learning curves, raw-score reliability, observed ratio-normalization checks,
-ensemble spread, and held-out closure tests for all eight model variables.
+ensemble spread, and held-out closure tests for all seven model inputs,
+including `cos(Phi)` and `cos(Psi)`.
 Reliability is a diagnostic of the NN output, with no correction fitted to
 its curve. The learned ratio and its reliability are evaluated on the
 untouched 25% closure split. The validation split controls early stopping and
@@ -305,19 +312,19 @@ full selected sample, so absolute-yield
 closure is not independent of that one scalar. The binned chi-square values
 are discrepancy summaries, not p-values.
 
-Newly trained model artifacts use format version 4 and explicitly record the
-raw-ensemble-odds rule. Older calibrated format-v2/v3 artifacts are rejected;
-they are not silently reinterpreted as raw models. Train a new Correction,
-then a new background-removal model using that Correction, and redecorate the
-original merged inputs into a new output directory. Keep old artifacts and
-decorated outputs separately for comparison. To omit post-training score
-corrections throughout the chain, start a fresh OmniFold campaign from these
-newly decorated files; existing ROOT weight branches may still contain earlier calibration
-corrections, and their numerical values alone do not identify that history.
+Newly trained model artifacts use format version 5 and explicitly record the
+seven-input feature order and raw-ensemble-odds rule. All earlier model formats,
+including format-4 raw-odds models with eleven encoded inputs, are incompatible.
+Train a new Correction, then a new background-removal model using that
+Correction, and redecorate the original merged inputs into a new output
+directory. Start a fresh OmniFold campaign from these newly decorated files.
+Keep old artifacts and decorated outputs separately; changing a manifest cannot
+convert the trained networks or their existing weights to the new inputs.
 For its standard background-removed data weight, OmniFold checks the embedded
-`background_removal_metadata` object when present and rejects a missing or
-incompatible raw estimator contract. Metadata-free inputs and custom weight
-branches remain accepted, so retain the model/output provenance as well.
+`background_removal_metadata` object when present. It requires decoration
+format 3, the seven-input feature contract, and the current raw estimator.
+Metadata-free inputs and custom weight branches remain accepted, so retain
+the model/output provenance as well.
 
 Removing post-training corrections does not establish that a network is
 well calibrated. Use the raw reliability and held-out closure diagnostics to

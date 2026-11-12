@@ -7,7 +7,7 @@ analysis region
 reconstructed && 115 < reco_m_ZZ < 130 GeV.
 ```
 
-`reco_m_ZZ` only defines this selection. The model uses the eight inputs
+`reco_m_ZZ` only defines this selection. The model uses the seven inputs
 listed in the [main BackgroundRemoval documentation](../README.md#variables-and-regions).
 
 The positive class is reconstructed-and-fiducial `gg_H_pythia`. The negative
@@ -59,8 +59,8 @@ validation-check patience, and an absolute `ln(2)` baseline check in addition
 to the relative ensemble filter. See
 [training controls](../README.md#validation-and-optimization-controls) for
 defaults and CLI options. New artifacts record training policy version 1 and
-per-member update/checkpoint histories; earlier raw-odds artifacts remain
-usable for inference.
+per-member update/checkpoint histories. Earlier artifacts with the old feature
+set must be retrained before inference with the current code.
 
 More precisely, the default Correction branch `weight` and Training branch
 `weight_nominal_pb` differ only by the common `312000 pb^-1` factor written by
@@ -88,7 +88,8 @@ model variable and raw-score reliability. Validation is used for early stopping
 and ensemble retries, with no fitted output correction. The scalar yield factor
 is intentionally computed from the full selected totals, so the absolute-yield closure shares that one scalar input.
 
-New models use artifact format 4. Older calibrated models are rejected; train
+New models use artifact format 5 with the seven-input feature contract. Earlier
+models, including raw-odds models with the old feature set, are rejected; train
 this stage with a newly trained raw-odds Correction and then redecorate the
 original merged inputs. Keep earlier artifacts and outputs in separate directories.
 

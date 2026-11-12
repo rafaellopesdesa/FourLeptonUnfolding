@@ -172,8 +172,8 @@ class DiagnosticsTest(unittest.TestCase):
 
     def test_ratio_diagnostics_predict_only_heldout_and_preserve_yields(self):
         model = _ConstantRatio()
-        features = np.column_stack([np.linspace(-0.5, 0.5, 6)] * 8)
-        features[:, 6:] += [90.0, 25.0]
+        features = np.column_stack([np.linspace(-0.5, 0.5, 6)] * len(FEATURES))
+        features[:, -2:] += [90.0, 25.0]
         splits = np.array([0, 1, 0, 2, 2, 2])
         target_weights = np.array([1000.0, 2000.0, 3000.0, -1.0, 3.0, 4.0])
         reference_weights = np.array([9999.0, 9999.0, 9999.0, -1.0, 1.0, 2.0])
@@ -190,7 +190,9 @@ class DiagnosticsTest(unittest.TestCase):
         # Deliberately mismatched: diagnostics must not fix a failing closure.
         self.assertEqual(normalization["reweighted_reference_yield"], 4.0)
         self.assertEqual(normalization["reference_shape_mean"], 1.0)
-        self.assertEqual(len(figures["closure"].axes), 16)
+        self.assertEqual(len(figures["closure"].axes), 14)
+        self.assertEqual(figures["closure"].axes[1].get_xlabel(), r"$\cos\Phi$")
+        self.assertEqual(figures["closure"].axes[3].get_xlabel(), r"$\cos\Psi$")
         self.assertTrue(all(axis.get_yscale() == "linear" for axis in figures["closure"].axes))
         self.assertEqual(figures["learning"].axes[0].get_yscale(), "linear")
         self.assertEqual(figures["learning"].axes[0].lines[0].get_ydata()[1], -0.1)
@@ -237,13 +239,35 @@ class DiagnosticsTest(unittest.TestCase):
             output = save_figures({"signed": figure}, Path(directory) / "plots.pdf")
             self.assertEqual(output.read_bytes()[:4], b"%PDF")
 
+    def test_cosine_distributions_match_sign_flips_and_avoid_double_transform(self):
+        angles = np.array([-2.1, -0.7, 0.4, 2.5])
+        weights = np.array([1.0, 2.0, -0.5, 3.0])
+        for raw_name in ("Phi", "reco_Phi", "truth_Psi"):
+            with self.subTest(raw_name=raw_name):
+                figure = plot_distributions(
+                    angles[:, None], weights, weights, -angles[:, None], weights,
+                    feature_names=[raw_name],
+                )
+                name = f"cos({raw_name})"
+                self.assertEqual(set(figure.diagnostic_metrics), {name})
+                self.assertEqual(figure.diagnostic_metrics[name]["Updated"]["chi2"], 0.0)
+                raw_histogram = figure.axes[0].patches[0].get_data()
+                expected, _ = _histogram(np.cos(angles), weights, np.linspace(-1, 1, 25))
+                np.testing.assert_allclose(raw_histogram.values, expected)
+                transformed = plot_distributions(
+                    np.cos(angles)[:, None], weights, weights, feature_names=[name],
+                )
+                transformed_histogram = transformed.axes[0].patches[0].get_data()
+                np.testing.assert_array_equal(raw_histogram.values, transformed_histogram.values)
+                np.testing.assert_array_equal(raw_histogram.edges, transformed_histogram.edges)
+
     def test_explicit_shape_only_and_extra_observables(self):
         names = (*FEATURES, "m_ZZ", "y_ZZ", "pT_ZZ")
         features = np.zeros((3, len(names)))
         figure = plot_distributions(features, np.array([2.0, -1.0, 2.0]),
                                     np.array([4.0, -1.0, 2.0]),
                                     feature_names=names, shape_only=True)
-        self.assertEqual(len(figure.axes), 22)
+        self.assertEqual(len(figure.axes), 20)
         for metric in figure.diagnostic_metrics.values():
             self.assertAlmostEqual(metric["Updated"]["target_yield"], 1.0)
             self.assertAlmostEqual(metric["Updated"]["estimate_yield"], 1.0)

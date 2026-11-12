@@ -33,12 +33,15 @@ The simulated signal additionally requires `fiducial`, because the preceding
 background-removal step treats nonfiducial ggH as background. Fiducial events
 that fail the detector selection are retained for the truth result.
 
-The three ratio models use the same eight decay inputs as BackgroundRemoval:
-`Phi`, `Phi1`, `Psi`, `cos_theta1`, `cos_theta2`, `cos_theta_star`, `m_Z1`, and
-`m_Z2`, with `reco_` or `truth_` prefixes. Periodic encoding turns the three
-azimuthal angles into sine/cosine pairs. `m_ZZ` defines the detector region;
-it is not an input to these networks. Truth means dressed particle level,
-not LHE level.
+All three ratio models in every iteration use the same seven NN inputs as
+BackgroundRemoval: `cos(Phi)`, `cos(Psi)`, `cos_theta1`, `cos_theta2`,
+`cos_theta_star`, `m_Z1`, and `m_Z2`. The reader loads `Phi` and `Psi` with
+`reco_` or `truth_` prefixes and computes their cosines; there are no sine
+inputs and no `Phi1` input. All seven components are standardized using the
+fit split. Reco pull and reco likelihood use reconstructed inputs; truth push
+uses dressed-particle inputs. `m_ZZ` defines the detector region and is not
+an NN input. The ntuple retains its other observables, including LHE and Born
+variables, but they do not enter these networks.
 
 **Do not use the mixed, reconstruction-selected `data.root` as the fiducial
 truth reference.** It contains backgrounds and omits reconstruction losses.
@@ -184,8 +187,7 @@ Each member records its checked losses, learning rates, selected checkpoint,
 stopping reason, and baseline comparison, so a short epoch count can be
 interpreted using the actual number of updates and checks.
 Reports also summarize recorded fit counts, parameter counts, effective
-counts, and average draws per fit event. Earlier raw artifacts with only
-epoch-level histories retain their original axis when reported.
+counts, and average draws per fit event.
 
 ## Unity OnDemand setup
 
@@ -381,36 +383,36 @@ are needed.
 
 New model and session manifests record `training_policy_version: 1`. The
 smaller default network and update-based validation apply to new campaigns;
-existing explicit configurations are not rewritten. Earlier raw-odds models
-and campaigns still load for inference, export, and reports, but an older
-session cannot append iterations under the new training policy. Start a new
-run directory to use these controls throughout an unfolding sequence. Do not
-edit the saved policy version to bypass the check: the earlier iterations
-were trained under different rules.
+existing explicit configurations are not rewritten. Appending iterations
+requires the current training policy. Independently, every load checks the
+seven-input feature contract: old feature sets cannot be used for inference,
+export, reports, or continued training with this version. Start a new run
+directory and do not edit saved versions or feature lists to bypass these
+checks; the stored network weights were fitted under their original contract.
 
-### Moving from calibrated campaigns
+### Moving to the seven-input networks
 
-New ratio artifacts use format 2 and new sessions use format 2, with an explicit
-raw-ensemble-odds contract. Legacy calibrated ratio artifacts and format-1
-sessions are rejected with a retraining message. Their cumulative weights were
-computed using the old corrections, so removing those corrections cannot be
-done by resuming that sequence or changing its manifest.
+New ratio artifacts and sessions use format 3 and explicitly record the
+seven-input feature order and raw-ensemble-odds rule. Older format-2 raw-odds
+campaigns and format-1 calibrated campaigns are incompatible. All three
+ratios must be retrained at every iteration in a fresh run directory; changing
+a manifest cannot convert stored network weights or cumulative ratios.
 
-Start a fresh run directory. For the entire chain to use raw NN outputs,
-retrain BackgroundRemoval Correction and Training (new artifact format 4),
-redecorate the original merged inputs, and use those new files for OmniFold.
-Keep old campaigns and outputs separately for comparison. A pre-existing ROOT
-weight branch can still contain a legacy correction; its values alone cannot
-reveal how it was produced. Retain the corresponding model/output provenance.
+Retrain BackgroundRemoval Correction and Training (artifact format 5),
+redecorate the original merged inputs, and use those newly decorated files for
+OmniFold. The original ntuples already contain the needed branches, so there
+is no need to rerun generation, Delphes, or analysis reduction. Keep old
+campaigns and outputs separately for comparison and retain their provenance.
 
 With the default `weight_background_removed` input, including its
 `weight * background_removal_weight` fallback, OmniFold checks the embedded
-`background_removal_metadata` object when present. Its raw-ensemble-odds
-contract must match the current estimator; missing, incompatible, or malformed
-metadata content requires retraining BackgroundRemoval and regenerating the
-decorated files. Inputs without that metadata object and explicitly selected
-custom weight branches remain accepted, so this check does not establish the
-history of every input file.
+`background_removal_metadata` object when present. It requires decoration
+format 3, the seven-input feature contract, and the current raw-ensemble-odds
+estimator. Missing, incompatible, or malformed metadata content requires
+retraining BackgroundRemoval and regenerating the decorated files. Inputs
+without that metadata object and explicitly selected custom weight branches
+remain accepted, so this check does not establish the history of every input
+file.
 
 The removed `--calibration-scale-min` and `--calibration-scale-max` options are
 not accepted, including the corresponding `RatioConfig` fields.

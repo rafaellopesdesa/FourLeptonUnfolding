@@ -13,13 +13,13 @@ in `ZZ_pythia.root` and `gg_H_pythia.root`. The Pythia files are combined
 before class balancing, so their physical relative normalization is
 preserved.
 
-The classifier uses the eight decay variables listed in
+The classifier uses the seven NN inputs listed in
 [`BackgroundRemoval.common`](../common.py). `reco_m_ZZ` is never a network
 input; it defines the strict sideband and contributes to the exact-duplicate
 fingerprint described below. The resulting correction is later used in the
 strict `115 < reco_m_ZZ < 130` GeV analysis region and on all reconstructed
 `ZZ` rows. This is an extrapolation in reconstructed four-lepton mass: it
-assumes that the eight-dimensional ratio learned in the sideband transfers
+assumes that the seven-dimensional ratio learned in the sideband transfers
 outside it. Sideband closure alone does not test that assumption.
 
 Train from the repository root:
@@ -61,8 +61,9 @@ negligible.
 
 Nominal pseudo-data are sampled with replacement and receive new sequential
 `event_id` values. Correction therefore assigns their split from a
-deterministic fingerprint of the eight inputs plus `reco_m_ZZ`, ensuring that
-exact bootstrap replicas stay together in fit, validation, or closure.
+deterministic fingerprint of the seven source branches plus `reco_m_ZZ`,
+ensuring that exact bootstrap replicas stay together in fit, validation, or
+closure.
 Pythia splits use the merged `event_id`.
 
 Signed data and MC weights are accepted in the sideband. The balanced BCE
@@ -92,8 +93,8 @@ patience, and an absolute `ln(2)` baseline check in addition to the relative
 ensemble filter. See
 [training controls](../README.md#validation-and-optimization-controls) for
 defaults and CLI options. New artifacts record training policy version 1 and
-per-member update/checkpoint histories; earlier raw-odds artifacts remain
-usable for inference.
+per-member update/checkpoint histories. Earlier artifacts with the old feature
+set must be retrained before inference with the current code.
 
 The artifact contains one checksummed state file per ensemble member (four by
 default, configurable with `--ensemble-size`, with a minimum of four),
@@ -104,7 +105,7 @@ and checksummed input provenance. It also records the weight branch,
 normalization family, units, and conversion to pb when known; custom units are recorded as arbitrary. The
 PDF includes learning curves, raw-score reliability, observed
 ratio-normalization checks, ensemble spread, and two data-versus-MC yield closures
-for all eight inputs: the learned `(ZZ+ggH)*C` ratio and the requested
+for all seven NN inputs: the learned `(ZZ+ggH)*C` ratio and the requested
 downstream `ZZ*C+ggH` prescription. Their difference makes the `ZZ`-dominance
 approximation visible rather than hiding it. The network is fit on 60%;
 the 15% validation split controls early stopping and ensemble retries. Raw
@@ -125,9 +126,12 @@ directory Application to enforce a single campaign. Use
 `--skip-input-checksums` only when byte-level provenance is intentionally
 unavailable; doing so disables the corresponding downstream match checks.
 
-New artifacts use format 4. Older calibrated models are rejected. Retrain
-Correction in a new model directory, then retrain background removal and
-redecorate the original merged files; retain earlier outputs separately.
+New artifacts use format 5 with exactly seven inputs: `cos(Phi)`, `cos(Psi)`,
+`cos_theta1`, `cos_theta2`, `cos_theta_star`, `m_Z1`, and `m_Z2`. Earlier models
+are rejected, including raw-odds models with the old feature set. Retrain
+Correction in a new model directory, then retrain background removal,
+redecorate the original merged files, and start a new OmniFold campaign.
+The original ntuples can be reused; retain earlier outputs separately.
 
 An existing output directory is rejected unless `--overwrite` is supplied.
 For safety, overwrite is limited to a recognized Correction artifact of the

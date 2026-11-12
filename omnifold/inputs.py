@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from BackgroundRemoval.common import RAW_RATIO_ESTIMATOR
+from BackgroundRemoval.common import FEATURES, MODEL_FEATURES, RAW_RATIO_ESTIMATOR
 
 
 def validate_background_weight_metadata(
@@ -24,12 +24,17 @@ def validate_background_weight_metadata(
         return
     message = (
         f"{path}: background_removal_metadata does not identify raw, uncalibrated "
-        "background-removal weights. Retrain the BackgroundRemoval models and "
+        "background-removal weights from the seven cosine-only NN inputs. "
+        "Retrain the BackgroundRemoval models and "
         "regenerate/redecorate this input before using a new OmniFold campaign."
     )
     try:
         metadata = json.loads(str(root_file["background_removal_metadata"]))
     except (TypeError, ValueError) as error:
         raise ValueError(message) from error
-    if not isinstance(metadata, dict) or metadata.get("ratio_estimator") != RAW_RATIO_ESTIMATOR:
+    if (not isinstance(metadata, dict)
+            or metadata.get("format_version") != 3
+            or metadata.get("ratio_estimator") != RAW_RATIO_ESTIMATOR
+            or metadata.get("features") != list(FEATURES)
+            or metadata.get("model_features") != list(MODEL_FEATURES)):
         raise ValueError(message)

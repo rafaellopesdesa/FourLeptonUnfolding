@@ -1,11 +1,13 @@
 # Application
 
-Application requires the new format-4 raw-ensemble-odds models. Legacy calibrated
-model artifacts are rejected rather than reinterpreted. Retrain Correction,
-then Training using that new Correction, and redecorate the original merged
-inputs into a fresh output directory. Retain older decorated files separately;
-their existing weight values do not establish whether output corrections were
-used when they were produced.
+Application requires format-5 raw-ensemble-odds models with exactly seven
+inputs: `cos(Phi)`, `cos(Psi)`, `cos_theta1`, `cos_theta2`, `cos_theta_star`,
+`m_Z1`, and `m_Z2`. Earlier model artifacts are incompatible, including raw-odds
+models with the old feature set. Retrain Correction, then Training using that
+new Correction, and redecorate the original merged inputs into a fresh output
+directory. New decorations record format 3 and both the source-branch and NN
+feature orders. Start a new OmniFold campaign from those files. Retain older
+decorated files separately; their weights were computed with different models.
 
 Application writes two compact branches while preserving the input tree,
 entry order, original signed weights, fixed-size arrays, and string metadata:

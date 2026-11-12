@@ -22,6 +22,7 @@ from BackgroundRemoval.common import (
     CORRECTION_MASS_WINDOW,
     FEATURES,
     MASS_BRANCH,
+    MODEL_FEATURES,
     MODEL_KIND_BACKGROUND_REMOVAL,
     MODEL_KIND_DATA_MC_CORRECTION,
     PRIMARY_OUTPUT_BRANCH,
@@ -588,7 +589,7 @@ def decorate(
                     output_tree.extend(arrays)
 
                 application_metadata = {
-                    "format_version": 2,
+                    "format_version": 3,
                     "created_utc": datetime.now(timezone.utc).isoformat(),
                     "source": str(input_path),
                     "source_provenance": input_provenance,
@@ -607,6 +608,7 @@ def decorate(
                         models.correction_manifest_sha256
                     ),
                     "features": list(FEATURES),
+                    "model_features": list(MODEL_FEATURES),
                     "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                     "written_branches": list(written_branches),
                     "entries": entry_count,

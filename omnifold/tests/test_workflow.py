@@ -12,7 +12,7 @@ from unittest.mock import patch
 import numpy as np
 import uproot
 
-from BackgroundRemoval.common import FEATURES, RAW_RATIO_ESTIMATOR, TREE_NAME, sha256_file
+from BackgroundRemoval.common import FEATURES, MODEL_FEATURES, RAW_RATIO_ESTIMATOR, TREE_NAME, sha256_file
 from omnifold.workflow import OmniFoldSession, TRUTH_FEATURES
 
 
@@ -155,7 +155,9 @@ class WorkflowTest(unittest.TestCase):
     def test_background_metadata_guard_accepts_raw_and_generic_weighted_inputs(self):
         cases = [
             (None, "weight_background_removed"),
-            ({"ratio_estimator": dict(RAW_RATIO_ESTIMATOR)}, "weight_background_removed"),
+            ({"format_version": 3, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
+              "features": list(FEATURES), "model_features": list(MODEL_FEATURES)},
+             "weight_background_removed"),
             ({"format_version": 1}, "weight"),
         ]
         for direct in (False, True):
@@ -179,6 +181,10 @@ class WorkflowTest(unittest.TestCase):
     def test_known_legacy_background_weights_rejected_before_training(self):
         metadata_cases = [
             json.dumps({"format_version": 1}),
+            json.dumps({"format_version": 2, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
+                        "features": ["reco_Phi", "reco_Phi1", *FEATURES[1:]]}),
+            json.dumps({"format_version": 3, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
+                        "features": list(FEATURES)}),
             json.dumps({"ratio_estimator": {**RAW_RATIO_ESTIMATOR, "posthoc_calibration": True}}),
             json.dumps({"ratio_estimator": {**RAW_RATIO_ESTIMATOR, "empirical_normalization": True}}),
             "not JSON", "null",
@@ -369,10 +375,14 @@ class WorkflowTest(unittest.TestCase):
         session = self.create()
         path = session.run_dir / "session.json"
         original = json.loads(path.read_text())
-        self.assertEqual(original["format_version"], 2)
+        self.assertEqual(original["format_version"], 3)
         self.assertFalse(original["ratio_estimator"]["posthoc_calibration"])
         for modified, message in [
             ({**original, "format_version": 1}, "Legacy calibrated"),
+            ({**original, "format_version": 2}, "seven cosine-only"),
+            ({**original, "features_reco": ["reco_Phi1", *FEATURES]}, "feature contract"),
+            ({**original, "features_truth": list(reversed(TRUTH_FEATURES))}, "feature contract"),
+            ({**original, "model_features": ["sin(Phi)", *original["model_features"]]}, "feature contract"),
             ({**original, "ratio_estimator": {**original["ratio_estimator"], "posthoc_calibration": True}}, "without calibration"),
             ({**original, "calibration": {}}, "without calibration"),
         ]:
@@ -389,6 +399,8 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(session.manifest["training_policy_version"], 1)
         session.step()
         for call in _HistogramRatio.calls:
+            self.assertEqual(call["target"].shape[1], 7)
+            self.assertEqual(call["reference"].shape[1], 7)
             config = call["config"]
             self.assertEqual((config["hidden_layers"], config["neurons"], config["batch_size"]), (2, 64, 512))
             self.assertEqual(config["weight_decay"], 1e-4)

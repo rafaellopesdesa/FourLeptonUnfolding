@@ -17,7 +17,7 @@ import mplhep as hep  # noqa: E402
 import numpy as np  # noqa: E402
 
 from BackgroundRemoval.common import (
-    FEATURES,
+    MODEL_FEATURES,
     MODEL_KIND_DATA_MC_CORRECTION,
     ratio_outputs,
 )
@@ -27,9 +27,8 @@ hep.style.use("ATLAS")
 
 
 FEATURE_LABELS = {
-    "reco_Phi": r"Reco $\Phi$",
-    "reco_Phi1": r"Reco $\Phi_1$",
-    "reco_Psi": r"Reco $\Psi$",
+    "cos(reco_Phi)": r"Reco $\cos\Phi$",
+    "cos(reco_Psi)": r"Reco $\cos\Psi$",
     "reco_cos_theta1": r"Reco $\cos\theta_1$",
     "reco_cos_theta2": r"Reco $\cos\theta_2$",
     "reco_cos_theta_star": r"Reco $\cos\theta^{*}$",
@@ -39,9 +38,7 @@ FEATURE_LABELS = {
 
 
 def _edges(name: str) -> np.ndarray:
-    if name in {"reco_Phi", "reco_Phi1", "reco_Psi"}:
-        return np.linspace(-math.pi, math.pi, 25)
-    if name.startswith("reco_cos_theta"):
+    if name in {"cos(reco_Phi)", "cos(reco_Psi)"} or name.startswith("reco_cos_theta"):
         return np.linspace(-1.0, 1.0, 25)
     if name == "reco_m_Z1":
         return np.linspace(50.0, 106.0, 25)
@@ -770,17 +767,20 @@ def make_diagnostics_pdf(
         closure_reference_is_zz = (
             reference_is_zz[background_indices] if correction_mode else None
         )
-        for feature_index, feature_name in enumerate(FEATURES):
+        for feature_index, feature_name in enumerate(MODEL_FEATURES):
+            signal_values = np.asarray(signal_features[signal_indices, feature_index])
+            background_values = np.asarray(background_features[background_indices, feature_index])
+            if feature_name in {"cos(reco_Phi)", "cos(reco_Psi)"}:
+                signal_values = np.cos(signal_values)
+                background_values = np.cos(background_values)
             edges = _edges(feature_name)
             target_label = "Data target" if correction_mode else "Signal target"
             reference_label = "MC" if correction_mode else "Background"
             shape_metrics = _draw_comparison(
                 pdf,
-                values_target=np.asarray(signal_features[signal_indices, feature_index]),
+                values_target=signal_values,
                 weights_target=closure_weights["signal"],
-                values_estimate=np.asarray(
-                    background_features[background_indices, feature_index]
-                ),
+                values_estimate=background_values,
                 weights_estimate=(
                     closure_weights["background"]
                     * closure_outputs["background"]["background_shape_ratio"]
@@ -800,13 +800,9 @@ def make_diagnostics_pdf(
             if correction_mode:
                 combined_metrics = _draw_comparison(
                     pdf,
-                    values_target=np.asarray(
-                        signal_features[signal_indices, feature_index]
-                    ),
+                    values_target=signal_values,
                     weights_target=closure_weights["signal"],
-                    values_estimate=np.asarray(
-                        background_features[background_indices, feature_index]
-                    ),
+                    values_estimate=background_values,
                     weights_estimate=(
                         closure_weights["background"]
                         * closure_outputs["background"]["physical_ratio"]
@@ -830,13 +826,9 @@ def make_diagnostics_pdf(
                 )
                 requested_metrics = _draw_comparison(
                     pdf,
-                    values_target=np.asarray(
-                        signal_features[signal_indices, feature_index]
-                    ),
+                    values_target=signal_values,
                     weights_target=closure_weights["signal"],
-                    values_estimate=np.asarray(
-                        background_features[background_indices, feature_index]
-                    ),
+                    values_estimate=background_values,
                     weights_estimate=requested_weights,
                     edges=edges,
                     xlabel=FEATURE_LABELS[feature_name],
@@ -854,10 +846,8 @@ def make_diagnostics_pdf(
             else:
                 mixture_values = np.concatenate(
                     [
-                        np.asarray(signal_features[signal_indices, feature_index]),
-                        np.asarray(
-                            background_features[background_indices, feature_index]
-                        ),
+                        signal_values,
+                        background_values,
                     ]
                 )
                 mixture_weights = np.concatenate(
@@ -870,9 +860,7 @@ def make_diagnostics_pdf(
                 )
                 purity_metrics = _draw_comparison(
                     pdf,
-                    values_target=np.asarray(
-                        signal_features[signal_indices, feature_index]
-                    ),
+                    values_target=signal_values,
                     weights_target=closure_weights["signal"],
                     values_estimate=mixture_values,
                     weights_estimate=mixture_weights,
@@ -885,9 +873,7 @@ def make_diagnostics_pdf(
                     target_label="True signal",
                     estimate_label=r"$(S+B)\times w_{\mathrm{remove}}$",
                     normalize=False,
-                    shared_values=np.asarray(
-                        signal_features[signal_indices, feature_index]
-                    ),
+                    shared_values=signal_values,
                     shared_covariance_weights=(
                         closure_weights["signal"] ** 2
                         * closure_outputs["signal"]["target_purity"]
@@ -907,7 +893,7 @@ def make_diagnostics_pdf(
                 f"{'Variable':29s} {first_heading:>18s} "
                 f"{'(ZZ+ggH)*C -> D':>20s} {'ZZ*C+ggH -> D':>19s}"
             )
-            for name in FEATURES:
+            for name in MODEL_FEATURES:
                 shape = report_metrics["shape_closure"][name]
                 combined = report_metrics["combined_reference_yield_closure"][name]
                 requested = report_metrics["requested_application_closure"][name]
@@ -921,7 +907,7 @@ def make_diagnostics_pdf(
                 f"{'Variable':32s} {first_heading:>20s} "
                 f"{'(S+B)*w -> S yield':>22s}"
             )
-            for name in FEATURES:
+            for name in MODEL_FEATURES:
                 shape = report_metrics["shape_closure"][name]
                 purity = report_metrics["purity_closure"][name]
                 summary_lines.append(

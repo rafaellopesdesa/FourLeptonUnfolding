@@ -700,8 +700,8 @@ def train(args: argparse.Namespace) -> Path:
                 "features": list(FEATURES),
                 "model_features": list(MODEL_FEATURES),
                 "preprocessing": {
-                    "periodic_variables": list(FEATURES[:3]),
-                    "periodic_encoding": "sin_cos",
+                    "periodic_variables": list(FEATURES[:2]),
+                    "periodic_encoding": "cos",
                     "remaining_variables": "identity",
                     "mass_is_selection_only": MASS_BRANCH,
                 },
@@ -763,7 +763,7 @@ def train(args: argparse.Namespace) -> Path:
                         "splitmix64(source,event_id,seed) for Pythia"
                     ),
                     "data_grouping": (
-                        "exact duplicates in the eight inputs plus reco_m_ZZ share a split"
+                        "exact duplicates in the seven raw inputs plus reco_m_ZZ share a split"
                     ),
                     "seed": args.split_seed,
                     "fit_fraction": 0.60,

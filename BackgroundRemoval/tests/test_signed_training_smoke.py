@@ -76,7 +76,7 @@ def _write_signed_sample(
         "reco_m_ZZ": np.full(size, 122.0, dtype=np.float32),
     }
     for name in FEATURES:
-        if name in {"reco_Phi", "reco_Phi1", "reco_Psi"}:
+        if name in {"reco_Phi", "reco_Psi"}:
             arrays[name] = rng.uniform(-np.pi, np.pi, size).astype(np.float32)
         elif name.startswith("reco_cos_theta"):
             arrays[name] = rng.uniform(-1.0, 1.0, size).astype(np.float32)
