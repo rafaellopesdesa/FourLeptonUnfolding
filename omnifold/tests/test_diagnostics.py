@@ -191,8 +191,8 @@ class DiagnosticsTest(unittest.TestCase):
         self.assertEqual(normalization["reweighted_reference_yield"], 4.0)
         self.assertEqual(normalization["reference_shape_mean"], 1.0)
         self.assertEqual(len(figures["closure"].axes), 14)
-        self.assertEqual(figures["closure"].axes[1].get_xlabel(), r"$\cos\Phi$")
-        self.assertEqual(figures["closure"].axes[3].get_xlabel(), r"$\cos\Psi$")
+        self.assertEqual(figures["closure"].axes[1].get_xlabel(), r"$\Phi$")
+        self.assertEqual(figures["closure"].axes[3].get_xlabel(), r"$\Psi$")
         self.assertTrue(all(axis.get_yscale() == "linear" for axis in figures["closure"].axes))
         self.assertEqual(figures["learning"].axes[0].get_yscale(), "linear")
         self.assertEqual(figures["learning"].axes[0].lines[0].get_ydata()[1], -0.1)
@@ -239,7 +239,7 @@ class DiagnosticsTest(unittest.TestCase):
             output = save_figures({"signed": figure}, Path(directory) / "plots.pdf")
             self.assertEqual(output.read_bytes()[:4], b"%PDF")
 
-    def test_cosine_distributions_match_sign_flips_and_avoid_double_transform(self):
+    def test_angle_distributions_preserve_radians_and_distinguish_sign_flips(self):
         angles = np.array([-2.1, -0.7, 0.4, 2.5])
         weights = np.array([1.0, 2.0, -0.5, 3.0])
         for raw_name in ("Phi", "reco_Phi", "truth_Psi"):
@@ -248,18 +248,15 @@ class DiagnosticsTest(unittest.TestCase):
                     angles[:, None], weights, weights, -angles[:, None], weights,
                     feature_names=[raw_name],
                 )
-                name = f"cos({raw_name})"
-                self.assertEqual(set(figure.diagnostic_metrics), {name})
-                self.assertEqual(figure.diagnostic_metrics[name]["Updated"]["chi2"], 0.0)
+                self.assertEqual(set(figure.diagnostic_metrics), {raw_name})
+                self.assertGreater(figure.diagnostic_metrics[raw_name]["Updated"]["chi2"], 0.0)
                 raw_histogram = figure.axes[0].patches[0].get_data()
-                expected, _ = _histogram(np.cos(angles), weights, np.linspace(-1, 1, 25))
+                edges = np.linspace(-np.pi, np.pi, 25)
+                expected, _ = _histogram(angles, weights, edges)
                 np.testing.assert_allclose(raw_histogram.values, expected)
-                transformed = plot_distributions(
-                    np.cos(angles)[:, None], weights, weights, feature_names=[name],
-                )
-                transformed_histogram = transformed.axes[0].patches[0].get_data()
-                np.testing.assert_array_equal(raw_histogram.values, transformed_histogram.values)
-                np.testing.assert_array_equal(raw_histogram.edges, transformed_histogram.edges)
+                np.testing.assert_array_equal(raw_histogram.edges, edges)
+                reflected, _ = _histogram(-angles, weights, edges)
+                self.assertFalse(np.array_equal(raw_histogram.values, reflected))
 
     def test_explicit_shape_only_and_extra_observables(self):
         names = (*FEATURES, "m_ZZ", "y_ZZ", "pT_ZZ")

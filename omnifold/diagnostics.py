@@ -23,7 +23,6 @@ from BackgroundRemoval.common import FEATURES as RAW_FEATURES
 FEATURES = tuple(name.removeprefix("reco_") for name in RAW_FEATURES)
 LABELS = {
     "Phi": r"$\Phi$", "Phi1": r"$\Phi_1$", "Psi": r"$\Psi$",
-    "cos(Phi)": r"$\cos\Phi$", "cos(Psi)": r"$\cos\Psi$",
     "cos_theta1": r"$\cos\theta_1$", "cos_theta2": r"$\cos\theta_2$",
     "cos_theta_star": r"$\cos\theta^*$",
     "m_Z1": r"$m_{Z_1}$ [GeV]", "m_Z2": r"$m_{Z_2}$ [GeV]",
@@ -33,19 +32,10 @@ LABELS = {
 
 
 def _base_name(name: str) -> str:
-    if name.startswith("cos(") and name.endswith(")"):
-        return f"cos({_base_name(name[4:-1])})"
     for prefix in ("reco_", "truth_"):
         if name.startswith(prefix):
             return name[len(prefix):]
     return name
-
-
-def _plot_coordinate(name: str, values: np.ndarray) -> tuple[str, np.ndarray]:
-    """Plot the two azimuths in the cosine coordinates seen by the networks."""
-    if _base_name(name) in {"Phi", "Psi"}:
-        return f"cos({name})", np.cos(values)
-    return name, values
 
 
 def _sample(features: Any, weights: Any, name: str) -> tuple[np.ndarray, np.ndarray]:
@@ -75,7 +65,7 @@ def _edges(name: str, *samples: np.ndarray, bins: int = 24) -> np.ndarray:
     name = _base_name(name)
     if name in {"Phi", "Phi1", "Psi"}:
         return np.linspace(-np.pi, np.pi, bins + 1)
-    if name.startswith("cos_theta") or name in {"cos(Phi)", "cos(Psi)"}:
+    if name.startswith("cos_theta"):
         return np.linspace(-1.0, 1.0, bins + 1)
     values = np.concatenate([sample[np.isfinite(sample)] for sample in samples])
     if not values.size:
@@ -178,9 +168,7 @@ def _distribution_grid(features: np.ndarray, nominal_weights: np.ndarray,
         ratio_axis = figure.add_subplot(inner[1], sharex=axis)
         values = features[:, index]
         target_values = truth_features[:, index] if truth_features is not None else values
-        plot_name, values = _plot_coordinate(name, values)
-        _, target_values = _plot_coordinate(name, target_values)
-        edges = _edges(plot_name, values, target_values)
+        edges = _edges(name, values, target_values)
         centers = (edges[:-1] + edges[1:]) / 2.0
         histograms, covariances, transforms = [], [], []
         samples = [(values, nominal_weights), (values, updated_weights)]
@@ -226,12 +214,12 @@ def _distribution_grid(features: np.ndarray, nominal_weights: np.ndarray,
                 cross_cov.T if cross_cov is not None else None,
             )
         feature_metrics["nonfinite_entries"] = [int(np.count_nonzero(~np.isfinite(s[0]))) for s in samples]
-        metrics[plot_name] = feature_metrics
+        metrics[name] = feature_metrics
         axis.axhline(0.0, color="black", linewidth=0.5, alpha=0.4)
         ratio_axis.axhline(1.0, color="black", linestyle="--", linewidth=0.8)
         axis.set_ylabel("Fraction / bin" if shape_only else "Expected events / bin")
         ratio_axis.set_ylabel(f"/ {denominator_label}", fontsize=8)
-        ratio_axis.set_xlabel(LABELS.get(_base_name(plot_name), plot_name))
+        ratio_axis.set_xlabel(LABELS.get(_base_name(name), name))
         axis.tick_params(labelbottom=False)
         axis.set_yscale("linear")
         ratio_axis.set_yscale("linear")
@@ -260,8 +248,8 @@ def plot_distributions(features: Any, nominal_weights: Any, updated_weights: Any
     assume the target is statistically independent.  Ratio uncertainties are
     first-order approximations and become unreliable near a zero net bin.
     Nonfinite observables are counted on each panel; finite flow is folded.
-    Raw Phi/Psi columns are shown as cos(Phi)/cos(Psi), matching the NN
-    coordinates. Already transformed cosine columns are used unchanged.
+    Phi/Psi columns are shown directly as angles in radians, matching the NN
+    coordinates before standardization.
     """
     features, nominal_weights = _sample(features, nominal_weights, "nominal")
     _, updated_weights = _sample(features, updated_weights, "updated")

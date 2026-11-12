@@ -265,19 +265,26 @@ class RatioTrainingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "feature order"):
             ratios.RatioEstimator.load(corrupt, device="cpu")
 
-    def test_all_predictions_use_seven_inputs_and_are_even_in_phi_and_psi(self):
+    def test_predictions_preserve_phi_and_psi_as_two_of_seven_inputs(self):
         self.assertEqual(ratios.MODEL_FEATURE_ORDER,
-                         ("cos(Phi)", "cos(Psi)", "cos_theta1", "cos_theta2",
+                         ("Phi", "Psi", "cos_theta1", "cos_theta2",
                           "cos_theta_star", "m_Z1", "m_Z2"))
         self.assertTrue(all(model[0].in_features == 7 for model in self.model.models))
-        expected = self.model.predict(self.features)
-        for indices in ([0], [1], [0, 1]):
-            with self.subTest(flipped=indices):
-                reflected = self.features.copy()
-                reflected[:, indices] *= -1
-                prediction = self.model.predict(reflected)
-                for name in expected:
-                    np.testing.assert_array_equal(prediction[name], expected[name])
+        features = np.repeat(self.features[:1], 2, axis=0)
+        features[:, :2] = [[-.7, -1.4], [.7, 1.4]]
+        observed = []
+        hook = self.model.models[0][0].register_forward_pre_hook(
+            lambda _model, inputs: observed.append(inputs[0].detach().cpu().numpy().copy())
+        )
+        try:
+            self.model.predict(features)
+        finally:
+            hook.remove()
+        mean = np.asarray(self.model.manifest["scaler"]["mean"], dtype=np.float32)
+        scale = np.asarray(self.model.manifest["scaler"]["scale"], dtype=np.float32)
+        expected = (features - mean) / scale
+        np.testing.assert_array_equal(np.concatenate(observed), expected)
+        self.assertTrue(np.all(observed[0][0, :2] != observed[0][1, :2]))
 
     def test_legacy_calibrated_artifacts_and_injected_corrections_are_rejected(self):
         destination = self.root / "legacy-or-tampered"
@@ -286,7 +293,9 @@ class RatioTrainingTests(unittest.TestCase):
         original = json.loads(manifest_path.read_text())
         cases = [
             ({**original, "format_version": 1, "calibration": {"scale": .5, "bias": .2}}, "Legacy calibrated"),
-            ({**original, "format_version": 2}, "seven cosine-only"),
+            ({**original, "format_version": 2}, "Phi and Psi in radians"),
+            ({**original, "model_features": ["cos(Phi)", "cos(Psi)",
+                *original["model_features"][2:]]}, "feature order"),
             ({**original, "model_features": ["sin(Phi)", "cos(Phi)", "sin(Phi1)",
                 "cos(Phi1)", "sin(Psi)", "cos(Psi)", "cos_theta1", "cos_theta2",
                 "cos_theta_star", "m_Z1", "m_Z2"]}, "feature order"),

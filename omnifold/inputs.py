@@ -24,7 +24,7 @@ def validate_background_weight_metadata(
         return
     message = (
         f"{path}: background_removal_metadata does not identify raw, uncalibrated "
-        "background-removal weights from the seven cosine-only NN inputs. "
+        "background-removal weights using seven inputs with Phi and Psi in radians. "
         "Retrain the BackgroundRemoval models and "
         "regenerate/redecorate this input before using a new OmniFold campaign."
     )

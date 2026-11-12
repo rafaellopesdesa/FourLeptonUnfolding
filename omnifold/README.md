@@ -34,12 +34,12 @@ background-removal step treats nonfiducial ggH as background. Fiducial events
 that fail the detector selection are retained for the truth result.
 
 All three ratio models in every iteration use the same seven NN inputs as
-BackgroundRemoval: `cos(Phi)`, `cos(Psi)`, `cos_theta1`, `cos_theta2`,
-`cos_theta_star`, `m_Z1`, and `m_Z2`. The reader loads `Phi` and `Psi` with
-`reco_` or `truth_` prefixes and computes their cosines; there are no sine
-inputs and no `Phi1` input. All seven components are standardized using the
-fit split. Reco pull and reco likelihood use reconstructed inputs; truth push
-uses dressed-particle inputs. `m_ZZ` defines the detector region and is not
+BackgroundRemoval: `Phi`, `Psi`, `cos_theta1`, `cos_theta2`, `cos_theta_star`,
+`m_Z1`, and `m_Z2`. `Phi` and `Psi` are the angles themselves in radians, read
+with `reco_` or `truth_` prefixes. Preprocessing applies no sine or cosine
+encoding, and `Phi1` is excluded. All seven components are standardized using
+the fit split. Reco pull and reco likelihood use reconstructed inputs; truth
+push uses dressed-particle inputs. `m_ZZ` defines the detector region and is not
 an NN input. The ntuple retains its other observables, including LHE and Born
 variables, but they do not enter these networks.
 
@@ -178,7 +178,7 @@ for estimating the statistical uncertainty of the entire adaptive unfolding.
 The notebook and CLI reports expose learning curves indexed by optimizer
 update, one raw-score reliability panel per ratio, ensemble spread, and
 per-variable weighted closure for each
-stage. Reconstructed and truth comparison figures show absolute expected-event yields by default;
+stage. The `Phi` and `Psi` panels show angles in radians over `[-pi, pi]`. Reconstructed and truth comparison figures show absolute expected-event yields by default;
 set notebook `SHAPE_ONLY=True` or CLI `--shape-only` for normalized
 comparisons. This plotting option does not change training or fitted yield
 ratios. The Herwig truth curve is an independent diagnostic target, not a
@@ -390,13 +390,16 @@ export, reports, or continued training with this version. Start a new run
 directory and do not edit saved versions or feature lists to bypass these
 checks; the stored network weights were fitted under their original contract.
 
-### Moving to the seven-input networks
+### Moving to the unencoded-angle inputs
 
-New ratio artifacts and sessions use format 3 and explicitly record the
-seven-input feature order and raw-ensemble-odds rule. Older format-2 raw-odds
-campaigns and format-1 calibrated campaigns are incompatible. All three
-ratios must be retrained at every iteration in a fresh run directory; changing
-a manifest cannot convert stored network weights or cumulative ratios.
+Ratio artifacts and sessions retain format 3 and explicitly record the exact
+seven-input feature order and raw-ensemble-odds rule. Previous cosine-only
+models and campaigns are incompatible even when they also use format 3:
+`Phi` and `Psi` are now angle inputs in radians, with no trigonometric
+encoding. Older format-2 raw-odds campaigns and format-1 calibrated campaigns
+are also incompatible. All three ratios must be retrained at every iteration
+in a fresh run directory; changing a manifest cannot convert stored network
+weights or cumulative ratios.
 
 Retrain BackgroundRemoval Correction and Training (artifact format 5),
 redecorate the original merged inputs, and use those newly decorated files for
@@ -407,9 +410,11 @@ campaigns and outputs separately for comparison and retain their provenance.
 With the default `weight_background_removed` input, including its
 `weight * background_removal_weight` fallback, OmniFold checks the embedded
 `background_removal_metadata` object when present. It requires decoration
-format 3, the seven-input feature contract, and the current raw-ensemble-odds
-estimator. Missing, incompatible, or malformed metadata content requires
-retraining BackgroundRemoval and regenerating the decorated files. Inputs
+format 3, the exact seven-input contract with unencoded `Phi` and `Psi`, and
+the current raw-ensemble-odds estimator. Previous cosine-only decorations are
+therefore incompatible even though their format number is also 3. Missing,
+incompatible, or malformed metadata content requires retraining
+BackgroundRemoval and regenerating the decorated files. Inputs
 without that metadata object and explicitly selected custom weight branches
 remain accepted, so this check does not establish the history of every input
 file.

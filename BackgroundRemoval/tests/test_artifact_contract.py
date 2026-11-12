@@ -198,6 +198,15 @@ class ArtifactContractTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "ratio|calibration"):
                     self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
 
+    def test_loader_rejects_same_version_cosine_only_artifact(self):
+        with tempfile.TemporaryDirectory() as directory_name:
+            root = Path(directory_name) / "artifact"
+            manifest = _write_artifact(root, model_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+            manifest["model_features"] = ["cos(reco_Phi)", "cos(reco_Psi)", *FEATURES[2:]]
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "actual Phi/Psi angles.*retrain"):
+                self._load(root, expected_kind=MODEL_KIND_BACKGROUND_REMOVAL)
+
     def test_loader_requires_versioned_inference_logit_bound(self):
         with tempfile.TemporaryDirectory() as directory_name:
             root = Path(directory_name) / "artifact"

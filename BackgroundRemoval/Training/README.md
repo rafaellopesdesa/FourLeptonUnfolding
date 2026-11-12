@@ -88,10 +88,13 @@ model variable and raw-score reliability. Validation is used for early stopping
 and ensemble retries, with no fitted output correction. The scalar yield factor
 is intentionally computed from the full selected totals, so the absolute-yield closure shares that one scalar input.
 
-New models use artifact format 5 with the seven-input feature contract. Earlier
-models, including raw-odds models with the old feature set, are rejected; train
-this stage with a newly trained raw-odds Correction and then redecorate the
-original merged inputs. Keep earlier artifacts and outputs in separate directories.
+Models use artifact format 5 with the exact seven-input feature contract:
+`Phi`, `Psi`, `cos_theta1`, `cos_theta2`, `cos_theta_star`, `m_Z1`, and `m_Z2`.
+The first two inputs are angles in radians, standardized without trigonometric
+encoding. Previous cosine-only models are incompatible even when their
+format number is also 5. Train this stage with a newly trained Correction,
+redecorate the original merged inputs, and start a fresh OmniFold campaign.
+Keep earlier artifacts and outputs in separate directories.
 
 An existing output directory is rejected unless `--overwrite` is supplied.
 For safety, overwrite is limited to a recognized background-removal artifact

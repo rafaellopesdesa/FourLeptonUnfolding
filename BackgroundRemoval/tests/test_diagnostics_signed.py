@@ -119,15 +119,16 @@ class SignedDiagnosticsTest(unittest.TestCase):
         self.assertEqual(set(metrics["reliability"]), {"closure_raw"})
         self.assertNotIn("calibration", metrics)
         self.assertEqual(set(metrics["shape_closure"]), set(MODEL_FEATURES))
-        # Raw azimuths are zero in this fixture, so cosine feature plots must
-        # receive ones and use [-1, 1] bins, not draw the excluded signed angles.
+        # The two azimuths enter the model and closure plots as signed radians,
+        # preserving the original values rather than taking their cosines.
         for feature_index in (0, 1):
             plotted = comparison.call_args_list[2 * feature_index].kwargs
-            np.testing.assert_allclose(plotted["values_target"], 1.0)
-            np.testing.assert_allclose(plotted["values_estimate"], 1.0)
-            self.assertEqual(plotted["edges"][0], -1.0)
-            self.assertEqual(plotted["edges"][-1], 1.0)
-            self.assertIn(r"\cos", plotted["xlabel"])
+            np.testing.assert_allclose(plotted["values_target"], 0.0)
+            np.testing.assert_allclose(plotted["values_estimate"], 0.0)
+            self.assertEqual(plotted["edges"][0], -np.pi)
+            self.assertEqual(plotted["edges"][-1], np.pi)
+            self.assertIn("[rad]", plotted["xlabel"])
+            self.assertNotIn(r"\cos", plotted["xlabel"])
         expected_mean = np.average(scores["background"] / (1.0 - scores["background"]),
                                    weights=weights["background"])
         self.assertNotAlmostEqual(expected_mean, 1.0)

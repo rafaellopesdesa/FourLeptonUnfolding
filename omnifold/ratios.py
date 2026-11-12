@@ -183,7 +183,7 @@ def _read_manifest(path: Path) -> dict[str, Any]:
                          "to use raw NN odds without calibration corrections")
     if result.get("model_kind") == MODEL_KIND and result.get("format_version") == 2:
         raise ValueError("Legacy OmniFold ratio artifact uses the old angular feature contract; "
-                         "retrain in a new campaign with the seven cosine-only NN inputs")
+                         "retrain in a new campaign with seven inputs and Phi and Psi in radians")
     if result.get("model_kind") != MODEL_KIND or result.get("format_version") != FORMAT_VERSION:
         raise ValueError(f"not a supported OmniFold ratio artifact: {path}")
     if result.get("ratio_estimator") != common.RAW_RATIO_ESTIMATOR or "calibration" in result:
@@ -385,8 +385,8 @@ class RatioEstimator:
         root = Path(path).expanduser().resolve()
         manifest = _read_manifest(root)
         if manifest.get("feature_order") != list(FEATURE_ORDER) or manifest.get("model_features") != list(MODEL_FEATURE_ORDER):
-            raise ValueError("ratio artifact feature order is incompatible with the seven cosine-only "
-                             "NN inputs; retrain in a new campaign")
+            raise ValueError("ratio artifact feature order is incompatible with the seven-input "
+                             "contract (Phi and Psi in radians); retrain in a new campaign")
         config = RatioConfig(**manifest["config"])
         config.validate()
         members = manifest.get("members", [])

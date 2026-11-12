@@ -126,9 +126,11 @@ directory Application to enforce a single campaign. Use
 `--skip-input-checksums` only when byte-level provenance is intentionally
 unavailable; doing so disables the corresponding downstream match checks.
 
-New artifacts use format 5 with exactly seven inputs: `cos(Phi)`, `cos(Psi)`,
-`cos_theta1`, `cos_theta2`, `cos_theta_star`, `m_Z1`, and `m_Z2`. Earlier models
-are rejected, including raw-odds models with the old feature set. Retrain
+Artifacts use format 5 with exactly seven inputs: `Phi`, `Psi`, `cos_theta1`,
+`cos_theta2`, `cos_theta_star`, `m_Z1`, and `m_Z2`. `Phi` and `Psi` enter as
+angles in radians, with no trigonometric encoding before standardization.
+The exact feature contract rejects previous cosine-only models even when
+they also use format 5, as well as older feature sets. Retrain
 Correction in a new model directory, then retrain background removal,
 redecorate the original merged files, and start a new OmniFold campaign.
 The original ntuples can be reused; retain earlier outputs separately.

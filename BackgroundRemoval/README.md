@@ -24,14 +24,14 @@ is an event-level preprocessing factor in reconstructed phase space.
 Both classifiers use exactly seven NN inputs, in this order:
 
 ```text
-cos(reco_Phi), cos(reco_Psi),
+reco_Phi, reco_Psi,
 reco_cos_theta1, reco_cos_theta2, reco_cos_theta_star,
 reco_m_Z1, reco_m_Z2
 ```
 
-The reader takes `reco_Phi` and `reco_Psi` from the ntuple and computes their
-cosines. Each of these angles supplies one input; no sine terms or `Phi1`
-enter any network. The seven components are standardized using the fit split.
+`reco_Phi` and `reco_Psi` are the angles themselves, in radians. Each supplies
+one input, with no sine or cosine encoding; `Phi1` is excluded. Preprocessing
+preserves the seven variables and then standardizes them using the fit split.
 OmniFold uses the same seven inputs at reconstructed or dressed-truth level.
 The other observables remain available in the analysis ntuple, so this change
 does not require event generation, Delphes, or ntuple production to be rerun.
@@ -303,7 +303,7 @@ Each model directory contains `manifest.json`, one checksummed state file per
 ensemble member (four by default), and `diagnostics.pdf`. The PDF reports
 learning curves, raw-score reliability, observed ratio-normalization checks,
 ensemble spread, and held-out closure tests for all seven model inputs,
-including `cos(Phi)` and `cos(Psi)`.
+including `Phi` and `Psi` in radians over `[-pi, pi]`.
 Reliability is a diagnostic of the NN output, with no correction fitted to
 its curve. The learned ratio and its reliability are evaluated on the
 untouched 25% closure split. The validation split controls early stopping and
@@ -312,18 +312,20 @@ full selected sample, so absolute-yield
 closure is not independent of that one scalar. The binned chi-square values
 are discrepancy summaries, not p-values.
 
-Newly trained model artifacts use format version 5 and explicitly record the
-seven-input feature order and raw-ensemble-odds rule. All earlier model formats,
-including format-4 raw-odds models with eleven encoded inputs, are incompatible.
-Train a new Correction, then a new background-removal model using that
-Correction, and redecorate the original merged inputs into a new output
-directory. Start a fresh OmniFold campaign from these newly decorated files.
-Keep old artifacts and decorated outputs separately; changing a manifest cannot
+Model artifacts use format version 5 and explicitly record the seven-input
+feature order and raw-ensemble-odds rule. Compatibility depends on the exact
+feature contract, not only the format number: previous format-5 models using
+`cos(Phi)` and `cos(Psi)` are incompatible, as are format-4 models with eleven
+encoded inputs. Train a new Correction, then a new background-removal model
+using that Correction, and redecorate the original merged inputs into a new
+output directory. Start a fresh OmniFold campaign from these newly decorated
+files. Keep old artifacts and decorated outputs separately; changing a manifest cannot
 convert the trained networks or their existing weights to the new inputs.
 For its standard background-removed data weight, OmniFold checks the embedded
 `background_removal_metadata` object when present. It requires decoration
-format 3, the seven-input feature contract, and the current raw estimator.
-Metadata-free inputs and custom weight branches remain accepted, so retain
+format 3, the exact seven-input contract with unencoded `Phi` and `Psi`, and
+the current raw estimator. Metadata-free inputs and custom weight branches
+remain accepted, so retain
 the model/output provenance as well.
 
 Removing post-training corrections does not establish that a network is

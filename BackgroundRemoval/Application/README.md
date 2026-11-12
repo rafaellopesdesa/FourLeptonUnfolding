@@ -1,13 +1,16 @@
 # Application
 
 Application requires format-5 raw-ensemble-odds models with exactly seven
-inputs: `cos(Phi)`, `cos(Psi)`, `cos_theta1`, `cos_theta2`, `cos_theta_star`,
-`m_Z1`, and `m_Z2`. Earlier model artifacts are incompatible, including raw-odds
-models with the old feature set. Retrain Correction, then Training using that
-new Correction, and redecorate the original merged inputs into a fresh output
-directory. New decorations record format 3 and both the source-branch and NN
-feature orders. Start a new OmniFold campaign from those files. Retain older
-decorated files separately; their weights were computed with different models.
+inputs: `Phi`, `Psi`, `cos_theta1`, `cos_theta2`, `cos_theta_star`, `m_Z1`, and
+`m_Z2`. `Phi` and `Psi` are angles in radians, standardized without sine or
+cosine encoding. Exact feature checks reject previous cosine-only models even
+when their format number is also 5, along with older feature sets. Retrain
+Correction, then Training using that new Correction, and redecorate the
+original merged inputs into a fresh output directory. Decorations retain
+format 3 and record both the source-branch and NN feature orders; previous
+cosine-only decorations do not satisfy the current feature contract. Start a
+new OmniFold campaign from the newly decorated files and retain older outputs
+separately.
 
 Application writes two compact branches while preserving the input tree,
 entry order, original signed weights, fixed-size arrays, and string metadata:

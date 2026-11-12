@@ -185,6 +185,9 @@ class WorkflowTest(unittest.TestCase):
                         "features": ["reco_Phi", "reco_Phi1", *FEATURES[1:]]}),
             json.dumps({"format_version": 3, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                         "features": list(FEATURES)}),
+            json.dumps({"format_version": 3, "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
+                        "features": list(FEATURES), "model_features":
+                        ["cos(reco_Phi)", "cos(reco_Psi)", *MODEL_FEATURES[2:]]}),
             json.dumps({"ratio_estimator": {**RAW_RATIO_ESTIMATOR, "posthoc_calibration": True}}),
             json.dumps({"ratio_estimator": {**RAW_RATIO_ESTIMATOR, "empirical_normalization": True}}),
             "not JSON", "null",
@@ -379,10 +382,12 @@ class WorkflowTest(unittest.TestCase):
         self.assertFalse(original["ratio_estimator"]["posthoc_calibration"])
         for modified, message in [
             ({**original, "format_version": 1}, "Legacy calibrated"),
-            ({**original, "format_version": 2}, "seven cosine-only"),
+            ({**original, "format_version": 2}, "Phi and Psi in radians"),
             ({**original, "features_reco": ["reco_Phi1", *FEATURES]}, "feature contract"),
             ({**original, "features_truth": list(reversed(TRUTH_FEATURES))}, "feature contract"),
             ({**original, "model_features": ["sin(Phi)", *original["model_features"]]}, "feature contract"),
+            ({**original, "model_features": ["cos(Phi)", "cos(Psi)",
+                *original["model_features"][2:]]}, "feature contract"),
             ({**original, "ratio_estimator": {**original["ratio_estimator"], "posthoc_calibration": True}}, "without calibration"),
             ({**original, "calibration": {}}, "without calibration"),
         ]:

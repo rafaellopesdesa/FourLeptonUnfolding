@@ -35,7 +35,7 @@ MODEL_KIND_BACKGROUND_REMOVAL = "background_removal"
 MODEL_KIND_DATA_MC_CORRECTION = "data_mc_correction"
 
 # Keep this order identical for correction, background removal, and OmniFold.
-# Phi and Psi are read as angles and enter the network only through cosine.
+# Phi and Psi enter the network as the stored angles in radians.
 # reco_m_ZZ is deliberately only a region-selection variable and never enters
 # any neural network.
 FEATURES = (
@@ -47,15 +47,7 @@ FEATURES = (
     "reco_m_Z1",
     "reco_m_Z2",
 )
-MODEL_FEATURES = (
-    "cos(reco_Phi)",
-    "cos(reco_Psi)",
-    "reco_cos_theta1",
-    "reco_cos_theta2",
-    "reco_cos_theta_star",
-    "reco_m_Z1",
-    "reco_m_Z2",
-)
+MODEL_FEATURES = FEATURES
 
 PRIMARY_OUTPUT_BRANCH = "background_removal_weight"
 ANALYSIS_REGION_BRANCH = "analysis_region"
@@ -238,7 +230,7 @@ def toolkit_runtime_provenance() -> dict[str, Any]:
 
 
 def transformed_features(raw: np.ndarray) -> np.ndarray:
-    """Build the seven NN inputs, retaining only cosines of Phi and Psi."""
+    """Validate the seven NN inputs and retain Phi/Psi as angles in radians."""
 
     raw = np.asarray(raw)
     if raw.ndim != 2 or raw.shape[1] != len(FEATURES):
@@ -248,11 +240,7 @@ def transformed_features(raw: np.ndarray) -> np.ndarray:
         )
     if not np.all(np.isfinite(raw)):
         raise ValueError("model inputs contain non-finite values")
-    output = np.empty((raw.shape[0], len(MODEL_FEATURES)), dtype=np.float32)
-    output[:, 0] = np.cos(raw[:, 0])
-    output[:, 1] = np.cos(raw[:, 1])
-    output[:, 2:] = raw[:, 2:]
-    return output
+    return np.asarray(raw, dtype=np.float32)
 
 
 def deterministic_split(
@@ -494,7 +482,8 @@ class ModelBundle:
             )
         if tuple(manifest.get("model_features", ())) != MODEL_FEATURES:
             raise ValueError(
-                "model preprocessing schema is incompatible with the seven-input definition; "
+                "model preprocessing schema is incompatible with the seven-input definition "
+                "using actual Phi/Psi angles in radians; "
                 "retrain in a new directory"
             )
         architecture = manifest.get("architecture")

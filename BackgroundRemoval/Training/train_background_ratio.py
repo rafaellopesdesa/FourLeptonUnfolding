@@ -1421,7 +1421,7 @@ def train(args: argparse.Namespace) -> Path:
                 "model_features": list(MODEL_FEATURES),
                 "preprocessing": {
                     "periodic_variables": list(FEATURES[:2]),
-                    "periodic_encoding": "cos",
+                    "periodic_encoding": "identity",
                     "remaining_variables": "identity",
                 },
                 "selections": {

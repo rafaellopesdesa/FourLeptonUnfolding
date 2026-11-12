@@ -63,32 +63,29 @@ class CommonUtilitiesTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "input changed"):
                 assert_file_unchanged(path, provenance)
 
-    def test_cosine_encoding_has_no_boundary_discontinuity(self):
+    def test_azimuth_boundaries_remain_distinct_stored_angles(self):
         raw = np.zeros((2, len(FEATURES)), dtype=np.float32)
         raw[0, :2] = -math.pi + 1.0e-6
         raw[1, :2] = math.pi - 1.0e-6
         transformed = transformed_features(raw)
-        np.testing.assert_allclose(transformed[0], transformed[1], atol=3.0e-6)
+        np.testing.assert_array_equal(transformed, raw)
+        self.assertTrue(np.all(transformed[1, :2] - transformed[0, :2] > 6.0))
         self.assertEqual(transformed.shape, (2, 7))
 
-    def test_exact_seven_input_definition_discards_azimuth_signs(self):
+    def test_exact_seven_input_definition_preserves_azimuth_values_and_signs(self):
         self.assertEqual(FEATURES, (
             "reco_Phi", "reco_Psi", "reco_cos_theta1", "reco_cos_theta2",
             "reco_cos_theta_star", "reco_m_Z1", "reco_m_Z2",
         ))
-        self.assertEqual(MODEL_FEATURES, (
-            "cos(reco_Phi)", "cos(reco_Psi)", "reco_cos_theta1",
-            "reco_cos_theta2", "reco_cos_theta_star", "reco_m_Z1", "reco_m_Z2",
-        ))
+        self.assertEqual(MODEL_FEATURES, FEATURES)
         raw = np.array([
             [0.7, -1.2, 0.3, -0.4, 0.5, 91.0, 24.0],
             [-0.7, 1.2, 0.3, -0.4, 0.5, 91.0, 24.0],
-        ], dtype=np.float32)
+        ], dtype=np.float64)
         transformed = transformed_features(raw)
-        np.testing.assert_array_equal(transformed[0], transformed[1])
-        np.testing.assert_allclose(transformed[0], [
-            math.cos(0.7), math.cos(1.2), 0.3, -0.4, 0.5, 91.0, 24.0,
-        ], rtol=1e-6)
+        self.assertEqual(transformed.dtype, np.dtype("float32"))
+        np.testing.assert_array_equal(transformed, raw.astype(np.float32))
+        self.assertFalse(np.array_equal(transformed[0, :2], transformed[1, :2]))
 
     def test_old_eight_observable_input_bank_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "7 columns"):

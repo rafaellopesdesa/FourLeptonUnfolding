@@ -255,7 +255,7 @@ class OmniFoldSession:
         if manifest.get("kind") == "omnifold_session" and manifest.get("format_version") == 2:
             raise ValueError("Legacy OmniFold campaign uses the old angular feature contract; "
                              "retrain from the first iteration in a new run directory with "
-                             "the seven cosine-only NN inputs")
+                             "seven inputs and Phi and Psi in radians")
         if manifest.get("kind") != "omnifold_session" or manifest.get("format_version") != FORMAT_VERSION:
             raise ValueError("Unsupported OmniFold session")
         if manifest.get("ratio_estimator") != RAW_RATIO_ESTIMATOR or "calibration" in manifest:
@@ -263,8 +263,8 @@ class OmniFoldSession:
         if (manifest.get("features_reco") != list(FEATURES)
                 or manifest.get("features_truth") != list(TRUTH_FEATURES)
                 or manifest.get("model_features") != list(MODEL_FEATURE_ORDER)):
-            raise ValueError("OmniFold session feature contract differs from the seven cosine-only "
-                             "NN inputs; retrain in a new run directory")
+            raise ValueError("OmniFold session feature contract differs from the seven-input "
+                             "contract (Phi and Psi in radians); retrain in a new run directory")
         config = RatioConfig(**manifest["config"])
         config.validate()
         if device is not None:
