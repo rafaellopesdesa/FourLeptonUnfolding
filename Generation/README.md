@@ -87,6 +87,17 @@ analysis chain in transient worker scratch. The full workflow and output
 layout are in
 [`../BatchSubmit/README.md`](../BatchSubmit/README.md).
 
+For a full-chain muon momentum-scale variation, add `--muon-scale up` or
+`--muon-scale down` to `submit_generation.sh`. These multiply the reconstructed
+muon momentum by `1.01` or `0.99` after resolution smearing and before
+reconstruction/ID and isolation efficiencies; `nominal` is the default.
+Campaign and output names distinguish the choices. Use a separate
+`--analysis-output-root` for each variation so the usual merge patterns select
+one choice at a time. To reuse existing showered events, run
+[`../Simulation/run_simulation.sh`](../Simulation/run_simulation.sh) with the
+same option instead of submitting a new generation campaign; see the
+[simulation instructions](../Simulation/README.md#muon-momentum-scale-variations).
+
 ## Run the four combinations
 
 By default, the runner uses the validated Run-3 cards in `../PowhegCards`.

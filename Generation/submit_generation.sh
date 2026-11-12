@@ -34,6 +34,7 @@ Campaign options:
   --reuse-grid DIR        Reuse a compatible existing POWHEG grid and skip grid job
   --mass-region NAME      extended or signal (default: extended)
   --delphes-card FILE     Override the installed ATLAS base card
+  --muon-scale NAME       nominal, up (+1%), or down (-1%); resolution unchanged
   --higgs-br VALUE        H->ZZ->4l weight factor (default: 2.771E-04)
   --keep-intermediates    Persist the complete per-task work directory for debugging
 
@@ -84,6 +85,7 @@ PDF_ID="${PDF_ID:-303400}"
 REUSE_GRID=""
 MASS_REGION=extended
 DELPHES_CARD=""
+MUON_SCALE=nominal
 HIGGS_BR="2.771E-04"
 KEEP_INTERMEDIATES=0
 PARTITION=cpu
@@ -116,6 +118,7 @@ while (($#)); do
     --reuse-grid) need_value "$@"; REUSE_GRID="$2"; shift 2 ;;
     --mass-region) need_value "$@"; MASS_REGION="$2"; shift 2 ;;
     --delphes-card) need_value "$@"; DELPHES_CARD="$2"; shift 2 ;;
+    --muon-scale) need_value "$@"; MUON_SCALE="$2"; shift 2 ;;
     --higgs-br) need_value "$@"; HIGGS_BR="$2"; shift 2 ;;
     --keep-intermediates) KEEP_INTERMEDIATES=1; shift ;;
     --partition) need_value "$@"; PARTITION="$2"; shift 2 ;;
@@ -138,6 +141,11 @@ done
   echo "SHOWER must be pythia or herwig" >&2
   exit 2
 }
+case "$MUON_SCALE" in
+  nominal) MUON_SCALE_SUFFIX="" ;;
+  up|down) MUON_SCALE_SUFFIX="_muon_scale_${MUON_SCALE}" ;;
+  *) echo "--muon-scale must be nominal, up, or down" >&2; exit 2 ;;
+esac
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || {
   echo "--jobs must be a positive integer" >&2
   exit 2
@@ -266,7 +274,7 @@ RUN_CARD="$(realpath "$RUN_CARD")"
   exit 1
 }
 
-CAMPAIGN_DIR="$OUTPUT_ROOT/$CAMPAIGN"
+CAMPAIGN_DIR="$OUTPUT_ROOT/${CAMPAIGN}${MUON_SCALE_SUFFIX}"
 [[ ! -e "$CAMPAIGN_DIR" ]] || {
   echo "Campaign already exists: $CAMPAIGN_DIR" >&2
   exit 1
@@ -358,6 +366,7 @@ write_config() {
   write_config MASS_REGION "$MASS_REGION"
   write_config SCRATCH_ROOT "$SCRATCH_ROOT"
   write_config DELPHES_CARD "$DELPHES_CARD"
+  write_config MUON_SCALE "$MUON_SCALE"
   write_config HIGGS_BR "$HIGGS_BR"
   write_config KEEP_INTERMEDIATES "$KEEP_INTERMEDIATES"
   write_config BEAM_ENERGY_GEV 6800
@@ -448,6 +457,7 @@ done
   printf 'max_concurrent_per_wave=%s\n' "$MAX_CONCURRENT"
   printf 'analysis_output_root=%s\n' "$ANALYSIS_OUTPUT_ROOT"
   printf 'mass_region=%s\n' "$MASS_REGION"
+  printf 'muon_scale_variation=%s\n' "$MUON_SCALE"
   printf 'keep_intermediates=%s\n' "$KEEP_INTERMEDIATES"
   printf 'beam_energy_gev=6800\n'
   printf 'sqrt_s_gev=13600\n'
@@ -458,7 +468,7 @@ echo "Campaign: $CAMPAIGN_DIR"
 echo "Grid job: ${GRID_JOB_ID:-reused grid}"
 echo "Event arrays: ${ARRAY_JOB_IDS[*]}"
 echo "Planned events: $((JOBS * EVENTS_PER_JOB))"
-echo "Compact outputs: $ANALYSIS_OUTPUT_ROOT/${PROCESS}_${SHOWER}_${CAMPAIGN}_job_*.root"
+echo "Compact outputs: $ANALYSIS_OUTPUT_ROOT/${PROCESS}_${SHOWER}_${CAMPAIGN}_job_*${MUON_SCALE_SUFFIX}.root"
 if ((DRY_RUN)); then
   echo "Dry run only: no jobs were submitted."
 else

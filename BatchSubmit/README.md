@@ -96,6 +96,33 @@ Pass `--scratch-root DIR` if the site provides a different node-local area.
 `--time` covers the complete chain, not generation alone. Run `--help` for
 memory, seed, concurrency, card, mass-region, and debugging options.
 
+For a muon momentum-scale variation, add `--muon-scale up` or
+`--muon-scale down`. The default `nominal` preserves the original output
+layout. The variations apply a uniform `+1%` or `-1%` momentum scale after
+muon resolution smearing and before reconstruction/ID and isolation
+efficiencies. These are the study's one-sigma scale proxies; the resolution
+model is unchanged.
+
+For example, a separate up-variation campaign can use:
+
+```bash
+./submit_generation.sh gg_H pythia \
+  --jobs 1000 --events-per-job 10000 \
+  --campaign gg_H_pythia_run3 \
+  --muon-scale up \
+  --analysis-output-root "${ANALYSIS_SHARDS}_muon_scale_up"
+```
+
+The campaign directory and output labels receive a `_muon_scale_up` or
+`_muon_scale_down` suffix. The choice is recorded in `campaign.env`, forwarded
+to Simulation, and retained as `simulation_metadata` in compact ROOT files.
+Use one shard directory per scale choice: the usual process/shower merge
+patterns select every matching shard, and merging different scale choices
+is rejected. Apply the same choice to all components of a pseudo-data sample.
+Existing retained HepMC inputs can instead be rerun directly with
+[`Simulation/run_simulation.sh --muon-scale up|down`](../Simulation/README.md#muon-momentum-scale-variations),
+without regenerating events.
+
 ## POWHEG grid stage
 
 Each campaign first runs one grid-preparation job. Event arrays start through

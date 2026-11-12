@@ -28,7 +28,8 @@ def shell_assignment(name: str, value: object) -> str:
 
 
 class FullChainWorkerTest(unittest.TestCase):
-    def make_campaign(self, root: Path, *, fail_simulation: bool = False) -> tuple[Path, Path]:
+    def make_campaign(self, root: Path, *, fail_simulation: bool = False,
+                      muon_scale: str | None = None) -> tuple[Path, Path]:
         fake_repo = root / "repo"
         campaign = root / "campaign"
         grid = campaign / "grid"
@@ -48,12 +49,17 @@ class FullChainWorkerTest(unittest.TestCase):
             #!/bin/bash
             set -euo pipefail
             output=""
+            seed=""
             while (($#)); do
-              if [[ "$1" == --output-dir ]]; then output="$2"; shift 2; else shift; fi
+              case "$1" in
+                --output-dir) output="$2"; shift 2 ;;
+                --seed) seed="$2"; shift 2 ;;
+                *) shift ;;
+              esac
             done
             mkdir -p "$output"
             printf 'HepMC::Version 3.0.0\nHepMC::Asciiv3-START_EVENT_LISTING\nE 1\n' >"$output/events.hepmc3"
-            printf 'process=gg_H\nseed=1001\n' >"$output/run-metadata.txt"
+            printf 'process=gg_H\nseed=%s\n' "$seed" >"$output/run-metadata.txt"
             printf '{"schema_version": 1}\n' >"$output/lhe-provenance.json"
             printf 'generation log\n' >"$output/powheg.log"
             """,
@@ -61,14 +67,27 @@ class FullChainWorkerTest(unittest.TestCase):
         simulation_body = "exit 17" if fail_simulation else """
             input="$1"; shift
             output_root=""
+            muon_scale=""
             while (($#)); do
-              if [[ "$1" == --output-root ]]; then output_root="$2"; shift 2; else shift; fi
+              case "$1" in
+                --output-root) output_root="$2"; shift 2 ;;
+                --muon-scale) muon_scale="$2"; shift 2 ;;
+                *) shift ;;
+              esac
             done
             output="$output_root/$(basename "$input")"
+            case "$muon_scale" in
+              nominal) factor=1.0 ;;
+              up) output+="_muon_scale_up"; factor=1.01 ;;
+              down) output+="_muon_scale_down"; factor=0.99 ;;
+              *) echo 'missing or invalid --muon-scale' >&2; exit 18 ;;
+            esac
             mkdir -p "$output"
             printf 'delphes placeholder\n' >"$output/delphes.root"
             printf 'simulation log\n' >"$output/delphes.log"
-            printf 'process=gg_H\n' >"$output/simulation-metadata.txt"
+            printf 'process=gg_H\nmuon_scale_variation=%s\nmuon_scale_factor=%s\n' \\
+              "$muon_scale" "$factor" >"$output/simulation-metadata.txt"
+            printf '# muon_scale=%s\n' "$muon_scale" >"$output/delphes_card_ATLAS_resolved.tcl"
             cp "$input/lhe-provenance.json" "$output/lhe-provenance.json"
         """
         write_executable(
@@ -84,6 +103,7 @@ class FullChainWorkerTest(unittest.TestCase):
             """
             #!/usr/bin/env python3
             import argparse
+            from pathlib import Path
             import numpy as np
             import uproot
             parser = argparse.ArgumentParser()
@@ -93,11 +113,13 @@ class FullChainWorkerTest(unittest.TestCase):
             parser.add_argument("--require-lhe", action="store_true")
             parser.add_argument("--require-born", action="store_true")
             args = parser.parse_args()
+            assert Path(args.input).is_file(), "analysis must receive the selected simulation output"
             assert args.require_lhe, "batch analysis must require LHE matching"
             assert args.require_born, "batch analysis must require a certified Born source"
             size = 3
             index = np.arange(size)
             with uproot.recreate(args.output) as root_file:
+                root_file["analysis_input"] = args.input
                 root_file["Analysis"] = {
                     "event_id": index.astype(np.uint64),
                     "event_number": index.astype(np.int64),
@@ -155,6 +177,8 @@ class FullChainWorkerTest(unittest.TestCase):
             "HIGGS_BR": "2.771E-04",
             "KEEP_INTERMEDIATES": 0,
         }
+        if muon_scale is not None:
+            settings["MUON_SCALE"] = muon_scale
         config.write_text(
             "".join(shell_assignment(name, value) for name, value in settings.items()),
             encoding="utf-8",
@@ -212,6 +236,44 @@ class FullChainWorkerTest(unittest.TestCase):
             status = (job / "slurm-status.txt").read_text(encoding="utf-8")
             self.assertIn("stage=simulation", status)
             self.assertFalse(any((root / "scratch").iterdir()))
+
+    def test_muon_scale_variants_coexist_with_distinct_outputs_and_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for variation, factor in (("nominal", "1.0"), ("up", "1.01"), ("down", "0.99")):
+                with self.subTest(variation=variation):
+                    config, outputs = self.make_campaign(root, muon_scale=variation)
+                    result = self.run_worker(config)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    suffix = "" if variation == "nominal" else f"_muon_scale_{variation}"
+                    output = outputs / f"gg_H_pythia_campaign_job_000000_seed1001{suffix}.root"
+                    self.assertTrue(output.is_file())
+                    job = root / "campaign" / "jobs" / f"job_000000_seed1001{suffix}"
+                    diagnostics = job / "diagnostics"
+                    self.assertTrue((job / "SUCCESS").is_file())
+                    metadata = (diagnostics / "simulation-metadata.txt").read_text()
+                    self.assertIn(f"muon_scale_variation={variation}\n", metadata)
+                    self.assertIn(f"muon_scale_factor={factor}\n", metadata)
+                    self.assertIn("seed=1001\n", (diagnostics / "generation-metadata.txt").read_text())
+                    self.assertEqual((diagnostics / "delphes_card_ATLAS_resolved.tcl").read_text(),
+                                     f"# muon_scale={variation}\n")
+                    with uproot.open(output) as root_file:
+                        input_path = str(root_file["analysis_input"])
+                        self.assertTrue(input_path.endswith(f"/simulation/generation{suffix}/delphes.root"))
+                    self.assertFalse(any((root / "scratch").iterdir()))
+            self.assertEqual(len(list(outputs.glob("*.root"))), 3)
+            self.assertEqual(len(list((root / "campaign" / "jobs").glob("job_*"))), 3)
+
+    def test_invalid_muon_scale_rejected_before_worker_dependencies(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, outputs = self.make_campaign(root, muon_scale="sideways")
+            (root / "repo" / "Simulation" / "run_simulation.sh").unlink()
+            result = self.run_worker(config)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("MUON_SCALE", result.stderr)
+            self.assertNotIn("runner is missing", result.stderr)
+            self.assertFalse(any(outputs.iterdir()))
 
     def test_requeue_accepts_only_the_same_recorded_output(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -28,6 +28,7 @@ from Analysis.born import empty_columns as empty_born_columns  # noqa: E402
 from Analysis.lhe_matching import (  # noqa: E402
     EVENT_NUMBER_CONVENTION, file_identity, load_lhe_source,
 )
+from Analysis.simulation_metadata import collect_delphes_metadata  # noqa: E402
 from Tools.four_lepton_kinematics import KinematicError  # noqa: E402
 from Tools.born_projection import BORN_PROJECTION_METADATA  # noqa: E402
 
@@ -578,6 +579,7 @@ def main() -> None:
     args = parser.parse_args()
 
     inputs = discover_inputs(args.inputs)
+    simulation_metadata = collect_delphes_metadata(inputs)
     if len(inputs) != 1 and any(value is not None for value in (args.lhe, args.lhe_map, args.hepmc)):
         parser.error("--lhe, --lhe-map and --hepmc overrides require exactly one Delphes input")
     output_path = args.output.expanduser().resolve()
@@ -664,6 +666,9 @@ def main() -> None:
             output_file["lhe_metadata"] = json.dumps(
                 {"schema_version": 1, "event_number": EVENT_NUMBER_CONVENTION,
                  "sources": lhe_sources}, sort_keys=True, allow_nan=False,
+            )
+            output_file["simulation_metadata"] = json.dumps(
+                simulation_metadata, sort_keys=True, allow_nan=False,
             )
             output_file["born_metadata"] = json.dumps(
                 {"schema_version": 1, "projection": BORN_PROJECTION_METADATA,

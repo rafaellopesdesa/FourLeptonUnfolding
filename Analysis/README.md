@@ -106,6 +106,16 @@ pixi run --manifest-path Analysis/pixi.toml analyze \
 The default uproot chunk size is 50 MB and can be changed with
 `--step-size "100 MB"`.
 
+Muon-scale inputs must have one common `nominal`, `up`, or `down` choice.
+Pass explicit per-variation Delphes directories, such as
+`/path/to/job/delphes_ATLAS_muon_scale_up`, when a parent directory contains
+several choices; recursive discovery would include them all. Keep
+`simulation-metadata.txt` beside `delphes.root` when moving simulation
+outputs. The reducer reads that sidecar and writes the common scale contract
+as the ROOT object `simulation_metadata`; merging preserves it and rejects
+mixed choices, including across pseudo-data components. Legacy files without
+scale metadata are assumed nominal.
+
 ### Joining the original LHE event
 
 New generation/simulation runs carry the original **1-based LHE source-event

@@ -11,6 +11,9 @@ import argparse
 from pathlib import Path
 
 
+MUON_SCALE_FACTORS = {"nominal": 1.0, "up": 1.01, "down": 0.99}
+
+
 def _module_block(text: str, declaration: str) -> tuple[int, int, str]:
     start = text.find(declaration)
     if start < 0:
@@ -385,10 +388,45 @@ def _add_output_branches(text: str) -> str:
     return text
 
 
-def prepare_card(text: str) -> str:
+def _configure_muon_scale(text: str, muon_scale: str) -> str:
+    """Shift only the dedicated H4l muon response, after its nominal smearing."""
+
+    if muon_scale == "nominal":
+        return text
+
+    text = _insert_after(
+        text,
+        "  H4lMuonMomentumSmearing\n",
+        "  H4lMuonMomentumScale\n",
+    )
+    _, end, _ = _module_block(
+        text, "module MomentumSmearing H4lMuonMomentumSmearing {"
+    )
+    scale_module = (
+        "\n# Deterministic muon momentum scale; the nominal resolution is unchanged.\n"
+        "module EnergyScale H4lMuonMomentumScale {\n"
+        "  set InputArray H4lMuonMomentumSmearing/muons\n"
+        "  set OutputArray muons\n"
+        f"  set ScaleFormula {{ {MUON_SCALE_FACTORS[muon_scale]:.2f} }}\n"
+        "}\n"
+    )
+    text = text[:end] + scale_module + text[end:]
+    return _replace_in_module(
+        text,
+        "module Efficiency H4lMuonRecoID {",
+        "set InputArray H4lMuonMomentumSmearing/muons",
+        "set InputArray H4lMuonMomentumScale/muons",
+    )
+
+
+def prepare_card(text: str, *, muon_scale: str = "nominal") -> str:
     """Return the H4l response variant of a bundled Delphes ATLAS card."""
 
+    if not isinstance(muon_scale, str) or muon_scale not in MUON_SCALE_FACTORS:
+        raise ValueError("muon_scale must be one of: nominal, up, down")
+
     text = _add_h4l_lepton_modules(text)
+    text = _configure_muon_scale(text, muon_scale)
     text = _configure_jets(text)
     text = _add_output_branches(text)
 
@@ -396,6 +434,8 @@ def prepare_card(text: str) -> str:
         "# FourLeptonUnfolding H->ZZ->4l response card.\n"
         "# Derived at run time from Delphes's bundled ATLAS card.\n"
         "# RecoElectron/RecoMuon include smearing, Loose reco+ID, and loose isolation.\n"
+        f"# muon_scale={muon_scale}\n"
+        f"# muon_scale_factor={MUON_SCALE_FACTORS[muon_scale]:.2f}\n"
         "# Identical truth/reco kinematic and event cuts are applied downstream.\n\n"
         + text
     )
@@ -405,10 +445,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input_card", type=Path)
     parser.add_argument("output_card", type=Path)
+    parser.add_argument(
+        "--muon-scale",
+        choices=tuple(MUON_SCALE_FACTORS),
+        default="nominal",
+        help="H4l muon momentum scale: nominal, up (+1%%), or down (-1%%)",
+    )
     args = parser.parse_args()
 
     source = args.input_card.read_text(encoding="utf-8")
-    args.output_card.write_text(prepare_card(source), encoding="utf-8")
+    args.output_card.write_text(
+        prepare_card(source, muon_scale=args.muon_scale), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ Options:
   --process NAME       auto, gg_H, or ZZ (default: auto from run-metadata.txt)
   --output-root DIR    Put outputs below DIR/JOB_LABEL instead of beside input
   --card FILE          Override Delphes's bundled delphes_card_ATLAS.tcl
+  --muon-scale NAME    nominal, up (+1%), or down (-1%); resolution unchanged
   --higgs-br VALUE     gg_H weight factor (default: 2.771E-04)
   --random-seed N      Delphes base seed; increments for multiple inputs
                        (default: generation metadata seed)
@@ -50,6 +51,7 @@ shift
 PROCESS=auto
 OUTPUT_ROOT=""
 CARD=""
+MUON_SCALE=nominal
 HIGGS_BR="$HIGGS_BR_DEFAULT"
 DELPHES_SEED_OVERRIDE=""
 MAX_EVENTS=0
@@ -68,6 +70,7 @@ while (($#)); do
     --process) need_value "$@"; PROCESS="$2"; shift 2 ;;
     --output-root) need_value "$@"; OUTPUT_ROOT="$2"; shift 2 ;;
     --card) need_value "$@"; CARD="$2"; shift 2 ;;
+    --muon-scale) need_value "$@"; MUON_SCALE="$2"; shift 2 ;;
     --higgs-br) need_value "$@"; HIGGS_BR="$2"; shift 2 ;;
     --random-seed) need_value "$@"; DELPHES_SEED_OVERRIDE="$2"; shift 2 ;;
     --max-events) need_value "$@"; MAX_EVENTS="$2"; shift 2 ;;
@@ -82,6 +85,12 @@ done
   echo "--process must be auto, gg_H, or ZZ" >&2
   exit 2
 }
+case "$MUON_SCALE" in
+  nominal) MUON_SCALE_FACTOR=1.0; MUON_SCALE_SUFFIX="" ;;
+  up) MUON_SCALE_FACTOR=1.01; MUON_SCALE_SUFFIX=_muon_scale_up ;;
+  down) MUON_SCALE_FACTOR=0.99; MUON_SCALE_SUFFIX=_muon_scale_down ;;
+  *) echo "--muon-scale must be nominal, up, or down" >&2; exit 2 ;;
+esac
 [[ "$HIGGS_BR" =~ ^[0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?$ ]] || {
   echo "--higgs-br must be a positive number" >&2
   exit 2
@@ -177,6 +186,32 @@ metadata_value() {
   local file="$2"
   [[ -r "$file" ]] || return 0
   awk -F= -v wanted="$key" '$1 == wanted {print substr($0, index($0, "=") + 1); exit}' "$file"
+}
+
+validate_reused_muon_scale() {
+  local metadata="$1"
+  local card="$2"
+  local variation factor one_sigma model card_sha
+  variation="$(metadata_value muon_scale_variation "$metadata")"
+  factor="$(metadata_value muon_scale_factor "$metadata")"
+  one_sigma="$(metadata_value muon_scale_one_sigma "$metadata")"
+  model="$(metadata_value muon_scale_model "$metadata")"
+  # Older nominal outputs did not record this nuisance. Recognized scale
+  # metadata must be complete and match the requested variation.
+  if [[ "$MUON_SCALE" != nominal || -n "$variation$factor$one_sigma$model" ]]; then
+    if [[ "$variation" != "$MUON_SCALE" || "$factor" != "$MUON_SCALE_FACTOR" ||
+          "$one_sigma" != 0.01 || "$model" != uniform_relative_momentum_scale_v1 ]]; then
+      echo "Existing output has missing or mismatched muon-scale metadata; rerun with --overwrite." >&2
+      return 1
+    fi
+  fi
+  card_sha="$(metadata_value resolved_card_sha256 "$metadata")"
+  if [[ -n "$card_sha" ]]; then
+    if [[ ! -r "$card" || "$card_sha" != "$(sha256sum "$card" | awk '{print $1}')" ]]; then
+      echo "Existing output resolved card checksum does not match its metadata; rerun with --overwrite." >&2
+      return 1
+    fi
+  fi
 }
 
 detect_hepmc_format() {
@@ -287,9 +322,9 @@ for input_file in "${INPUT_FILES[@]}"; do
       "$input_file" "$delphes_seed" >&2
   fi
   if [[ -n "$OUTPUT_ROOT" ]]; then
-    output_dir="$OUTPUT_ROOT/$label"
+    output_dir="$OUTPUT_ROOT/${label}${MUON_SCALE_SUFFIX}"
   else
-    output_dir="$input_dir/delphes_ATLAS"
+    output_dir="$input_dir/delphes_ATLAS${MUON_SCALE_SUFFIX}"
   fi
   output_dir="$(realpath -m "$output_dir")"
   if [[ "$output_dir" == "$(realpath "$input_dir")" ]]; then
@@ -315,6 +350,10 @@ for input_file in "${INPUT_FILES[@]}"; do
   fi
 
   if [[ -f "$output_dir/SUCCESS" && -s "$output_file" && $OVERWRITE -eq 0 ]]; then
+    if ! validate_reused_muon_scale "$status_file" "$resolved_card"; then
+      failures=$((failures + 1))
+      continue
+    fi
     if [[ -f "$source_lhe_provenance" ]]; then
       if ! python3 "$SCRIPT_DIR/lhe_provenance.py" verify-output \
           "$source_lhe_provenance" "$output_file" "$bound_lhe_provenance" \
@@ -347,7 +386,7 @@ for input_file in "${INPUT_FILES[@]}"; do
     continue
   fi
 
-  python3 "$SCRIPT_DIR/prepare_fiducial_card.py" "$CARD" "$resolved_card"
+  python3 "$SCRIPT_DIR/prepare_fiducial_card.py" "$CARD" "$resolved_card" --muon-scale "$MUON_SCALE"
   {
     printf '\n# Added by FourLeptonUnfolding/Simulation/run_simulation.sh\n'
     printf 'set WeightScale %.17g\n' "$weight_scale"
@@ -355,9 +394,9 @@ for input_file in "${INPUT_FILES[@]}"; do
     ((MAX_EVENTS == 0)) || printf 'set MaxEvents %d\n' "$MAX_EVENTS"
   } >>"$resolved_card"
 
-  printf '[simulation] %s -> %s (HepMC%s, process=%s, weight scale=%s, seed=%s)\n' \
+  printf '[simulation] %s -> %s (HepMC%s, process=%s, weight scale=%s, seed=%s, muon scale=%s)\n' \
     "$input_file" "$output_file" "$format" "$resolved_process" "$weight_scale" \
-    "$delphes_seed"
+    "$delphes_seed" "$MUON_SCALE"
 
   if "$reader" "$resolved_card" "$output_file" "$input_file" >"$log_file" 2>&1 && \
       [[ -s "$output_file" ]] && \
@@ -400,6 +439,11 @@ for input_file in "${INPUT_FILES[@]}"; do
       printf 'process=%s\n' "$resolved_process"
       printf 'hepmc_format=%s\n' "$format"
       printf 'random_seed=%s\n' "$delphes_seed"
+      printf 'muon_scale_variation=%s\n' "$MUON_SCALE"
+      printf 'muon_scale_factor=%s\n' "$MUON_SCALE_FACTOR"
+      printf 'muon_scale_one_sigma=0.01\n'
+      printf 'muon_scale_model=uniform_relative_momentum_scale_v1\n'
+      printf 'muon_scale_affected_collections=RecoMuon,RecoMuonNoIso\n'
       printf 'weight_scale=%s\n' "$weight_scale"
       printf 'higgs_br_h_to_zz_to_4l_including_taus=%s\n' "$HIGGS_BR"
       printf 'weight_branches_scaled=Event.Weight,Weight.Weight\n'

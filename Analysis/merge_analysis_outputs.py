@@ -23,6 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 from Analysis.lhe_matching import merge_born_metadata, merge_lhe_metadata  # noqa: E402
+from Analysis.simulation_metadata import merge_simulation_metadata  # noqa: E402
 
 
 TREE_NAME = "Analysis"
@@ -550,6 +551,7 @@ def merge_sample(
     source_snapshots = [_snapshot_source(path) for path in files]
     lhe_metadata = merge_lhe_metadata(files)
     born_metadata = merge_born_metadata(files)
+    simulation_metadata = merge_simulation_metadata(files)
     stats, branches = scan_files(
         files,
         step_size=step_size,
@@ -590,6 +592,7 @@ def merge_sample(
                 output_file["lhe_metadata"] = json.dumps(lhe_metadata, sort_keys=True, allow_nan=False)
             if born_metadata is not None:
                 output_file["born_metadata"] = json.dumps(born_metadata, sort_keys=True, allow_nan=False)
+            output_file["simulation_metadata"] = json.dumps(simulation_metadata, sort_keys=True, allow_nan=False)
             output_tree = output_file[TREE_NAME]
             for snapshot in source_snapshots:
                 _assert_source_unchanged(
@@ -1099,6 +1102,7 @@ def _build_pseudo_data_file(
     ]
     lhe_metadata = merge_lhe_metadata([snapshot.path for snapshot in source_snapshots])
     born_metadata = merge_born_metadata([snapshot.path for snapshot in source_snapshots])
+    simulation_metadata = merge_simulation_metadata([snapshot.path for snapshot in source_snapshots])
     _assert_sources_unchanged(
         source_snapshots,
         context="before building a pseudo-data file",
@@ -1254,6 +1258,7 @@ def _build_pseudo_data_file(
                 output_file["lhe_metadata"] = json.dumps(lhe_metadata, sort_keys=True, allow_nan=False)
             if born_metadata is not None:
                 output_file["born_metadata"] = json.dumps(born_metadata, sort_keys=True, allow_nan=False)
+            output_file["simulation_metadata"] = json.dumps(simulation_metadata, sort_keys=True, allow_nan=False)
         _assert_sources_unchanged(
             source_snapshots,
             context="before finalizing the pseudo-data output",

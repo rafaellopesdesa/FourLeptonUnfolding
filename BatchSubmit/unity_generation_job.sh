@@ -31,6 +31,12 @@ TASK_OFFSET="${3:-0}"
 # scalar assignments.
 # shellcheck source=/dev/null
 source "$CONFIG_FILE"
+MUON_SCALE="${MUON_SCALE:-nominal}"
+case "$MUON_SCALE" in
+  nominal) MUON_SCALE_SUFFIX="" ;;
+  up|down) MUON_SCALE_SUFFIX="_muon_scale_${MUON_SCALE}" ;;
+  *) echo "MUON_SCALE must be nominal, up, or down" >&2; exit 2 ;;
+esac
 
 required=(
   REPO_ROOT CAMPAIGN_NAME CAMPAIGN_DIR PROCESS SHOWER EVENTS_PER_JOB BASE_SEED
@@ -65,6 +71,7 @@ done
 }
 
 ACTIVE_WORK_DIR=""
+ACTIVE_SIMULATION_DIR=""
 ACTIVE_JOB_DIR=""
 ACTIVE_STATUS_FILE=""
 ACTIVE_STAGE="not-started"
@@ -87,6 +94,7 @@ write_status() {
     printf 'slurm_array_task_id=%s\n' "${SLURM_ARRAY_TASK_ID:-not-set}"
     printf 'task_id=%s\n' "$ACTIVE_TASK_ID"
     printf 'seed=%s\n' "$ACTIVE_SEED"
+    printf 'muon_scale_variation=%s\n' "$MUON_SCALE"
     printf 'stage=%s\n' "$ACTIVE_STAGE"
     printf 'analysis_output=%s\n' "${ACTIVE_ANALYSIS_OUTPUT:-not-set}"
     printf 'work_directory=%s\n' "${ACTIVE_WORK_DIR:-not-set}"
@@ -121,16 +129,16 @@ collect_diagnostics() {
     "$diagnostic_dir/generation-metadata.txt"
   copy_if_present "$ACTIVE_WORK_DIR/generation/lhe-provenance.json" \
     "$diagnostic_dir/generation-lhe-provenance.json"
-  copy_if_present "$ACTIVE_WORK_DIR/simulation/generation/delphes.log" \
+  copy_if_present "$ACTIVE_SIMULATION_DIR/delphes.log" \
     "$diagnostic_dir/delphes.log"
   copy_if_present \
-    "$ACTIVE_WORK_DIR/simulation/generation/simulation-metadata.txt" \
+    "$ACTIVE_SIMULATION_DIR/simulation-metadata.txt" \
     "$diagnostic_dir/simulation-metadata.txt"
   copy_if_present \
-    "$ACTIVE_WORK_DIR/simulation/generation/lhe-provenance.json" \
+    "$ACTIVE_SIMULATION_DIR/lhe-provenance.json" \
     "$diagnostic_dir/simulation-lhe-provenance.json"
   copy_if_present \
-    "$ACTIVE_WORK_DIR/simulation/generation/delphes_card_ATLAS_resolved.tcl" \
+    "$ACTIVE_SIMULATION_DIR/delphes_card_ATLAS_resolved.tcl" \
     "$diagnostic_dir/delphes_card_ATLAS_resolved.tcl"
 }
 
@@ -233,9 +241,9 @@ run_event_stage() {
   local seed=$((BASE_SEED + task_id))
   local task_label
   printf -v task_label '%06d' "$task_id"
-  local job_dir="$CAMPAIGN_DIR/jobs/job_${task_label}_seed${seed}"
+  local job_dir="$CAMPAIGN_DIR/jobs/job_${task_label}_seed${seed}${MUON_SCALE_SUFFIX}"
   local status_file="$job_dir/slurm-status.txt"
-  local output_name="${PROCESS}_${SHOWER}_${CAMPAIGN_NAME}_job_${task_label}_seed${seed}.root"
+  local output_name="${PROCESS}_${SHOWER}_${CAMPAIGN_NAME}_job_${task_label}_seed${seed}${MUON_SCALE_SUFFIX}.root"
   local analysis_output="$ANALYSIS_OUTPUT_ROOT/$output_name"
   mkdir -p "$job_dir"
 
@@ -306,6 +314,7 @@ run_event_stage() {
   ACTIVE_WORK_DIR="$(
     mktemp -d "$scratch_parent/four-lepton-${SLURM_JOB_ID:-local}-${task_label}.XXXXXX"
   )"
+  ACTIVE_SIMULATION_DIR="$ACTIVE_WORK_DIR/simulation/generation${MUON_SCALE_SUFFIX}"
   touch "$ACTIVE_WORK_DIR/.four-lepton-batch-workdir"
   local generation_dir="$ACTIVE_WORK_DIR/generation"
   mkdir -p "$generation_dir"
@@ -343,6 +352,7 @@ run_event_stage() {
     --process "$PROCESS"
     --output-root "$ACTIVE_WORK_DIR/simulation"
     --higgs-br "${HIGGS_BR:-2.771E-04}"
+    --muon-scale "$MUON_SCALE"
     --overwrite
   )
   if [[ -n "${DELPHES_CARD:-}" ]]; then
@@ -350,7 +360,7 @@ run_event_stage() {
   fi
   "${simulation_command[@]}"
 
-  local delphes_output="$ACTIVE_WORK_DIR/simulation/generation/delphes.root"
+  local delphes_output="$ACTIVE_SIMULATION_DIR/delphes.root"
   [[ -s "$delphes_output" ]] || {
     echo "Simulation did not produce $delphes_output" >&2
     fail_event_stage 1
@@ -387,6 +397,7 @@ run_event_stage() {
     printf 'campaign_config_sha256=%s\n' "$(sha256sum "$CONFIG_FILE" | awk '{print $1}')"
     printf 'events=%s\n' "$EVENTS_PER_JOB"
     printf 'mass_region=%s\n' "$MASS_REGION"
+    printf 'muon_scale_variation=%s\n' "$MUON_SCALE"
   } >"$job_dir/output-metadata.txt"
   rm -f -- "$job_dir/FAILED"
   touch "$job_dir/SUCCESS"

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import math
+import hashlib
+from pathlib import Path
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 
-from Simulation.prepare_fiducial_card import _module_block, prepare_card
+from Simulation.prepare_fiducial_card import MUON_SCALE_FACTORS, _module_block, prepare_card
 
 
 CARD = """
@@ -58,6 +63,94 @@ module TreeWriter TreeWriter {
 class PrepareFiducialCardTest(unittest.TestCase):
     def setUp(self) -> None:
         self.result = prepare_card(CARD)
+
+    def test_nominal_preserves_existing_card_body(self):
+        self.assertEqual(self.result, prepare_card(CARD, muon_scale="nominal"))
+        self.assertIn("# muon_scale=nominal\n", self.result)
+        self.assertIn("# muon_scale_factor=1.00\n", self.result)
+        self.assertNotIn("H4lMuonMomentumScale", self.result)
+        # Frozen before the scale variation was added: every physics module,
+        # execution-path entry, and output branch is byte-for-byte unchanged.
+        body = self.result.split("\n\n", 1)[1]
+        self.assertEqual(
+            hashlib.sha256(body.encode()).hexdigest(),
+            "cb390de3416c30ee5a46c1a5cc503740116e87dea28b7542c8c0a4c723aaf29c",
+        )
+
+    def test_muon_scale_runs_once_after_smearing_before_efficiencies(self):
+        self.assertEqual(MUON_SCALE_FACTORS, {"nominal": 1.0, "up": 1.01, "down": 0.99})
+        for choice, factor in (("up", "1.01"), ("down", "0.99")):
+            with self.subTest(muon_scale=choice):
+                result = prepare_card(CARD, muon_scale=choice)
+                self.assertIn(f"# muon_scale={choice}\n", result)
+                self.assertIn(f"# muon_scale_factor={factor}\n", result)
+                _, _, scale = _module_block(
+                    result, "module EnergyScale H4lMuonMomentumScale {"
+                )
+                self.assertEqual(
+                    scale,
+                    "module EnergyScale H4lMuonMomentumScale {\n"
+                    "  set InputArray H4lMuonMomentumSmearing/muons\n"
+                    "  set OutputArray muons\n"
+                    f"  set ScaleFormula {{ {factor} }}\n"
+                    "}\n",
+                )
+                execution = result.split("set ExecutionPath {", 1)[1].split("}", 1)[0].split()
+                index = execution.index("H4lMuonMomentumSmearing")
+                self.assertEqual(
+                    execution[index:index + 4],
+                    ["H4lMuonMomentumSmearing", "H4lMuonMomentumScale",
+                     "H4lMuonRecoID", "H4lMuonIsolation"],
+                )
+                self.assertEqual(execution.count("H4lMuonMomentumScale"), 1)
+
+    def test_muon_scale_preserves_resolution_truth_electrons_and_output_branches(self):
+        declarations = re.findall(r"^module \w+ \w+ \{", self.result, flags=re.MULTILINE)
+        for choice in ("up", "down"):
+            result = prepare_card(CARD, muon_scale=choice)
+            self.assertEqual(
+                len(re.findall(r"^module \w+ \w+ \{", result, flags=re.MULTILINE)),
+                len(declarations) + 1,
+            )
+            for declaration in declarations:
+                with self.subTest(muon_scale=choice, module=declaration):
+                    _, _, expected = _module_block(self.result, declaration)
+                    _, _, actual = _module_block(result, declaration)
+                    if declaration == "module Efficiency H4lMuonRecoID {":
+                        expected = expected.replace(
+                            "set InputArray H4lMuonMomentumSmearing/muons",
+                            "set InputArray H4lMuonMomentumScale/muons",
+                        )
+                    self.assertEqual(actual, expected)
+
+    def test_invalid_muon_scale_is_rejected(self):
+        for value in ("UP", "", "1.01", "resolution_up", None, 1.01):
+            with self.subTest(muon_scale=value):
+                with self.assertRaisesRegex(ValueError, "nominal, up, down"):
+                    prepare_card(CARD, muon_scale=value)
+
+    def test_cli_muon_scale_choices_and_default(self):
+        script = Path(__file__).resolve().parents[1] / "prepare_fiducial_card.py"
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "input.tcl"
+            source.write_text(CARD, encoding="utf-8")
+            for choice in (None, "nominal", "up", "down", "invalid"):
+                with self.subTest(muon_scale=choice):
+                    output = Path(directory) / f"output-{choice}.tcl"
+                    command = [sys.executable, str(script), str(source), str(output)]
+                    if choice is not None:
+                        command.extend(["--muon-scale", choice])
+                    process = subprocess.run(command, capture_output=True, text=True)
+                    if choice == "invalid":
+                        self.assertNotEqual(process.returncode, 0)
+                        self.assertIn("invalid choice", process.stderr)
+                        self.assertFalse(output.exists())
+                    else:
+                        self.assertEqual(process.returncode, 0, process.stderr)
+                        self.assertEqual(
+                            output.read_text(encoding="utf-8"),
+                            prepare_card(CARD, muon_scale=choice or "nominal"),
+                        )
 
     def electron_resolution(
         self, energy: float, eta: float, pt: float = 45.0

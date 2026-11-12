@@ -356,6 +356,53 @@ job_000000_seed1001/
 Use `--output-root DIR` to place outputs elsewhere. Run `--help` for smoke-test
 limits and overwrite behavior.
 
+### Muon momentum-scale variations
+
+Pass `--muon-scale nominal|up|down` to choose a uniform muon momentum-scale
+variation. The default is `nominal`. Here one sigma is defined as a relative
+scale shift of 1%: `up` multiplies the smeared muon momentum by `1.01`, and
+`down` by `0.99`. This is a controlled detector-response proxy rather than an
+official ATLAS calibration uncertainty.
+
+The generated card inserts the built-in Delphes `EnergyScale` module after
+`H4lMuonMomentumSmearing` and before the reconstruction/ID and isolation
+efficiencies. The existing resolution-smearing model is retained. The shift
+therefore changes `RecoMuonNoIso` and `RecoMuon`, including their efficiencies
+and subsequent analysis acceptance. Muon directions are unchanged by the
+scale operation. The truth collections, stock diagnostic `Muon` response,
+and electron response formulas are unchanged.
+
+For an existing generation run, produce the two variations with:
+
+```bash
+./run_simulation.sh ../Generation/runs/gg_H_pythia_seed101 --muon-scale up
+./run_simulation.sh ../Generation/runs/gg_H_pythia_seed101 --muon-scale down
+```
+
+The same HepMC and LHE inputs can be reused; neither generation nor a Delphes
+rebuild is needed. The three outputs coexist:
+
+| Choice | Output beside the HepMC input | With `--output-root DIR` |
+|---|---|---|
+| `nominal` | `delphes_ATLAS/` | `DIR/<input-directory-name>/` |
+| `up` | `delphes_ATLAS_muon_scale_up/` | `DIR/<input-directory-name>_muon_scale_up/` |
+| `down` | `delphes_ATLAS_muon_scale_down/` | `DIR/<input-directory-name>_muon_scale_down/` |
+
+The resolved card and `simulation-metadata.txt` record the variation and
+factor; the metadata also records `muon_scale_one_sigma=0.01` and
+`muon_scale_model=uniform_relative_momentum_scale_v1`. A completed output is
+reused only when its recorded scale choice is compatible with the request.
+Legacy outputs without scale metadata are treated as nominal.
+
+For matched comparisons, use the same inputs and seed for all choices. The
+scale module consumes no random numbers, but scale-dependent efficiency
+decisions can change later random-number consumption; identical seeds do not
+guarantee identical stochastic decisions throughout the event stream.
+
+Reduce each variation separately by passing its Delphes output directory to
+Analysis. Analysis preserves the scale choice in `simulation_metadata`, and
+reduction and merging reject mixed scale choices in one output.
+
 ## Higgs normalization
 
 The `gg_H` POWHEG sample carries the inclusive gluon-fusion normalization even
