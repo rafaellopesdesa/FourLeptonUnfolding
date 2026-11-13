@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "injection": {"operator": "O_HB", "c_HB": 0.1, "lambda_tev": 1.0, "controls": [0.0, -0.1], "confirmed_by_user": true},
+  "sqrt_s_tev": 13.6,
+  "luminosity_fb": 312.0,
+  "features": ["cos_theta1", "cos_theta2", "cos_theta_star", "Psi", "Phi", "m_Z1", "m_Z2"],
+  "phi_psi_encoding": "raw_radians",
+  "large_network": {"ensemble_size": 4, "hidden_layers": 4, "neurons": 1024, "weight_decay": 0.0},
+  "posthoc_calibration": false,
+  "required_reconstructed_events_per_sample": 5000000,
+  "statistical_pseudo_experiments_minimum": 100,
+  "auxiliary_ensemble": {"size": 100, "distribution": "uniform_square", "bounds": [-2.0, 2.0], "seed": 20261113, "interpretation": "sensitivity ensemble, not Gaussian coverage"},
+  "storage_bytes": {"work_target": 300000000000, "work_hard": 400000000000, "project_target": 2000000000000, "project_hard": 3000000000000},
+  "pilot": {"events_per_job": 1000, "jobs_per_configuration": 1, "automatic_production_scaling": false}
+}

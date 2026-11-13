@@ -1,0 +1,40 @@
+# Unity bootstrap and pilot
+
+Run inputs belong to `codex_bootstrap_20261113`, not main. All active I/O is
+inside the authorized /work project. Compact validated samples and trained
+artifacts are later copied with checksums to the corresponding /project.
+
+The install jobs build the generator stack and patched Delphes, and install
+the locked Analysis and BackgroundRemoval Python environments. The validation
+job uses the dedicated `codex_validation` worktree. Dependency builds and
+tests run through Slurm; no training or simulation is run on a login node.
+
+`launch_pilot.sbatch` is submitted with an `afterok` dependency on successful
+generator and clean-environment Delphes setup. Its initial phase submits one
+fresh POWHEG integration and one 1,000-event Pythia nominal shard per process.
+After each grid succeeds, a dependent launcher submits Pythia up/down and
+Herwig nominal using that grid. Eight sample configurations result.
+
+Resource requests: setup 1 CPU / 2 GB / 30 min; each integration or event job
+1 CPU / 4 GB, at most 48 h for integration and 6 h for 1,000 full-chain events.
+These are initial limits, not measured consumption. Check `sacct`, selections,
+signed yields, Born coverage and bytes/event before sizing the 5M-reco campaign.
+There is no automatic large-production escalation.
+
+`retry_pilot.sbatch PROCESS` preserves the previous per-shard diagnostics,
+then retries the four configurations with their existing cards, seeds and
+validated grid. Use it only after addressing the recorded failure. Summary
+JSON files retain the Slurm job identifier so failed attempts are not erased.
+
+`validate_physics.sbatch [COMPONENT ...]` runs the Analysis, Tools, Simulation,
+Generation, BatchSubmit, Plotting and SMEFT regression suites by default.
+Native shared-library test builds are removed after Python exits because
+removing an open library on NFS leaves temporary `.nfs` files.
+
+Nominal/up/down Pythia request the same hard-process seed. Actual retained
+LHE identities must establish correlation; identical seeds alone do not
+guarantee matched detector random decisions. Herwig uses a separate seed.
+
+The confirmed deformation is C_HB = +0.1 at Lambda = 1 TeV, with 0 and −0.1
+controls. It is not applied in this undecorated pilot. Positive data-like
+sampling variance must be validated before the pseudo-experiment ensemble.
