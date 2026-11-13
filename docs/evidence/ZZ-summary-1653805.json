@@ -1,0 +1,214 @@
+{
+  "updated_utc": "2026-11-13T19:38:45.519584+00:00",
+  "process": "ZZ",
+  "samples": [
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "nominal",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/nominal/ZZ_pythia_ZZ_pythia_pilot10k_20261113_job_000000_seed2002001.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 4512.073999941349,
+            "sum_squared_weights": 2117.23297575106,
+            "cross_section_pb": 0.45120739936828613,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 4451,
+            "lhe_higgs_entries": 0,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "hard_source_events": 10000,
+          "hard_source_sha256": "c7b2d8c8c84b912fa96b2c7fb4b7da2c8f2caf34b3c6a4e723a88d34d36857a5",
+          "showered_events": 10000,
+          "repeated_showered_sources": 0,
+          "bytes": 1941463,
+          "sha256": "5b4d91924550b8425238311b5182ebf915b578d1edfe4757c368219afb004135",
+          "reconstructed": 77,
+          "reconstructed_signal_window": 24,
+          "fiducial": 107,
+          "negative_weight_entries": 97,
+          "reco_sumw": 34.5100499689579,
+          "reco_sum_abs_w": 35.43031796813011,
+          "reco_sumw2": 16.302693913283157,
+          "born_available_reco": 77,
+          "born_valid_reco": 77,
+          "born_tau_reco": 12,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/nominal/ZZ_pythia_ZZ_pythia_pilot10k_20261113_job_000000_seed2002001.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 77,
+        "reconstructed_signal_window": 24,
+        "fiducial": 107,
+        "negative_weight_entries": 97,
+        "bytes": 1941463,
+        "showered_events": 10000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 1,
+        "hard_source_events": 10000
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "up",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/up/ZZ_pythia_ZZ_pythia_pilot10k_20261113_muon_scale_up_job_000000_seed2002001_muon_scale_up.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 4512.073999941349,
+            "sum_squared_weights": 2117.23297575106,
+            "cross_section_pb": 0.45120739936828613,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 4451,
+            "lhe_higgs_entries": 0,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "hard_source_events": 10000,
+          "hard_source_sha256": "c7b2d8c8c84b912fa96b2c7fb4b7da2c8f2caf34b3c6a4e723a88d34d36857a5",
+          "showered_events": 10000,
+          "repeated_showered_sources": 0,
+          "bytes": 1942057,
+          "sha256": "ad69b94b46a0712fa66219c8c00de73832d0289cb831dc24a438fe6a7a9b8e9e",
+          "reconstructed": 77,
+          "reconstructed_signal_window": 25,
+          "fiducial": 107,
+          "negative_weight_entries": 97,
+          "reco_sumw": 34.5100499689579,
+          "reco_sum_abs_w": 35.43031796813011,
+          "reco_sumw2": 16.302693913283157,
+          "born_available_reco": 77,
+          "born_valid_reco": 77,
+          "born_tau_reco": 13,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/up/ZZ_pythia_ZZ_pythia_pilot10k_20261113_muon_scale_up_job_000000_seed2002001_muon_scale_up.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 77,
+        "reconstructed_signal_window": 25,
+        "fiducial": 107,
+        "negative_weight_entries": 97,
+        "bytes": 1942057,
+        "showered_events": 10000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 1,
+        "hard_source_events": 10000
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "down",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/down/ZZ_pythia_ZZ_pythia_pilot10k_20261113_muon_scale_down_job_000000_seed2002001_muon_scale_down.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 4512.073999941349,
+            "sum_squared_weights": 2117.23297575106,
+            "cross_section_pb": 0.45120739936828613,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 4451,
+            "lhe_higgs_entries": 0,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "hard_source_events": 10000,
+          "hard_source_sha256": "c7b2d8c8c84b912fa96b2c7fb4b7da2c8f2caf34b3c6a4e723a88d34d36857a5",
+          "showered_events": 10000,
+          "repeated_showered_sources": 0,
+          "bytes": 1941245,
+          "sha256": "253ecbb90ab4fa1c736af876a53a8dfbe6dfe1e49778dd9a1586de94f0dd62c8",
+          "reconstructed": 71,
+          "reconstructed_signal_window": 23,
+          "fiducial": 107,
+          "negative_weight_entries": 97,
+          "reco_sumw": 31.74924597144127,
+          "reco_sum_abs_w": 32.66951397061348,
+          "reco_sumw2": 15.03235412783252,
+          "born_available_reco": 71,
+          "born_valid_reco": 71,
+          "born_tau_reco": 9,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/down/ZZ_pythia_ZZ_pythia_pilot10k_20261113_muon_scale_down_job_000000_seed2002001_muon_scale_down.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 71,
+        "reconstructed_signal_window": 23,
+        "fiducial": 107,
+        "negative_weight_entries": 97,
+        "bytes": 1941245,
+        "showered_events": 10000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 1,
+        "hard_source_events": 10000
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "scale": "nominal",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/nominal/ZZ_herwig_ZZ_herwig_pilot10k_20261113_job_000000_seed12002001.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 9832.0,
+            "sum_squared_weights": 10000.0,
+            "cross_section_pb": 0.45235851407051086,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 4327,
+            "lhe_higgs_entries": 0,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "hard_source_events": 10100,
+          "hard_source_sha256": "909d3b3eb5cb06219330a7e6eac23b1e0c06e3ac6085d4d85fc68208c95357ef",
+          "showered_events": 10000,
+          "repeated_showered_sources": 0,
+          "bytes": 1904472,
+          "sha256": "6f5bc2fe17bc22a28fb40491576c4465fea20cc6ec58adc2d58f45b6d3cdbea7",
+          "reconstructed": 81,
+          "reconstructed_signal_window": 28,
+          "fiducial": 102,
+          "negative_weight_entries": 84,
+          "reco_sumw": 79.0,
+          "reco_sum_abs_w": 81.0,
+          "reco_sumw2": 81.0,
+          "born_available_reco": 81,
+          "born_valid_reco": 81,
+          "born_tau_reco": 12,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/nominal/ZZ_herwig_ZZ_herwig_pilot10k_20261113_job_000000_seed12002001.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 81,
+        "reconstructed_signal_window": 28,
+        "fiducial": 102,
+        "negative_weight_entries": 84,
+        "bytes": 1904472,
+        "showered_events": 10000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 1,
+        "hard_source_events": 10100
+      }
+    }
+  ],
+  "physics_closure_performed": false,
+  "expected_entries_per_shard": 10000,
+  "expected_shards_per_configuration": 1,
+  "count_semantics": "Showered/compact rows are distinct from supplied POWHEG hard events; hard sources are deduplicated by SHA256 within each configuration."
+}

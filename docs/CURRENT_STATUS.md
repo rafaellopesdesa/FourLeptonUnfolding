@@ -1,9 +1,9 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-13 18:26 UTC. Signal production is running; its 18:21 snapshot
-shows 113/400 shards completed, including two recovered Herwig shards. ZZ
-integration and all four 1k background pilots passed; four 10k ZZ jobs are submitted.
-No unfolding, HPO, or coefficient measurement has yet been performed.
+Updated: 2026-11-13 19:44 UTC. Signal wave one has 225/400 completed shards (56.25%),
+with 16 workers active. All four 10k ZZ pilots are validated and persisted.
+Thirteen signal shards await the scheduled recovery round. No unfolding, HPO,
+or coefficient measurement has yet been performed.
 
 ## Confirmed study
 
@@ -118,12 +118,12 @@ Actual validated counts determine completion.
 | 1636684 | Pythia nominal, 100 × 10k events | Running; at most four workers |
 | 1636696 / 1636697 | Pythia up/down, 100 × 10k each | Running; four workers per array |
 | 1636700 | Herwig nominal, 100 × 10k events | Running; at most four workers |
-| 1644720 | Retry Herwig tasks 4, 10, 17 with reserve | First two completed; task 17 running |
+| 1644720 | Retry Herwig tasks 4, 10, 17 with reserve | All three completed successfully |
 | 1645888 | One final recovery round for known failures | Waiting for original arrays and initial retries |
 | 1636701 | Validate/persist production wave | Waiting for recovery controller; it will add recovery dependencies |
 | 1646582 | Launch four bounded 10k ZZ checks | Completed |
-| 1646727–1646730 | Four 10k ZZ configurations | Submitted; immutable runtime, fresh seeds |
-| 1646731 | Validate/persist larger ZZ pilot | Waiting for four ZZ jobs |
+| 1646727–1646730 | Four 10k ZZ configurations | Completed; immutable runtime, fresh seeds |
+| 1646731 / 1653805 | Validate/persist larger ZZ pilot | Filename discovery corrected; rerun passed for all four |
 | 1646583 | Verify revised count summary on 10k signal pilot | Completed |
 
 The first production wave requests exactly 100 × 10,000 showered events per
@@ -136,8 +136,8 @@ No next wave is automatic. One million showered events per configuration
 is only the first installment toward five million selected events. New Herwig
 workers supply 1% extra hard events to cover rare shower discards. Original
 queued tasks retain their old batch script, so remaining EOF failures are
-handled by the completion recovery controller. Current original-array successes
-are 28/28/28/27; two successful Herwig retries bring the total to 113/400.
+handled by the completion recovery controller. Current successful shard counts, including recovered tasks,
+are 55/56/56/58 across the four configurations, totaling 225/400.
 Slurm completion is followed by independent summary validation and persistence.
 
 ## Production failures and recovery
@@ -149,7 +149,7 @@ Buffer check 1643289 supplied 10,100 hard events and obtained 10,000 unique
 showered source identities with zero repeats; the first 10,000 hard-event
 blocks exactly matched the original failed input. The source is never reopened.
 Main now separates requested hard/showered counts and retains native logs.
-Full-chain retries 1644720_4 and _10 have completed successfully.
+Full-chain retries 1644720_4, _10 and _17 have completed successfully.
 
 I also replaced an executing shell script on NFS during deployment. This caused
 eight separate stale-file-handle failures. Incomplete outputs were rejected;
@@ -174,7 +174,27 @@ are 7/7/7/8 negative rows inclusively, none selected. Selected tau counts are
 4/4/4/0. This is too small to estimate the shower difference or final production
 size precisely. Launcher 1646582 checks persisted checksums/storage, then runs
 four 10k ZZ shards (1646727–1646730) using the immutable runtime, one CPU /
-3 GB / one hour each. Summary 1646731 waits for them.
+3 GB / one hour each. All four completed in approximately 10–11 minutes. Summary 1646731 missed the
+scale-variation filenames; after correcting discovery, 1653805 validated and
+persisted all four files. Selected reco counts are 77/77/71/81 (Higgs window:
+24/25/23/28). All selected Born kinematics are valid. Each configuration now
+has negative selected weight, so positive data-like intensity construction
+requires explicit validation before pseudo-experiments.
+
+## Latest recovery checkpoint
+
+At 19:44 UTC, 13 signal shards remain failed: eight original NFS failures,
+four further finite-LHE Herwig failures, and one Pythia provenance failure.
+Nominal Pythia task 37 was rejected because the HepMC file identity changed
+during validation; the root cause is unresolved. The pending completion
+controller now allows one same-seed retry with all integrity checks enabled
+and intermediates retained. A repeated failure remains an error.
+
+The existing controller waits for the four original arrays, runs the bounded
+recovery, and then releases final validation/persistence. At current throughput,
+roughly 2–3 hours remain for this first wave including recovery and summary;
+this is an estimate, not a scheduler guarantee. The five-million-selected-event
+requirements need substantial additional production beyond this wave.
 
 ## Branches and directories
 
@@ -182,7 +202,7 @@ Reference: https://github.com/rafaellopesdesa/FourLeptonUnfolding
 
 - Published main: `29a5e301674821421a72a759ec7288cb9a38095b`.
 - Published tests: `codex_validation`, `b57c0f1562ff87f2791e2983e0f389d19263d602`.
-- Published campaign inputs: `codex_bootstrap_20261113`, `9c5664331034515be2a55915f746bb39d1d3474c`.
+- Published campaign inputs: `codex_bootstrap_20261113`, `fc106375876ad512cea799e040e51abf84e6155f`.
 - Unique report: `codex_report`, 20 reveal.js slides under `/docs`, with
   measured pilots, training ledger and failure history. GitHub Pages-ready; live hosting is not configured.
 - `codebase/`: implementation; `validation/`: tests; `repository/`: runtime
@@ -242,3 +262,15 @@ Pilot update 2026-11-13T18:20:28.754587+00:00: gg_H; 0 configurations with error
 - pythia up: 1544 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
 - pythia down: 1526 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
 - herwig nominal: 1477 selected / 10000 showered rows from 10000 supplied hard events; 1 repeated source occurrences.
+
+Pilot update 2026-11-13T18:34:36.495196+00:00: ZZ; 2 configurations with errors. Measured details: `runs/pilot10k/ZZ-summary.json`.
+- pythia nominal: 77 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
+- pythia up: 0 selected / 0 showered rows from 0 supplied hard events; 0 repeated source occurrences.
+- pythia down: 0 selected / 0 showered rows from 0 supplied hard events; 0 repeated source occurrences.
+- herwig nominal: 81 selected / 10000 showered rows from 10100 supplied hard events; 0 repeated source occurrences.
+
+Pilot update 2026-11-13T19:38:45.519584+00:00: ZZ; 0 configurations with errors. Measured details: `runs/pilot10k/ZZ-summary.json`.
+- pythia nominal: 77 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
+- pythia up: 77 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
+- pythia down: 71 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
+- herwig nominal: 81 selected / 10000 showered rows from 10100 supplied hard events; 0 repeated source occurrences.

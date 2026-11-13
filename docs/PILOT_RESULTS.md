@@ -175,3 +175,36 @@ four 10k background shards with fresh seeds and the immutable runtime, one
 CPU / 3 GB / one hour each. The launcher completed and submitted jobs
 1646727–1646730, with dependent summary 1646731. The summary measures acceptance and
 validates/persists the compact outputs; no larger ZZ wave is automatic.
+
+## 19:44 UTC checkpoint: wave one and larger ZZ pilot
+
+Signal completion is 225/400 shards (56.25%): 55 Pythia nominal, 56 up,
+56 down, and 58 Herwig, including all three successful initial retries.
+Sixteen workers remain active. The wave summary and /project publication wait
+for completion and recovery. [Snapshot](evidence/production-status-20261113-checkpoint2.json)
+records each configuration and its remaining failed task indices.
+
+Thirteen shards await recovery: eight original NFS failures, four additional
+Herwig EOF failures, and Pythia nominal task 37. The latter failed its existing
+HepMC integrity guard after producing 10,000 showered rows; its cause is not
+established. One same-seed retry retains the guard and preserves intermediates
+for investigation if it recurs. No failed shard is accepted or silently omitted.
+
+All four 10k ZZ jobs completed in 10–11 minutes. Summary 1646731 initially
+missed scale-suffixed campaign names. Correcting filename discovery, with the
+same expected counts and physics checks, gives a passing rerun in 1653805.
+All compact outputs are now checksum-verified and persisted on /project.
+
+| Configuration | Selected reco | Reco 115–130 GeV | Fiducial | Inclusive negative rows | Selected tau rows |
+|---|---:|---:|---:|---:|---:|
+| Pythia nominal | 77 | 24 | 107 | 97 | 12 |
+| Pythia scale up | 77 | 25 | 107 | 97 | 13 |
+| Pythia scale down | 71 | 23 | 107 | 97 | 9 |
+| Herwig nominal | 81 | 28 | 102 | 84 | 12 |
+
+All selected Born kinematics are valid. Selected net weight is now smaller
+than selected absolute weight in every configuration: negative selected MC
+is present. This confirms the need to validate the positive data-like intensity
+before constructing Poisson pseudo-experiments. Approximate acceptance is
+0.7–0.8%; this remains a timing pilot, not the five-million-selected background
+production. [Full signed sums, source counts and hashes](evidence/ZZ-summary-1653805.json).

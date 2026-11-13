@@ -1,0 +1,65 @@
+{
+  "updated_utc": "2026-11-13T19:44:13.091846+00:00",
+  "samples": [
+    {
+      "configuration": "gg_H_pythia_production_wave1_20261113",
+      "counts": {
+        "complete": 55,
+        "failed": 2,
+        "running": 4,
+        "not_started": 39
+      },
+      "failed_tasks": [
+        21,
+        37
+      ]
+    },
+    {
+      "configuration": "gg_H_pythia_production_wave1_20261113_muon_scale_up",
+      "counts": {
+        "complete": 56,
+        "failed": 4,
+        "running": 4,
+        "not_started": 36
+      },
+      "failed_tasks": [
+        20,
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "configuration": "gg_H_pythia_production_wave1_20261113_muon_scale_down",
+      "counts": {
+        "complete": 56,
+        "failed": 2,
+        "running": 4,
+        "not_started": 38
+      },
+      "failed_tasks": [
+        21,
+        22
+      ]
+    },
+    {
+      "configuration": "gg_H_herwig_production_wave1_20261113",
+      "counts": {
+        "complete": 58,
+        "failed": 5,
+        "running": 4,
+        "not_started": 33
+      },
+      "failed_tasks": [
+        23,
+        31,
+        36,
+        49,
+        58
+      ]
+    }
+  ],
+  "complete_shards": 225,
+  "target_shards": 400,
+  "independent_wave_summary_pending": true
+}

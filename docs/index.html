@@ -17,7 +17,7 @@
     <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
     <div class="rule"></div>
     <p><strong>Current phase:</strong> signal production; larger background pilot.</p>
-    <p class="small">1k/10k signal and 1k ZZ pilots validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+    <p class="small">1k/10k signal and ZZ pilots validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
   </section>
   <section>
     <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
@@ -41,7 +41,7 @@
       <tr><td>Software validation</td><td class="pass">428 checks pass across component runs</td><td><a href="TRAINING_LEDGER.md">Validation ledger</a></td></tr>
       <tr><td>Clean-worker ROOT/Delphes environment</td><td class="pass">Validated</td><td>Slurm 1629782</td></tr>
       <tr><td>Four gg_H pilot configurations</td><td class="pass">Validated and persisted</td><td>Summary 1634275</td></tr>
-      <tr><td>ZZ grid and four 1k pilots</td><td class="pass">Completed and persisted</td><td>1631379 / 1643989</td></tr>
+      <tr><td>ZZ grid and four 10k pilots</td><td class="pass">Completed and persisted</td><td>1631379 / 1653805</td></tr>
     </tbody></table>
     <p class="small">Snapshot updated manually from job output. See <a href="CURRENT_STATUS.md">current status</a> for the latest recorded update.</p>
   </section>
@@ -72,25 +72,25 @@
       <tr><td>gg_H</td><td>Herwig nominal</td><td>≥5M</td></tr>
       <tr><td>ZZ</td><td>Herwig nominal</td><td>≥5M</td></tr>
     </tbody></table>
-    <p>First signal wave: one million showered events per configuration, 16 workers plus one initial recovery worker. At 18:21 UTC, 113/400 shards completed. ZZ now advances to its 10k timing check.</p>
+    <p>First signal wave: one million showered events per configuration, 16 workers. At 19:44 UTC, 225/400 shards completed, including all three initial Herwig retries. The four 10k ZZ pilots are validated and persisted.</p>
     <p class="small">Persist compact samples and models on /project. Stage active I/O on /work; remove validated intermediates. Soft storage targets: 300 GB /work and 2 TB /project.</p>
   </section>
   <section>
     <p class="eyebrow">Production / Recovery</p><h2>Keep input and accepted counts explicit</h2>
     <p>Two rare Herwig discards left 9,998 accepted events from a 10,000-event finite source. The same seed succeeds with 10,100 supplied hard events and 10,000 unique showered outputs.</p>
-    <p>New Herwig workers use a 1% reserve. They retain original source identities, keep exceptions fatal, and never reopen the source. Two full-chain retries have passed.</p>
+    <p>New Herwig workers use a 1% reserve. They retain original source identities, keep exceptions fatal, and never reopen the source. All three initial full-chain retries have passed.</p>
     <p>I also caused eight NFS failures by updating an executing shared script. Partial files were rejected. Runtime files are now frozen; new jobs and final recovery use an immutable snapshot.</p>
     <p class="small">Controller 1645888 retries recognized failures once before summary 1636701. See <a href="PILOT_RESULTS.md#finite-herwig-input-and-runtime-deployment-failure">failure history and evidence</a>. No physics closure is inferred from these checks.</p>
   </section>
   <section>
-    <p class="eyebrow">Background / First pilot</p><h2>The ZZ chain also completes</h2>
-    <table><thead><tr><th>1,000 showered rows each</th><th>Selected reco</th><th>115–130 GeV</th><th>Fiducial</th></tr></thead><tbody>
-      <tr><td>Pythia nominal / up / down</td><td>12 / 12 / 12</td><td>5 / 5 / 5</td><td>19 / 19 / 19</td></tr>
-      <tr><td>Herwig nominal</td><td>5</td><td>2</td><td>12</td></tr>
+    <p class="eyebrow">Background / Larger pilot</p><h2>The ZZ chain also completes</h2>
+    <table><thead><tr><th>10,000 showered rows each</th><th>Selected reco</th><th>115–130 GeV</th><th>Fiducial</th></tr></thead><tbody>
+      <tr><td>Pythia nominal / up / down</td><td>77 / 77 / 71</td><td>24 / 25 / 23</td><td>107 / 107 / 107</td></tr>
+      <tr><td>Herwig nominal</td><td>81</td><td>28</td><td>102</td></tr>
     </tbody></table>
-    <p>All selected Born kinematics are valid. No selected negative rows occur in this small pilot; production-scale positivity still needs validation.</p>
-    <p>Integration took 1 h 35 min. The next check uses 10,000 events per configuration to improve acceptance and throughput estimates before scaling.</p>
-    <p class="small"><a href="evidence/ZZ-summary-1643989.json">Validated counts, signed sums and hashes</a> · The small independent samples do not establish a shower discrepancy.</p>
+    <p>All selected Born kinematics are valid. Negative selected weights now occur in every configuration; positive data-like sampling requires explicit validation.</p>
+    <p>Integration took 1 h 35 min; each 10k full-chain job took 10–11 minutes. The corrected summary validates and persists all four outputs.</p>
+    <p class="small"><a href="evidence/ZZ-summary-1653805.json">Validated counts, signed sums and hashes</a> · The small independent samples do not establish a shower discrepancy.</p>
   </section>
   <section>
     <p class="eyebrow">04 / Deformation convention</p><h2>Define the injected target exactly</h2>
@@ -180,7 +180,7 @@
     <p class="small">Unity partitions, account, limits, modules and storage guidance were checked on the live cluster. Existing allocations constrain all interactive work.</p>
   </section>
   <section class="cover">
-    <p class="eyebrow">Next checkpoint</p><h2>Recover and count the signal wave.<br>Measure the larger ZZ pilot.</h2>
+    <p class="eyebrow">Next checkpoint</p><h2>Recover and count the signal wave.<br>Size the remaining production.</h2>
     <p class="lead">Persist validated shards → count actual selected events → inspect signs and Born coverage → size the remaining waves.</p>
     <div class="rule"></div>
     <p><a href="CURRENT_STATUS.md">Current status</a> · <a href="PILOT_RESULTS.md">Pilot results</a> · <a href="TRAINING_LEDGER.md">Training ledger</a> · <a href="READING_NOTES.md">Reading notes</a></p>
