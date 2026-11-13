@@ -32,8 +32,8 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
         raise ValueError('Run area and campaign tag must be simple identifiers')
     if expected_entries not in (1000, 10000):
         raise ValueError('Only bounded 1000/10000-event pilots are supported')
-    if expected_shards not in (1, 100):
-        raise ValueError('Expected one pilot shard or one bounded 100-shard production wave')
+    if expected_shards not in (1, 100, 200):
+        raise ValueError('Expected one pilot shard or a bounded 100/200-shard production wave')
     base = STUDY / 'runs' / run_area
     records = []
     for shower, scale in [('pythia', 'nominal'), ('pythia', 'up'),
