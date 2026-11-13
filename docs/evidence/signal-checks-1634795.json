@@ -1,0 +1,203 @@
+{
+  "updated_utc": "2026-11-13T16:35:42.518903+00:00",
+  "job_id": "1634795",
+  "luminosity_fb": 312.0,
+  "pythia_hard_event_identities_match": true,
+  "samples": [
+    {
+      "sample": "gg_H_pythia_nominal",
+      "cross_section_pb": 0.009396030567586422,
+      "inclusive_expected_events_312fb": 2931.5615370869646,
+      "selected_expected_events_312fb": 505.23906250396556,
+      "signal_window_expected_events_312fb": 490.55188045443185,
+      "selected_mc_effective_entries": 171.9999999999999,
+      "signed_poisson_variance_over_net_selected": 1.0,
+      "normalized_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/diagnostics/1634795/gg_H_pythia_nominal.root",
+      "normalized_sha256": "d652bbf60f5f67108c5929aea75ae9623de847e6f25dd7d4d92c359266d7ac13",
+      "hb_scan": {
+        "coefficients": [
+          -0.1,
+          0.0,
+          0.1
+        ],
+        "lambda_tev": 1.0,
+        "unsupported_policy": "unity; explicitly counted, not evaluated",
+        "status_counts_all": {
+          "evaluated": 471,
+          "background_unity": 0,
+          "unavailable_born": 0,
+          "tau_unsupported": 529,
+          "unsupported_channel": 0,
+          "invalid_born_kinematics": 0
+        },
+        "status_counts_selected": {
+          "0": 171,
+          "3": 1
+        },
+        "ratio_quantiles_selected": [
+          [
+            0.4799566440188847,
+            1.0,
+            0.7692061462787623
+          ],
+          [
+            0.8763420687052791,
+            1.0,
+            0.7940504350783597
+          ],
+          [
+            1.001573567021698,
+            1.0,
+            1.000088052804879
+          ],
+          [
+            1.2368255867944127,
+            1.0,
+            1.1332103544031822
+          ],
+          [
+            1.2630822092515823,
+            1.0,
+            2.0159249621716353
+          ]
+        ],
+        "quantile_levels": [
+          0,
+          0.01,
+          0.5,
+          0.99,
+          1
+        ],
+        "inclusive_expected_events": [
+          2960.0141891765747,
+          2931.561537086914,
+          2969.722398274139
+        ],
+        "selected_expected_events": [
+          507.79117111279095,
+          505.2390625039638,
+          506.09174579326685
+        ],
+        "signal_window_expected_events": [
+          493.17608118239787,
+          490.55188045443003,
+          491.29817614101626
+        ],
+        "decorated_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/diagnostics/1634795/gg_H_pythia_nominal_hb_scan.root",
+        "decorated_sha256": "3ef5dcbf6283fa2a4a502ea3e4bde7dfdbb0163aa3c1624ceb1c592a8fe6daeb"
+      }
+    },
+    {
+      "sample": "gg_H_pythia_up",
+      "cross_section_pb": 0.009396030567586422,
+      "inclusive_expected_events_312fb": 2931.5615370869646,
+      "selected_expected_events_312fb": 505.23906250396556,
+      "signal_window_expected_events_312fb": 490.55188045443185,
+      "selected_mc_effective_entries": 171.9999999999999,
+      "signed_poisson_variance_over_net_selected": 1.0,
+      "normalized_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/diagnostics/1634795/gg_H_pythia_up.root",
+      "normalized_sha256": "5df940992918e7f01cff96b2249017f1a3ce1651632a342b6e11fe1c56747711"
+    },
+    {
+      "sample": "gg_H_pythia_down",
+      "cross_section_pb": 0.009396030567586422,
+      "inclusive_expected_events_312fb": 2931.5615370869646,
+      "selected_expected_events_312fb": 499.36418968415205,
+      "signal_window_expected_events_312fb": 490.55188045443185,
+      "selected_mc_effective_entries": 169.99999999999991,
+      "signed_poisson_variance_over_net_selected": 1.0,
+      "normalized_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/diagnostics/1634795/gg_H_pythia_down.root",
+      "normalized_sha256": "81fced1fe388e0c45109f39b4bfae13fecd4bc0a27a195a24419f0ee7fff0b36"
+    },
+    {
+      "sample": "gg_H_herwig_nominal",
+      "cross_section_pb": 0.009414860047399998,
+      "inclusive_expected_events_312fb": 2937.4363347887997,
+      "selected_expected_events_312fb": 411.24108687043196,
+      "signal_window_expected_events_312fb": 393.61646886169916,
+      "selected_mc_effective_entries": 140.0,
+      "signed_poisson_variance_over_net_selected": 1.0,
+      "normalized_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/diagnostics/1634795/gg_H_herwig_nominal.root",
+      "normalized_sha256": "0154a3cd9dc91ce1189c73bf5b28de3cca7d25f09c59c45d0c3bbc8354bf5976",
+      "hb_scan": {
+        "coefficients": [
+          -0.1,
+          0.0,
+          0.1
+        ],
+        "lambda_tev": 1.0,
+        "unsupported_policy": "unity; explicitly counted, not evaluated",
+        "status_counts_all": {
+          "evaluated": 443,
+          "background_unity": 0,
+          "unavailable_born": 0,
+          "tau_unsupported": 557,
+          "unsupported_channel": 0,
+          "invalid_born_kinematics": 0
+        },
+        "status_counts_selected": {
+          "0": 139,
+          "3": 1
+        },
+        "ratio_quantiles_selected": [
+          [
+            0.3997411210749185,
+            1.0,
+            0.7076545243312781
+          ],
+          [
+            0.9086772227594491,
+            1.0,
+            0.7821017677061104
+          ],
+          [
+            1.0043783772495964,
+            1.0,
+            0.9971273789747043
+          ],
+          [
+            1.2579569853836823,
+            1.0,
+            1.0980264214135564
+          ],
+          [
+            1.3668571479776899,
+            1.0,
+            2.4284066772332413
+          ]
+        ],
+        "quantile_levels": [
+          0,
+          0.01,
+          0.5,
+          0.99,
+          1
+        ],
+        "inclusive_expected_events": [
+          2969.7526730990817,
+          2937.4363347887997,
+          2933.104617356889
+        ],
+        "selected_expected_events": [
+          415.9058923586088,
+          411.24108687043196,
+          410.5644176339908
+        ],
+        "signal_window_expected_events": [
+          397.85824119467514,
+          393.61646886169916,
+          393.31821503035326
+        ],
+        "decorated_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/diagnostics/1634795/gg_H_herwig_nominal_hb_scan.root",
+        "decorated_sha256": "ce5b09f86dc40583bd16cd65aba8de3bb7051197f8ab117a2a4c43b08bf7c33f"
+      }
+    }
+  ],
+  "physics_closure_performed": false,
+  "limitations": [
+    "1000 generated events per configuration; no precision acceptance claim",
+    "Tau signal rows retained unchanged under an explicit diagnostic policy",
+    "Zero selected negative weights in a small pilot does not establish positivity at production scale",
+    "Merged and SMEFT-decorated MC are weighted templates, not Poisson pseudo-data"
+  ]
+}

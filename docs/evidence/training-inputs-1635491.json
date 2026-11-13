@@ -1,0 +1,230 @@
+{
+  "slurm_job_id": "1635491",
+  "checks": [
+    {
+      "sample": "gg_H_pythia_nominal.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": false,
+      "entries": 167,
+      "sumw": 490.55188045443185,
+      "split_counts": {
+        "0": 106,
+        "1": 27,
+        "2": 34
+      }
+    },
+    {
+      "sample": "gg_H_pythia_nominal.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": true,
+      "entries": 164,
+      "sumw": 481.7395712247115,
+      "split_counts": {
+        "0": 104,
+        "1": 26,
+        "2": 34
+      }
+    },
+    {
+      "sample": "gg_H_pythia_nominal.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": false,
+      "entries": 172,
+      "sumw": 505.23906250396556,
+      "split_counts": {
+        "0": 109,
+        "1": 27,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_pythia_nominal.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": true,
+      "entries": 169,
+      "sumw": 496.42675327424536,
+      "split_counts": {
+        "0": 107,
+        "1": 26,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_pythia_nominal.root",
+      "reader": "omnifold",
+      "kind": "mc",
+      "entries": 234,
+      "matched": 164,
+      "sumw": 687.360119918186
+    },
+    {
+      "sample": "gg_H_pythia_up.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": false,
+      "entries": 167,
+      "sumw": 490.55188045443185,
+      "split_counts": {
+        "0": 106,
+        "1": 27,
+        "2": 34
+      }
+    },
+    {
+      "sample": "gg_H_pythia_up.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": true,
+      "entries": 164,
+      "sumw": 481.7395712247115,
+      "split_counts": {
+        "0": 104,
+        "1": 26,
+        "2": 34
+      }
+    },
+    {
+      "sample": "gg_H_pythia_up.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": false,
+      "entries": 172,
+      "sumw": 505.23906250396556,
+      "split_counts": {
+        "0": 109,
+        "1": 27,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_pythia_up.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": true,
+      "entries": 169,
+      "sumw": 496.42675327424536,
+      "split_counts": {
+        "0": 107,
+        "1": 26,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_pythia_down.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": false,
+      "entries": 167,
+      "sumw": 490.55188045443185,
+      "split_counts": {
+        "0": 107,
+        "1": 26,
+        "2": 34
+      }
+    },
+    {
+      "sample": "gg_H_pythia_down.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": true,
+      "entries": 164,
+      "sumw": 481.7395712247115,
+      "split_counts": {
+        "0": 105,
+        "1": 25,
+        "2": 34
+      }
+    },
+    {
+      "sample": "gg_H_pythia_down.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": false,
+      "entries": 170,
+      "sumw": 499.36418968415205,
+      "split_counts": {
+        "0": 108,
+        "1": 26,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_pythia_down.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": true,
+      "entries": 167,
+      "sumw": 490.55188045443185,
+      "split_counts": {
+        "0": 106,
+        "1": 25,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_herwig_nominal.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": false,
+      "entries": 134,
+      "sumw": 393.61646886169916,
+      "split_counts": {
+        "0": 82,
+        "1": 16,
+        "2": 36
+      }
+    },
+    {
+      "sample": "gg_H_herwig_nominal.root",
+      "reader": "systematic",
+      "region": "signal",
+      "fiducial": true,
+      "entries": 133,
+      "sumw": 390.67903252691036,
+      "split_counts": {
+        "0": 82,
+        "1": 16,
+        "2": 35
+      }
+    },
+    {
+      "sample": "gg_H_herwig_nominal.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": false,
+      "entries": 140,
+      "sumw": 411.24108687043196,
+      "split_counts": {
+        "0": 85,
+        "1": 17,
+        "2": 38
+      }
+    },
+    {
+      "sample": "gg_H_herwig_nominal.root",
+      "reader": "systematic",
+      "region": "extended",
+      "fiducial": true,
+      "entries": 139,
+      "sumw": 408.30365053564316,
+      "split_counts": {
+        "0": 85,
+        "1": 17,
+        "2": 37
+      }
+    },
+    {
+      "sample": "gg_H_herwig_nominal.root",
+      "reader": "omnifold",
+      "kind": "truth",
+      "entries": 201,
+      "matched": 0,
+      "sumw": 590.4247032925488
+    }
+  ],
+  "neural_training_performed": false
+}

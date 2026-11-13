@@ -1,0 +1,185 @@
+{
+  "updated_utc": "2026-11-13T16:51:12.891805+00:00",
+  "process": "gg_H",
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/nominal/gg_H_pythia_gg_H_pythia_pilot10k_20261113_job_000000_seed1002001.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 94.11094103381038,
+            "sum_squared_weights": 0.8863958971212869,
+            "cross_section_pb": 0.009411094710230827,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 10000,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "bytes": 1789348,
+          "sha256": "384b86ddb64a8e66e2c9146544a6e7f93819ea02fbbc9acd6eed997c5b26b23b",
+          "reconstructed": 1528,
+          "reconstructed_signal_window": 1487,
+          "fiducial": 2138,
+          "negative_weight_entries": 2,
+          "reco_sumw": 14.385906152427197,
+          "reco_sum_abs_w": 14.385906152427197,
+          "reco_sumw2": 0.13544129308013264,
+          "born_available_reco": 1528,
+          "born_valid_reco": 1528,
+          "born_tau_reco": 2,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/nominal/gg_H_pythia_gg_H_pythia_pilot10k_20261113_job_000000_seed1002001.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 1528,
+        "reconstructed_signal_window": 1487,
+        "fiducial": 2138,
+        "negative_weight_entries": 2,
+        "bytes": 1789348,
+        "generated": 10000
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/up/gg_H_pythia_gg_H_pythia_pilot10k_20261113_job_000000_seed1002001_muon_scale_up.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 94.11094103381038,
+            "sum_squared_weights": 0.8863958971212869,
+            "cross_section_pb": 0.009411094710230827,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 10000,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "bytes": 1789444,
+          "sha256": "7fb3e9a2f70bc8fbca6f088509dce898a681b9932b7b6d3b4af0ecc6f82a6b0d",
+          "reconstructed": 1544,
+          "reconstructed_signal_window": 1494,
+          "fiducial": 2138,
+          "negative_weight_entries": 2,
+          "reco_sumw": 14.536543913185596,
+          "reco_sum_abs_w": 14.536543913185596,
+          "reco_sumw2": 0.13685952651552669,
+          "born_available_reco": 1544,
+          "born_valid_reco": 1544,
+          "born_tau_reco": 3,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/up/gg_H_pythia_gg_H_pythia_pilot10k_20261113_job_000000_seed1002001_muon_scale_up.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 1544,
+        "reconstructed_signal_window": 1494,
+        "fiducial": 2138,
+        "negative_weight_entries": 2,
+        "bytes": 1789444,
+        "generated": 10000
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/down/gg_H_pythia_gg_H_pythia_pilot10k_20261113_job_000000_seed1002001_muon_scale_down.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 94.11094103381038,
+            "sum_squared_weights": 0.8863958971212869,
+            "cross_section_pb": 0.009411094710230827,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 10000,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "bytes": 1789425,
+          "sha256": "4f93e382c19a7768804e8f4aa373eda76ad40b461744fa307c607870bea84e5c",
+          "reconstructed": 1526,
+          "reconstructed_signal_window": 1480,
+          "fiducial": 2138,
+          "negative_weight_entries": 2,
+          "reco_sumw": 14.367076432332397,
+          "reco_sum_abs_w": 14.367076432332397,
+          "reco_sumw2": 0.13526401390070839,
+          "born_available_reco": 1526,
+          "born_valid_reco": 1526,
+          "born_tau_reco": 1,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/down/gg_H_pythia_gg_H_pythia_pilot10k_20261113_job_000000_seed1002001_muon_scale_down.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 1526,
+        "reconstructed_signal_window": 1480,
+        "fiducial": 2138,
+        "negative_weight_entries": 2,
+        "bytes": 1789425,
+        "generated": 10000
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot10k/shards/nominal/gg_H_herwig_gg_H_herwig_pilot10k_20261113_job_000000_seed11002001.root",
+          "validation": {
+            "entries": 10000,
+            "sum_weights": 2.7682291448581964,
+            "sum_squared_weights": 0.0007678441803607753,
+            "cross_section_pb": 0.009404504671692848,
+            "lhe_matched_entries": 10000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 10000,
+            "born_source_entries": 10000,
+            "born_available_entries": 10000,
+            "born_kinematics_valid_entries": 10000
+          },
+          "bytes": 1756573,
+          "sha256": "fc662265950e8224bae8da48a7cc8e482b76cffc0c47a5150e13a2fca3f9bec9",
+          "reconstructed": 1477,
+          "reconstructed_signal_window": 1425,
+          "fiducial": 1971,
+          "negative_weight_entries": 5,
+          "reco_sumw": 0.4092767214169726,
+          "reco_sum_abs_w": 0.4092767214169726,
+          "reco_sumw2": 0.00011341058543928651,
+          "born_available_reco": 1477,
+          "born_valid_reco": 1477,
+          "born_tau_reco": 2,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot10k_20261113/nominal/gg_H_herwig_gg_H_herwig_pilot10k_20261113_job_000000_seed11002001.root"
+        }
+      ],
+      "errors": [],
+      "totals": {
+        "reconstructed": 1477,
+        "reconstructed_signal_window": 1425,
+        "fiducial": 1971,
+        "negative_weight_entries": 5,
+        "bytes": 1756573,
+        "generated": 10000
+      }
+    }
+  ],
+  "physics_closure_performed": false,
+  "expected_entries_per_shard": 10000,
+  "expected_shards_per_configuration": 1
+}

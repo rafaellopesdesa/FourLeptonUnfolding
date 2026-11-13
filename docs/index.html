@@ -16,8 +16,8 @@
     <h1>Unfolding the<br>Higgs decay.</h1>
     <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
     <div class="rule"></div>
-    <p><strong>Current phase:</strong> software validation and generation bootstrap.</p>
-    <p class="small">No generated physics sample or unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+    <p><strong>Current phase:</strong> signal production; background integration.</p>
+    <p class="small">1k and 10k signal pilots validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
   </section>
   <section>
     <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
@@ -32,18 +32,36 @@
     <p class="source"><a href="https://arxiv.org/abs/1208.4018">Angular definitions</a> · <a href="https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/main/SMEFT">SMEFT implementation</a></p>
   </section>
   <section>
-    <p class="eyebrow">02 / Evidence so far</p><h2>Infrastructure is taking shape</h2>
+    <p class="eyebrow">02 / Evidence so far</p><h2>The signal chain runs end to end</h2>
     <table><thead><tr><th>Component</th><th>Observed state</th><th>Evidence</th></tr></thead><tbody>
       <tr><td>Delphes 3.5.1 + project patches</td><td class="pass">Built successfully</td><td>Slurm 1626425</td></tr>
       <tr><td>Analysis environment</td><td class="pass">Installed; imports pass</td><td>Slurm 1626360</td></tr>
       <tr><td>NSBI / PyTorch environment</td><td class="pass">Installed; imports pass</td><td>Slurm 1626671</td></tr>
-      <tr><td>Generator stack</td><td class="pending">Build in progress</td><td>Slurm 1631091</td></tr>
-      <tr><td>Updated code validation</td><td class="pass">173 tests passed</td><td>Slurm 1628168</td></tr>
+      <tr><td>Generator stack</td><td class="pass">Built; compatible POWHEG core pinned</td><td>Slurm 1631091</td></tr>
+      <tr><td>Software validation</td><td class="pass">422 checks pass across component runs</td><td><a href="TRAINING_LEDGER.md">Validation ledger</a></td></tr>
       <tr><td>Clean-worker ROOT/Delphes environment</td><td class="pass">Validated</td><td>Slurm 1629782</td></tr>
-      <tr><td>Eight-configuration pilot launcher</td><td class="pending">Waiting for generator build</td><td>Slurm 1631123</td></tr>
-      <tr><td>Physics closure / c<sub>HB</sub> fit</td><td>Not started</td><td>No samples yet</td></tr>
+      <tr><td>Four gg_H pilot configurations</td><td class="pass">Validated and persisted</td><td>Summary 1634275</td></tr>
+      <tr><td>ZZ grid / first signal production wave</td><td class="pending">Running / 16 workers</td><td>1631379 / 1636684–700</td></tr>
     </tbody></table>
     <p class="small">Snapshot updated manually from job output. See <a href="CURRENT_STATUS.md">current status</a> for the latest recorded update.</p>
+  </section>
+  <section>
+    <p class="eyebrow">Pilot / Measured acceptance</p><h2>First compact signal samples</h2>
+    <table><thead><tr><th>1,000 generated events each</th><th>Selected reco</th><th>115–130 GeV</th><th>Fiducial</th><th>Walltime</th></tr></thead><tbody>
+      <tr><td>Pythia nominal</td><td>172</td><td>167</td><td>234</td><td>93 s</td></tr>
+      <tr><td>Pythia muon scale up</td><td>172</td><td>167</td><td>234</td><td>94 s</td></tr>
+      <tr><td>Pythia muon scale down</td><td>170</td><td>167</td><td>234</td><td>93 s</td></tr>
+      <tr><td>Herwig nominal</td><td>140</td><td>134</td><td>201</td><td>96 s</td></tr>
+    </tbody></table>
+    <p>All selected events have certified Born kinematics. Pythia scale variants retain identical hard-event identities. Compact files are approximately 0.25 MB each; peak memory is 650–790 MiB.</p>
+    <p class="small">The completed 10k pilot selects 1528/1544/1526/1477 events respectively, in 9 min 40 s–11 min 44 s. It supports sizing a first bounded production wave. <a href="PILOT_RESULTS.md">Measurements, failures and provenance →</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">Pilot / Native deformation</p><h2>The injected ratio is evaluable</h2>
+    <p class="equation compact">c<sub>HB</sub> = 0 → r = 1 exactly<br>c<sub>HB</sub> = +0.1 → selected Herwig r ∈ [0.708, 2.428]</p>
+    <p>The native −0.1/0/+0.1 scan passes finite, nonnegative-ratio checks. The existing merger reproduces the expected cross-section and luminosity normalization.</p>
+    <p>One selected tau-origin event in each nominal sample is unsupported by the direct-lepton calculation. It is explicitly counted and retained at unity for this diagnostic; the final treatment remains to be fixed.</p>
+    <p class="small">No pseudo-data draw, unfolding or coefficient fit was performed. The 1,000-event Herwig template gives selected weighted yields 411.24 → 410.56 at 312 fb⁻¹; this is a noisy template integral, not a measurement. <a href="evidence/signal-checks-1634795.json">Machine-readable check →</a></p>
   </section>
   <section>
     <p class="eyebrow">03 / Production design</p><h2>Measure acceptance before scaling</h2>
@@ -54,7 +72,7 @@
       <tr><td>gg_H</td><td>Herwig nominal</td><td>≥5M</td></tr>
       <tr><td>ZZ</td><td>Herwig nominal</td><td>≥5M</td></tr>
     </tbody></table>
-    <p>First: one 1,000-event shard per configuration. Record selected counts, Born coverage, negative-weight fractions, CPU time and bytes/event. Generated counts are not reconstructed counts.</p>
+    <p>Both signal pilots passed. First production wave: one million generated events per configuration, at most 16 workers, with storage checks and validated persistence. ZZ awaits its integration grid.</p>
     <p class="small">Persist compact samples and models on /project. Stage active I/O on /work; remove validated intermediates. Soft storage targets: 300 GB /work and 2 TB /project.</p>
   </section>
   <section>
@@ -101,6 +119,7 @@
       <tr><td>1627364</td><td>5 endpoint checks passed; 2 BR errors</td><td>Close mmap caches before NFS cleanup</td></tr>
       <tr><td>1627826</td><td>5 endpoint + 86 BR passed; 1 OF failure</td><td>Update a test that tried to mutate zero by multiplying it</td></tr>
       <tr><td>1628168</td><td>173 tests passed</td><td>Separate-stage and resume tests included</td></tr>
+      <tr><td>1633186 / 1633505</td><td>32 native / 132 Analysis checks passed</td><td>NFS library lifecycle; LHE footer and worker CLI regressions</td></tr>
     </tbody></table>
     <p>The endpoint smoke fit uses four tiny networks and one optimizer step, with deliberately relaxed acceptance tolerance. It checks artifact mechanics; it establishes no modeling accuracy.</p>
     <p class="small"><a href="TRAINING_LEDGER.md">Training ledger</a> records HPO, ensemble selection, reweighting, reliability and normalization status for each attempted fit category.</p>
@@ -144,10 +163,10 @@
     <p class="small">Unity partitions, account, limits, modules and storage guidance were checked on the live cluster. Existing allocations constrain all interactive work.</p>
   </section>
   <section class="cover">
-    <p class="eyebrow">Next checkpoint</p><h2>One validated shard<br>from every configuration.</h2>
-    <p class="lead">Finish generator installation → measure full-chain performance → validate signed yields and Born coverage → set the production budget.</p>
+    <p class="eyebrow">Next checkpoint</p><h2>Count the first production wave.<br>Complete the ZZ pilot.</h2>
+    <p class="lead">Persist validated shards → count actual selected events → inspect signs and Born coverage → size the remaining waves.</p>
     <div class="rule"></div>
-    <p><a href="CURRENT_STATUS.md">Current status</a> · <a href="TRAINING_LEDGER.md">Training ledger</a> · <a href="READING_NOTES.md">Reading notes</a></p>
+    <p><a href="CURRENT_STATUS.md">Current status</a> · <a href="PILOT_RESULTS.md">Pilot results</a> · <a href="TRAINING_LEDGER.md">Training ledger</a> · <a href="READING_NOTES.md">Reading notes</a></p>
     <p class="small">Living report branch: <code>codex_report</code><br>Code and documentation on main; campaign files and tests on codex branches.</p>
   </section>
 </div></div>

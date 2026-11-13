@@ -1,0 +1,151 @@
+{
+  "updated_utc": "2026-11-13T16:32:37.207206+00:00",
+  "process": "gg_H",
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/shards/nominal/gg_H_pythia_gg_H_pythia_pilot_20261113_job_000000_seed1001001.root",
+          "validation": {
+            "entries": 1000,
+            "sum_weights": 9.396030327305198,
+            "sum_squared_weights": 0.08863958971212868,
+            "cross_section_pb": 0.009396030567586422,
+            "lhe_matched_entries": 1000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 1000,
+            "born_source_entries": 1000,
+            "born_available_entries": 1000,
+            "born_kinematics_valid_entries": 1000
+          },
+          "bytes": 255194,
+          "sha256": "c9d5cf26080037fe5f521fb1d6794b06366af55c7a436aec93ac9ec7de88bc73",
+          "reconstructed": 172,
+          "reconstructed_signal_window": 167,
+          "fiducial": 234,
+          "negative_weight_entries": 1,
+          "reco_sumw": 1.6193559281527996,
+          "reco_sum_abs_w": 1.6193559281527996,
+          "reco_sumw2": 0.01524600943048613,
+          "born_available_reco": 172,
+          "born_valid_reco": 172,
+          "born_tau_reco": 1,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot_20261113/nominal/gg_H_pythia_gg_H_pythia_pilot_20261113_job_000000_seed1001001.root"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/shards/up/gg_H_pythia_gg_H_pythia_pilot_20261113_job_000000_seed1001001_muon_scale_up.root",
+          "validation": {
+            "entries": 1000,
+            "sum_weights": 9.396030327305198,
+            "sum_squared_weights": 0.08863958971212868,
+            "cross_section_pb": 0.009396030567586422,
+            "lhe_matched_entries": 1000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 1000,
+            "born_source_entries": 1000,
+            "born_available_entries": 1000,
+            "born_kinematics_valid_entries": 1000
+          },
+          "bytes": 255181,
+          "sha256": "38dd34584812f832547bc99841f206aaa5b2d5938fdc046dc74e3504b2fcec52",
+          "reconstructed": 172,
+          "reconstructed_signal_window": 167,
+          "fiducial": 234,
+          "negative_weight_entries": 1,
+          "reco_sumw": 1.6193559281527996,
+          "reco_sum_abs_w": 1.6193559281527996,
+          "reco_sumw2": 0.01524600943048613,
+          "born_available_reco": 172,
+          "born_valid_reco": 172,
+          "born_tau_reco": 1,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot_20261113/up/gg_H_pythia_gg_H_pythia_pilot_20261113_job_000000_seed1001001_muon_scale_up.root"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/shards/down/gg_H_pythia_gg_H_pythia_pilot_20261113_job_000000_seed1001001_muon_scale_down.root",
+          "validation": {
+            "entries": 1000,
+            "sum_weights": 9.396030327305198,
+            "sum_squared_weights": 0.08863958971212868,
+            "cross_section_pb": 0.009396030567586422,
+            "lhe_matched_entries": 1000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 1000,
+            "born_source_entries": 1000,
+            "born_available_entries": 1000,
+            "born_kinematics_valid_entries": 1000
+          },
+          "bytes": 255104,
+          "sha256": "3177eab9a5ca6d9f81aa5c16b278532b18a7dcb178ed1a41729612936cd89c27",
+          "reconstructed": 170,
+          "reconstructed_signal_window": 167,
+          "fiducial": 234,
+          "negative_weight_entries": 1,
+          "reco_sumw": 1.6005262080579996,
+          "reco_sum_abs_w": 1.6005262080579996,
+          "reco_sumw2": 0.015068730251061875,
+          "born_available_reco": 170,
+          "born_valid_reco": 170,
+          "born_tau_reco": 1,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot_20261113/down/gg_H_pythia_gg_H_pythia_pilot_20261113_job_000000_seed1001001_muon_scale_down.root"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "files": [
+        {
+          "path": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/pilot/shards/nominal/gg_H_herwig_gg_H_herwig_pilot_20261113_job_000000_seed11001001.root",
+          "validation": {
+            "entries": 1000,
+            "sum_weights": 0.27710001450031996,
+            "sum_squared_weights": 7.678441803607753e-05,
+            "cross_section_pb": 0.009414860047399998,
+            "lhe_matched_entries": 1000,
+            "lhe_four_lepton_entries": 0,
+            "lhe_higgs_entries": 1000,
+            "born_source_entries": 1000,
+            "born_available_entries": 1000,
+            "born_kinematics_valid_entries": 1000
+          },
+          "bytes": 253074,
+          "sha256": "5245640c30e8fffe385f31cb21cb81511ed6a6d51a27091b11719fd6fb9c4337",
+          "reconstructed": 140,
+          "reconstructed_signal_window": 134,
+          "fiducial": 201,
+          "negative_weight_entries": 0,
+          "reco_sumw": 0.038794002030044794,
+          "reco_sum_abs_w": 0.038794002030044794,
+          "reco_sumw2": 1.0749818525050854e-05,
+          "born_available_reco": 140,
+          "born_valid_reco": 140,
+          "born_tau_reco": 1,
+          "persisted_path": "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot_20261113/nominal/gg_H_herwig_gg_H_herwig_pilot_20261113_job_000000_seed11001001.root"
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "physics_closure_performed": false
+}

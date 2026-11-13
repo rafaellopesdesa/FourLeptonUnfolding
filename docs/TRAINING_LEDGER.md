@@ -52,6 +52,48 @@ Attempt 1628168 passes **82 OmniFold tests**, including independent stage
 overrides, fixed seeds, resume preservation and invalid-configuration rejection.
 Together with **86 background-removal and 5 endpoint tests: 173 tests pass**.
 
+## Analysis, generation and native matrix-element checks
+
+The final component outcomes total **422 passing checks**. This total combines
+successful component runs, not one monolithic test invocation:
+
+| Component | Passed | Slurm evidence |
+|---|---:|---|
+| Endpoint / background / OmniFold | 5 / 86 / 82 | 1628168 |
+| Analysis | 132 | 1633505 |
+| Tools / Simulation | 11 / 36 | 1632409 |
+| Generation / BatchSubmit / Plotting | 18 / 7 / 13 | 1632409 |
+| Native SMEFT | 32 | 1633186 |
+
+Job 1632409 passed its first six suites, then reported an SMEFT teardown
+error: a loaded native shared library left an NFS temporary file. The
+validation harness now keeps native builds until Python exits; the rerun
+1633186 passes all 32 tests, including independent Dirac-trace comparisons,
+arbitrary coefficients, Lorentz/permutation checks and the actual ROOT CLI.
+
+Actual pilot execution exposed two additional failures. POWHEG writes a
+standard RNG-state footer after the LHE closing tag, which the strict XML
+reader rejected. The parser now accepts exactly that known footer while
+retaining original source bytes/hashes and rejecting other trailing content.
+Next, the standalone output validator could not import Analysis when called
+from worker scratch. Its import bootstrap and a clean-working-directory
+subprocess regression fix that case. The final Analysis run passes 132 tests.
+
+Generator attempts 1626358 and 1630665 failed against an incompatible newer
+POWHEG core. Pinning the compatible core revision resolved both process
+builds (1631091). This and ROOT's prerequisite module ordering are recorded
+in the install metadata; no temporary process-source patch remains.
+
+The successful full-chain signal jobs and native scan in
+[PILOT_RESULTS.md](PILOT_RESULTS.md) are physics-input diagnostics. They contain
+no neural training, hyperparameter selection or fitted calibration.
+
+Slurm 1635491 also passes the real-input compatibility check: all four
+normalized signal configurations can be read by the systematic trainer in
+signal/extended regions, with and without fiducial selection. OmniFold reads
+234 fiducial Pythia MC events and 201 fiducial Herwig truth events with seven
+coordinates. No classifier fit is performed on these undersized samples.
+
 ## Production fits: pending
 
 For every future correction, subtraction, endpoint, OmniFold stage and
