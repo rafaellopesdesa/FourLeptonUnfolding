@@ -26,7 +26,7 @@ PDFSET="${PDFSET:-NNPDF31_nlo_as_0118}"
 LHAPDF_SET_BASE_URL="${LHAPDF_SET_BASE_URL:-https://lhapdfsets.web.cern.ch/current}"
 
 POWHEG_URL="${POWHEG_URL:-https://gitlab.com/POWHEG-BOX/V2/POWHEG-BOX-V2.git}"
-POWHEG_REF="${POWHEG_REF:-master}"
+POWHEG_REF="${POWHEG_REF:-9c3cd9ec74f7c804ea521ef21835ca5db5d3bf9e}"
 POWHEG_ZZ_PATCH="$SCRIPT_DIR/patches/powheg-zz-m4lmin.patch"
 
 usage() {

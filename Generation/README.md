@@ -7,7 +7,8 @@ This directory provides a first, reproducible Ubuntu 24.04 workflow for
 - Herwig 7.3.0/ThePEG 2.3.0;
 - GSL 2.8, Boost 1.83.0, LHAPDF, FastJet and HepMC3.
 
-POWHEG is cloned from its current official GitLab repository. The two process
+POWHEG is cloned from its official GitLab repository at core commit
+`9c3cd9ec74f7c804ea521ef21835ca5db5d3bf9e`. The two process
 repositories are initialized as pinned submodules, and the resolved commits are
 recorded in `software/versions.txt`. The installer also creates the process
 object/module directories expected by the upstream make-only build system;
@@ -15,6 +16,10 @@ POWHEG does not use a separate `configure` step. Its build is explicitly bound
 to the locally installed `lhapdf-config` and `fastjet-config`. The LHAPDF
 include flags and library directory are passed to the POWHEG compiler and
 linker instead of relying on system search paths.
+
+The core is pinned rather than following `master`: the subsequent flag-update
+revision `68b8a36` fails with the bundled process code in this build. Override
+`POWHEG_REF` only after validating both process builds and the full chain.
 
 ## Install
 
