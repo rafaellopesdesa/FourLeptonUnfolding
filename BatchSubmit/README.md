@@ -41,7 +41,8 @@ cd Generation
   --jobs 8 --skip-apt --gsl-module gsl/2.8
 
 cd ../Simulation
-./install_delphes.sh --skip-apt --jobs 8 --root-module mpich/4.2.1
+./install_delphes.sh --skip-apt --jobs 8 \
+  --root-prerequisite mpich/4.2.1 --root-module root/6.30.06
 
 cd ..
 pixi install --manifest-path Analysis/pixi.toml --locked
@@ -50,6 +51,10 @@ pixi install --manifest-path Analysis/pixi.toml --locked
 The submitter verifies both generated environment files and resolves the
 Analysis Python interpreter once on the login node. Workers invoke that
 interpreter directly, avoiding concurrent Pixi environment solves or locks.
+
+Check available module versions on Unity before installation. Hierarchical
+ROOT prerequisites must be passed explicitly so they are retained in the
+generated environment for workers submitted with `--export=NONE`.
 
 After updating to the Born-projection chain, rerun the Generation installer
 to rebuild the small PYTHIA bridge, update the Analysis environment (which
