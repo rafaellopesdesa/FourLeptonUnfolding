@@ -1,4 +1,4 @@
-"""Validate the bounded pilot, persist shards, and record measured acceptance."""
+"""Validate a bounded campaign, persist shards, and record measured acceptance."""
 from dataclasses import asdict
 from datetime import datetime, timezone
 import fcntl
@@ -24,13 +24,16 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected_entries=1000):
+def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected_entries=1000,
+              expected_shards=1):
     if process not in {'gg_H', 'ZZ'}:
         raise ValueError('Expected gg_H or ZZ')
     if not all(re.fullmatch(r'[a-zA-Z0-9_]+', value) for value in (run_area, campaign_tag)):
         raise ValueError('Run area and campaign tag must be simple identifiers')
     if expected_entries not in (1000, 10000):
         raise ValueError('Only bounded 1000/10000-event pilots are supported')
+    if expected_shards not in (1, 100):
+        raise ValueError('Expected one pilot shard or one bounded 100-shard production wave')
     base = STUDY / 'runs' / run_area
     records = []
     for shower, scale in [('pythia', 'nominal'), ('pythia', 'up'),
@@ -39,8 +42,8 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
         paths = sorted((base / 'shards' / scale).glob(pattern))
         record = {'process': process, 'shower': shower, 'scale': scale,
                   'files': [], 'errors': []}
-        if len(paths) != 1:
-            record['errors'].append(f'Expected one shard; found {len(paths)}')
+        if len(paths) != expected_shards:
+            record['errors'].append(f'Expected {expected_shards} shards; found {len(paths)}')
         for path in paths:
             try:
                 checked = validate_analysis_output(path, expected_entries=expected_entries,
@@ -85,10 +88,15 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                 record['files'].append(item)
             except Exception as error:
                 record['errors'].append(f'{path.name}: {type(error).__name__}: {error}')
+        record['totals'] = {name: sum(item[name] for item in record['files'])
+                            for name in ('reconstructed', 'reconstructed_signal_window',
+                                         'fiducial', 'negative_weight_entries', 'bytes')}
+        record['totals']['generated'] = sum(item['validation']['entries'] for item in record['files'])
         records.append(record)
     result = {'updated_utc': datetime.now(timezone.utc).isoformat(), 'process': process,
               'samples': records, 'physics_closure_performed': False}
     result['expected_entries_per_shard'] = expected_entries
+    result['expected_shards_per_configuration'] = expected_shards
     output = base / f'{process}-summary.json'
     payload = json.dumps(result, indent=2, allow_nan=False) + '\n'
     history = base / f'{process}-summary-{os.environ.get("SLURM_JOB_ID", "interactive")}.json'
@@ -102,6 +110,10 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
             status.write(f'\nPilot update {result["updated_utc"]}: {process}; '
                          f'{sum(bool(r["errors"]) for r in records)} configurations with errors. '
                          f'Measured details: `runs/{run_area}/{process}-summary.json`.\n')
+            for record in records:
+                status.write(f'- {record["shower"]} {record["scale"]}: '
+                             f'{record["totals"]["reconstructed"]} selected / '
+                             f'{record["totals"]["generated"]} generated in validated persisted shards.\n')
     print(json.dumps(result, indent=2))
     return int(any(r['errors'] for r in records))
 
@@ -111,4 +123,6 @@ if __name__ == '__main__':
         raise SystemExit(summarize(sys.argv[1]))
     if len(sys.argv) == 5:
         raise SystemExit(summarize(*sys.argv[1:4], int(sys.argv[4])))
-    raise SystemExit('Expected PROCESS [RUN_AREA CAMPAIGN_TAG ENTRIES]')
+    if len(sys.argv) == 6:
+        raise SystemExit(summarize(*sys.argv[1:4], int(sys.argv[4]), int(sys.argv[5])))
+    raise SystemExit('Expected PROCESS [RUN_AREA CAMPAIGN_TAG ENTRIES [SHARDS]]')

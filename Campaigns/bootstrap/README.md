@@ -56,3 +56,15 @@ production campaign.
 the normalized 1k pilot in `runs/pilot/diagnostics/1634795`. It checks all
 four configurations in the signal/extended regions, with/without fiducial
 selection, plus full fiducial MC/truth input. It does not train a network.
+
+`launch_signal_wave1.sbatch` is submitted after successful 10k pilot summary.
+It independently checks all four persisted checksums and selected counts,
+and requires 100 GB of /work headroom below the 300 GB soft target plus
+10 GB of /project headroom below 2 TB. It launches exactly 100 × 10,000 events
+per signal configuration, four concurrent workers per array (16 total),
+with fresh seeds, one CPU / 3 GB / one hour per worker. The 3 GB request
+provides headroom above the approximately 2 GB recorded by the 10k pilots.
+The dependent summary validates every shard, persists compact files, records
+actual selected totals and reports missing/failed shards. No subsequent
+production wave is launched automatically. One million generated events is
+not the five-million-selected-event target.
