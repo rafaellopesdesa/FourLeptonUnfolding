@@ -87,7 +87,7 @@ intercept adjustment, or empirical ratio-normalization multiplier is fitted.
 The physical target/reference yield ratio remains a separate factor.
 
 Correction retains four hidden layers of 1024 neurons and batch size 8192.
-The shared training controls now apply matrix-only NAdam weight decay,
+The shared training controls use NAdam with zero weight decay,
 validation by optimizer update, checkpoint selection with validation-check
 patience, and an absolute `ln(2)` baseline check in addition to the relative
 ensemble filter. See

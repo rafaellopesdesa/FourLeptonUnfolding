@@ -28,6 +28,15 @@ The workflow is split into:
   raw NN reco/truth/reco density ratios per iteration, fiducial closure,
   saved PDF diagnostics, fixed-reference likelihood objectives, and
   pseudo-experiment decoration; both interfaces share resumable campaigns.
+- [`Systematics/`](Systematics/) for unregularized NSBI varied/nominal
+  shape and yield endpoint ratios with explicit sample provenance.
+
+`main` contains reusable code and documentation. Regression suites live on
+[`codex_validation`](https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/codex_validation),
+campaign inputs on `codex_bootstrap_20261113`, and the living reveal.js report
+on [`codex_report`](https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/codex_report/docs).
+Use the validation branch/worktree when running the test commands documented
+below. Physics samples, model artifacts and bulk logs are not committed.
 
 The built-in samples use 6800 GeV per beam, $\sqrt{s}=13.6$ TeV. The runtime
 also validates the LHE beam record so custom cards and external LHE inputs

@@ -393,6 +393,16 @@ def ratio_outputs(
     return result
 
 
+def validate_training_weight_decay(value: float) -> None:
+    """Reject parameter penalties for new project trainings.
+
+    Keep this separate from artifact loading so older explicit configurations
+    can still be inspected without silently changing their trained models.
+    """
+    if isinstance(value, (bool, np.bool_)) or not np.isfinite(value) or value != 0.0:
+        raise ValueError("weight_decay must be zero: this project forbids NN regularization")
+
+
 def build_toolkit_model(architecture: dict[str, Any]):
     """Construct the pinned NSBI toolkit density-ratio network."""
 

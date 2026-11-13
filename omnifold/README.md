@@ -84,13 +84,13 @@ kinematics, should be checked with closure tests.
 
 ## Network and raw-score diagnostics
 
-All three OmniFold ratios use the same `RatioConfig`. New campaigns default
-to two hidden layers of 64 neurons with swish activation, four ensemble
-members, and batch size 512. They use the pinned NSBI toolkit
-`DensityRatioLightning` model and NAdam. Background Correction and Removal
-retain four hidden layers of 1024 neurons and batch size 8192 for their
-different classification tasks. The features, signed BCE, training controls,
-and raw-odds inference are shared.
+New campaigns default to four hidden layers of 1024 neurons with swish
+activation, four ensemble members, and batch size 8192. They use the pinned
+NSBI toolkit `DensityRatioLightning` model and NAdam, sharing the features,
+signed BCE, training controls, and raw-odds inference with Background
+Correction and Removal. Each stage can override the common `RatioConfig`.
+Tune the sparse-data `reco_pull` separately while preserving the large-sample
+settings for `truth_push` and `reco_likelihood`.
 
 The shape ratio is computed from the raw mean probability of the ensemble:
 
@@ -123,7 +123,7 @@ New `RatioConfig` defaults are:
 
 | Setting | Default | Meaning |
 |---|---:|---|
-| `weight_decay` | `1e-4` | Coupled L2 in NAdam, matrix weights only; no bias penalty |
+| `weight_decay` | `0` | No parameter penalty; nonzero values are rejected for new training |
 | `learning_rate` | `3e-4` | Initial learning rate |
 | `learning_rate_decay` | `0.98` | Decay per `learning_rate_decay_steps` optimizer updates |
 | `learning_rate_decay_steps` | `100` | Update scale for learning-rate decay |
@@ -160,10 +160,20 @@ on that baseline. No discrimination is forced and no constant ratio is
 substituted. A nearly unity ratio can be appropriate when target and reference
 agree.
 
-For a capacity comparison, start separate campaigns with
-`RatioConfig(hidden_layers=2, neurons=64)` and
-`RatioConfig(hidden_layers=3, neurons=128)`, holding inputs and split seeds
-fixed. Compare validation BCE and checkpoint behavior to choose capacity;
+For a reco-pull capacity comparison, start separate campaigns with the API
+argument `stage_configs={"reco_pull": RatioConfig(hidden_layers=2, neurons=64,
+batch_size=128)}` (use the same device as the common configuration), or pass
+`--stage-config-json PATH` to the CLI. The JSON contains only stage overrides:
+
+```json
+{"reco_pull": {"hidden_layers": 2, "neurons": 64, "batch_size": 128}}
+```
+
+Omitted JSON fields inherit the common CLI settings; omitted stages inherit
+the common configuration. The complete effective configurations are saved in
+`session.json` and restored on resume. Changing them requires a new campaign.
+These example values are scan candidates, not optimized settings. Hold inputs
+and split seeds fixed. Compare validation BCE and checkpoint behavior to choose capacity;
 reserve the untouched closure split for assessment. Do not choose network
 settings by matching the Herwig truth curve.
 
@@ -421,6 +431,14 @@ file.
 
 The removed `--calibration-scale-min` and `--calibration-scale-max` options are
 not accepted, including the corresponding `RatioConfig` fields.
+
+The project prohibits NN regularization and post-hoc calibration. New training
+therefore requires zero weight decay, including through the shared training
+API. Existing explicit artifact configurations remain readable for inspection;
+their stored parameters are never changed. Continuing a campaign previously
+trained with nonzero weight decay is not supported: start a new campaign.
+The existing finite logit domain for signed BCE and validation-based checkpoint
+selection remain explicit training controls, not fitted score corrections.
 
 The original ROOT inputs must remain unchanged during a campaign. Use a new
 run directory for different input files, selections, or model settings.

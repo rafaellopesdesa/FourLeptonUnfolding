@@ -209,7 +209,8 @@ change as well as its shape.
 
 ## Validation
 
-From the repository root:
+From the repository root on the `codex_validation` branch (tests are kept
+outside main):
 
 ```bash
 python -m unittest discover -s SMEFT/tests -v

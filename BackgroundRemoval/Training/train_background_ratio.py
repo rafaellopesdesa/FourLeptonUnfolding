@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
@@ -46,6 +47,7 @@ from BackgroundRemoval.common import (
     toolkit_runtime_provenance,
     transformed_features,
     validate_manifest_mass_window,
+    validate_training_weight_decay,
     weight_measure_contract,
 )
 
@@ -463,12 +465,21 @@ def _make_cache(
     return paths
 
 
-def _load_cache(paths: dict[str, CachePaths]) -> dict[str, CachedClass]:
+def _load_cache(
+    paths: dict[str, CachePaths], resources: ExitStack
+) -> dict[str, CachedClass]:
+    def load(path: Path) -> np.ndarray:
+        array = np.load(path, mmap_mode="r")
+        # Close mappings before unlinking their files. NFS otherwise retains
+        # .nfs files and TemporaryDirectory can fail with ENOTEMPTY.
+        resources.callback(array._mmap.close)
+        return array
+
     return {
         name: CachedClass(
-            features=np.load(item.features, mmap_mode="r"),
-            weights=np.load(item.weights, mmap_mode="r"),
-            splits=np.load(item.splits, mmap_mode="r"),
+            features=load(item.features),
+            weights=load(item.weights),
+            splits=load(item.splits),
         )
         for name, item in paths.items()
     }
@@ -621,7 +632,8 @@ def _train_member(
 
     validation_cap = positive_integer("validation_interval_steps", 25)
     decay_steps = positive_integer("learning_rate_decay_steps", 100)
-    weight_decay = float(architecture.get("weight_decay", 1.0e-4))
+    weight_decay = architecture.get("weight_decay", 0.0)
+    validate_training_weight_decay(weight_decay)
     minimum_delta = float(architecture.get("validation_min_delta", 1.0e-5))
     baseline_tolerance = float(architecture.get("baseline_tolerance", 0.01))
     for name, value in (("weight_decay", weight_decay), ("validation_min_delta", minimum_delta),
@@ -640,15 +652,8 @@ def _train_member(
 
     model = build_toolkit_model(architecture).to(device)
     loss_logit_clip = float(architecture["loss_logit_clip"])
-    matrix_parameters = [parameter for parameter in model.parameters()
-                         if parameter.requires_grad and parameter.ndim > 1]
-    other_parameters = [parameter for parameter in model.parameters()
-                        if parameter.requires_grad and parameter.ndim <= 1]
-    # NAdam's coupled decay is the gradient of wd/2 * sum(W**2).
-    # Biases and other scalar/vector parameters are deliberately not penalized.
     optimizer = torch.optim.NAdam(
-        [{"params": matrix_parameters, "weight_decay": weight_decay},
-         {"params": other_parameters, "weight_decay": 0.0}],
+        model.parameters(),
         lr=float(architecture["learning_rate"]),
         weight_decay=0.0,
     )
@@ -678,12 +683,8 @@ def _train_member(
         cache["background"].weights, background_indices, class_name="background")
 
     def regularization_value() -> float:
-        if weight_decay == 0.0 or not matrix_parameters:
-            return 0.0
-        with torch.no_grad():
-            squared_norm = sum(torch.sum(parameter.detach() ** 2)
-                               for parameter in matrix_parameters)
-            return 0.5 * weight_decay * float(squared_norm.item())
+        # Retain the history field for report/artifact compatibility.
+        return 0.0
 
     def evaluate() -> tuple[float, float, float, float]:
         result = _evaluate_member(
@@ -749,7 +750,6 @@ def _train_member(
         regularization = regularization_value()
         if not torch.isfinite(loss) or not math.isfinite(regularization):
             raise RuntimeError(f"member {slot} produced a non-finite training objective")
-        # Coupled L2 is applied by NAdam; do not add its gradient a second time.
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -820,7 +820,7 @@ def _train_member(
         "reference_draws_per_fit_event": completed_steps * half_batch / background_indices.size,
         "draw_reuse_definition": "mean draws per nonzero fit row; individual reuse follows absolute weights",
         "weight_decay": weight_decay,
-        "regularization_definition": "weight_decay / 2 * sum(matrix weights squared); biases excluded",
+        "regularization_definition": "none; weight_decay is required to be zero",
         "learning_rate_decay_steps": decay_steps,
         "learning_rate_history": "rate for the next optimizer update after the recorded completed step",
         "training_loss_history": "mean sampled signed BCE since previous validation; unavailable at step zero",
@@ -1062,8 +1062,7 @@ def train(args: argparse.Namespace) -> Path:
         0.0 < args.learning_rate_decay <= 1.0
     ):
         raise ValueError("learning-rate decay must be finite and lie in (0, 1]")
-    if not np.isfinite(args.weight_decay) or args.weight_decay < 0.0:
-        raise ValueError("weight decay must be finite and nonnegative")
+    validate_training_weight_decay(args.weight_decay)
     for name in ("validation_interval_steps", "learning_rate_decay_steps"):
         value = getattr(args, name)
         if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
@@ -1238,7 +1237,7 @@ def train(args: argparse.Namespace) -> Path:
     try:
         with tempfile.TemporaryDirectory(
             prefix="fourlepton-background-cache-", dir=cache_parent
-        ) as cache_name:
+        ) as cache_name, ExitStack() as cache_resources:
             cache_directory = Path(cache_name)
             print(f"Building bounded-memory cache in {cache_directory}...", flush=True)
             cache_paths = _make_cache(
@@ -1255,7 +1254,7 @@ def train(args: argparse.Namespace) -> Path:
             )
             assert_file_unchanged(gg_h_path, input_provenance["gg_H_pythia"])
             assert_file_unchanged(zz_path, input_provenance["ZZ_pythia"])
-            cache = _load_cache(cache_paths)
+            cache = _load_cache(cache_paths, cache_resources)
             effective_steps_per_epoch = (
                 args.steps_per_epoch
                 if args.steps_per_epoch is not None
@@ -1280,7 +1279,7 @@ def train(args: argparse.Namespace) -> Path:
                 "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
                 "dropout": 0.0,
                 "weight_decay": args.weight_decay,
-                "regularization": "coupled L2 on weight matrices; biases excluded",
+                "regularization": "none",
                 "optimizer": "NAdam",
                 "learning_rate": args.learning_rate,
                 "learning_rate_schedule": "exponential_per_optimizer_step",
@@ -1605,8 +1604,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="Validation checks without a meaningful improvement")
     parser.add_argument("--learning-rate", type=float, default=3.0e-4)
     parser.add_argument("--learning-rate-decay", type=float, default=0.98)
-    parser.add_argument("--weight-decay", type=float, default=1.0e-4,
-                        help="Coupled L2 on weight matrices; validation uses unpenalized signed BCE")
+    parser.add_argument("--weight-decay", type=float, default=0.0,
+                        help="Must be zero; NN regularization is disabled by project policy")
     parser.add_argument("--validation-interval-steps", type=int, default=25,
                         help="Maximum optimizer steps between validation checks")
     parser.add_argument("--learning-rate-decay-steps", type=int, default=100,

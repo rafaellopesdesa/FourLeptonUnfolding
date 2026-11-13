@@ -178,8 +178,8 @@ Both stages use the same defaults:
 - four hidden layers with 1024 SiLU cells per layer and batch size 8192;
 - signed BCE with logits bounded to `[-logit-clip, +logit-clip]`, NAdam, and
   learning-rate decay by optimizer update;
-- weight decay `1e-4` on matrix weights only, implemented as coupled L2 in
-  NAdam; biases are not penalized and there is no dropout;
+- zero weight decay and no dropout; new training rejects any nonzero
+  `--weight-decay`, following the project's no-regularization policy;
 - deterministic 60% fit, 15% validation, and 25% untouched
   closure splits;
 - arithmetic-mean probability aggregation;
@@ -438,7 +438,8 @@ From the repository root, install the isolated, locked environment once:
 pixi install --locked --manifest-path BackgroundRemoval/pixi.toml
 ```
 
-From the repository root, run the regression tests with:
+Regression tests are preserved on `codex_validation`, outside main. From
+that branch's repository root, run:
 
 ```bash
 pixi run --locked --manifest-path BackgroundRemoval/pixi.toml test
