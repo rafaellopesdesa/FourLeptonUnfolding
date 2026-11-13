@@ -13,6 +13,7 @@ import gzip
 import hashlib
 import math
 from pathlib import Path
+import re
 from typing import Iterator
 import xml.etree.ElementTree as ET
 
@@ -159,6 +160,27 @@ def _event_from_element(element: ET.Element, ordinal: int, path: Path) -> LHEEve
         raise ValueError(f"{path}: LHE event {ordinal}: {error}") from error
 
 
+def _xml_events(stream):
+    """Accept POWHEG's one non-XML RNG footer, preserving original file bytes.
+
+    All other trailing content is still parsed and must be valid XML. Feed
+    incrementally so an event is available before the whole file is read.
+    """
+    parser = ET.XMLPullParser(events=("start", "end"))
+    root_closed = footer_seen = False
+    footer = re.compile(rb"\s*#Random number generator exit values:\s+[+-]?\d+\s+[+-]?\d+\s+[+-]?\d+\s*")
+    for line in stream:
+        if root_closed and not footer_seen and footer.fullmatch(line):
+            footer_seen = True
+            continue
+        parser.feed(line)
+        for phase, element in parser.read_events():
+            if phase == "end" and _tag(element) == "LesHouchesEvents":
+                root_closed = True
+            yield phase, element
+    parser.close()
+
+
 def iter_lhe_events(path: str | Path) -> Iterator[LHEEvent]:
     """Yield validated standard LHE(.gz) events without retaining the document.
 
@@ -172,7 +194,7 @@ def iter_lhe_events(path: str | Path) -> Iterator[LHEEvent]:
     stack: list[ET.Element] = []
     try:
         with opener(path, "rb") as stream:
-            for phase, element in ET.iterparse(stream, events=("start", "end")):
+            for phase, element in _xml_events(stream):
                 tag = _tag(element)
                 if phase == "start":
                     if not stack and tag != "LesHouchesEvents":

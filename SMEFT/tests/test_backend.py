@@ -163,9 +163,16 @@ _COMPILER = shlex.split(os.environ.get("CXX", "c++"))
 class NativeHBBackendTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temporary = tempfile.TemporaryDirectory(prefix="test-hb-native-")
-        cls.addClassCleanup(cls.temporary.cleanup)
-        cls.build_dir = Path(cls.temporary.name)
+        native_root = os.environ.get("FOURLEPTON_NATIVE_TEST_BUILDS")
+        if native_root:
+            # A loaded CDLL cannot be unlinked cleanly on NFS. The batch
+            # harness owns this directory and removes it after Python exits.
+            Path(native_root).mkdir(parents=True, exist_ok=True)
+            cls.build_dir = Path(tempfile.mkdtemp(prefix="test-hb-native-", dir=native_root))
+        else:
+            cls.temporary = tempfile.TemporaryDirectory(prefix="test-hb-native-")
+            cls.addClassCleanup(cls.temporary.cleanup)
+            cls.build_dir = Path(cls.temporary.name)
         cls.backend = NativeHBBackend(build_dir=cls.build_dir)
 
     def test_independent_dirac_trace_absolute_amplitudes_and_coefficients(self):

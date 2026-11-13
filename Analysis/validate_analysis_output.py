@@ -8,9 +8,14 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
+import sys
 
 import numpy as np
 import uproot
+
+if __package__ in (None, ""):
+    # Batch workers invoke this file directly from their private work area.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 TREE_NAME = "Analysis"

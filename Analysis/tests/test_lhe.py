@@ -96,6 +96,34 @@ class LHEParserTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "malformed LHE XML"):
             next(iterator)
 
+    def test_powheg_rng_footer_preserves_events_and_original_checksum(self):
+        self.write(_event_text(_leptons()))
+        expected = list(iter_lhe_events(self.path))
+        footer = b" #Random number generator exit values: 1001001 452369 0\n"
+        original = self.path.read_bytes() + footer
+        self.path.write_bytes(original)
+        self.assertEqual(list(iter_lhe_events(self.path)), expected)
+        self.assertEqual(source_sha256(self.path), hashlib.sha256(original).hexdigest())
+        compressed = self.path.with_suffix('.lhe.gz')
+        with gzip.open(compressed, 'wb') as stream:
+            stream.write(original)
+        self.assertEqual(list(iter_lhe_events(compressed)), expected)
+
+    def test_rng_footer_does_not_hide_malformed_or_extra_content(self):
+        footer = '\n#Random number generator exit values: 123 456 0\n'
+        for suffix in (footer + '<event/>', footer + footer,
+                       '\n#Random number generator exit values: 123 456\n',
+                       '\nunrecognized trailing content\n'):
+            with self.subTest(suffix=suffix):
+                self.write(_event_text([]))
+                self.path.write_text(self.path.read_text() + suffix)
+                with self.assertRaisesRegex(ValueError, 'malformed LHE XML'):
+                    list(iter_lhe_events(self.path))
+        self.write(_event_text([]), close=False)
+        self.path.write_text(self.path.read_text() + footer)
+        with self.assertRaisesRegex(ValueError, 'malformed LHE XML'):
+            list(iter_lhe_events(self.path))
+
     def test_malformed_headers_counts_and_particle_fields_are_rejected(self):
         particle = _leptons()[0]
         cases = [

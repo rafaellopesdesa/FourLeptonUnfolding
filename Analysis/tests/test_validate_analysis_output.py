@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -58,6 +61,19 @@ def write_output(
 
 
 class ValidateAnalysisOutputTest(unittest.TestCase):
+    def test_standalone_cli_resolves_lhe_imports_outside_repository(self):
+        from Analysis.lhe import empty_columns
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'analysis.root'
+            write_output(path, lhe_columns=empty_columns(3))
+            environment = dict(os.environ)
+            environment.pop('PYTHONPATH', None)
+            script = Path(__file__).resolve().parents[1] / 'validate_analysis_output.py'
+            completed = subprocess.run([sys.executable, str(script), str(path)],
+                cwd=temporary, env=environment, text=True, capture_output=True)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertIn('entries=3', completed.stdout)
+
     def test_accepts_a_complete_compact_tree(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "analysis.root"
