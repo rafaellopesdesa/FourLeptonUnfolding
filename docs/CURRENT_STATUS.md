@@ -1,9 +1,10 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-13 19:44 UTC. Signal wave one has 225/400 completed shards (56.25%),
-with 16 workers active. All four 10k ZZ pilots are validated and persisted.
-Thirteen signal shards await the scheduled recovery round. No unfolding, HPO,
-or coefficient measurement has yet been performed.
+Updated: 2026-11-13 21:56 UTC. The original signal arrays have finished. Wave one has
+384/400 successful shards (96%); the remaining 16 have submitted recovery jobs
+(12 running, four queued at this snapshot). Final validation/persistence waits
+for those jobs. All four 10k ZZ pilots remain validated and persisted. No
+unfolding, HPO, or coefficient measurement has yet been performed.
 
 ## Confirmed study
 
@@ -115,12 +116,13 @@ Actual validated counts determine completion.
 | 1635016–1635019 | Four signal configurations, 10,000 events each | Completed |
 | 1635020 | Validate/persist larger signal pilot | Completed |
 | 1636246 | Guarded first signal production-wave launcher | Completed; checks passed |
-| 1636684 | Pythia nominal, 100 × 10k events | Running; at most four workers |
-| 1636696 / 1636697 | Pythia up/down, 100 × 10k each | Running; four workers per array |
-| 1636700 | Herwig nominal, 100 × 10k events | Running; at most four workers |
+| 1636684 | Pythia nominal, 100 × 10k events | Original array finished; remaining shards in recovery |
+| 1636696 / 1636697 | Pythia up/down, 100 × 10k each | Original arrays finished |
+| 1636700 | Herwig nominal, 100 × 10k events | Original array finished |
 | 1644720 | Retry Herwig tasks 4, 10, 17 with reserve | All three completed successfully |
-| 1645888 | One final recovery round for known failures | Waiting for original arrays and initial retries |
-| 1636701 | Validate/persist production wave | Waiting for recovery controller; it will add recovery dependencies |
+| 1645888 | One final recovery round for known failures | Completed; submitted 16 retries |
+| 1672510 / 1672513 / 1672518 / 1672519 | Nominal / up / down / Herwig recovery | 12 tasks running, four queued |
+| 1636701 | Validate/persist production wave | Waiting for all four recovery arrays |
 | 1646582 | Launch four bounded 10k ZZ checks | Completed |
 | 1646727–1646730 | Four 10k ZZ configurations | Completed; immutable runtime, fresh seeds |
 | 1646731 / 1653805 | Validate/persist larger ZZ pilot | Filename discovery corrected; rerun passed for all four |
@@ -137,7 +139,7 @@ is only the first installment toward five million selected events. New Herwig
 workers supply 1% extra hard events to cover rare shower discards. Original
 queued tasks retain their old batch script, so remaining EOF failures are
 handled by the completion recovery controller. Current successful shard counts, including recovered tasks,
-are 55/56/56/58 across the four configurations, totaling 225/400.
+are 98/96/98/92 across the four configurations, totaling 384/400.
 Slurm completion is followed by independent summary validation and persistence.
 
 ## Production failures and recovery
@@ -181,7 +183,7 @@ persisted all four files. Selected reco counts are 77/77/71/81 (Higgs window:
 has negative selected weight, so positive data-like intensity construction
 requires explicit validation before pseudo-experiments.
 
-## Latest recovery checkpoint
+## Earlier recovery checkpoint (19:44 UTC)
 
 At 19:44 UTC, 13 signal shards remain failed: eight original NFS failures,
 four further finite-LHE Herwig failures, and one Pythia provenance failure.
@@ -195,6 +197,24 @@ recovery, and then releases final validation/persistence. At current throughput,
 roughly 2–3 hours remain for this first wave including recovery and summary;
 this is an estimate, not a scheduler guarantee. The five-million-selected-event
 requirements need substantial additional production beyond this wave.
+
+## Recovery now running (21:56 UTC)
+
+The original arrays are terminal. Controller 1645888 completed at 21:51 UTC
+and submitted 16 same-seed retries using the immutable runtime: two nominal,
+four scale-up, two scale-down, and eight Herwig. Their recorded causes are
+eight NFS failures, seven Herwig finite-input failures, and one unresolved
+Pythia provenance failure. No new failure category was encountered.
+
+Twelve retries are running and four Herwig tasks are queued. Summary 1636701
+now depends on all four recovery arrays, as verified in Slurm. It will validate
+all 400 compact shards, count selected reconstructed events, and copy verified
+files to /project. No complete-wave selected total is available yet.
+
+About 20–40 minutes of remaining runtime is plausible at the measured rate,
+plus queue delays and any further failure investigation. This is only the
+first signal wave; the five-million-selected targets require further waves.
+ZZ bulk production and neural unfolding have not started.
 
 ## Branches and directories
 

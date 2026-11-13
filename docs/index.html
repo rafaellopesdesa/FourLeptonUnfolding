@@ -16,7 +16,7 @@
     <h1>Unfolding the<br>Higgs decay.</h1>
     <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
     <div class="rule"></div>
-    <p><strong>Current phase:</strong> signal production; larger background pilot.</p>
+    <p><strong>Current phase:</strong> signal recovery and validation.</p>
     <p class="small">1k/10k signal and ZZ pilots validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
   </section>
   <section>
@@ -72,7 +72,7 @@
       <tr><td>gg_H</td><td>Herwig nominal</td><td>≥5M</td></tr>
       <tr><td>ZZ</td><td>Herwig nominal</td><td>≥5M</td></tr>
     </tbody></table>
-    <p>First signal wave: one million showered events per configuration, 16 workers. At 19:44 UTC, 225/400 shards completed, including all three initial Herwig retries. The four 10k ZZ pilots are validated and persisted.</p>
+    <p>First signal wave: one million showered events per configuration, At 21:56 UTC, 384/400 shards succeeded. The original arrays have finished; 12 recovery tasks are running and four are queued. Final validation waits for all retries. The four 10k ZZ pilots are validated and persisted.</p>
     <p class="small">Persist compact samples and models on /project. Stage active I/O on /work; remove validated intermediates. Soft storage targets: 300 GB /work and 2 TB /project.</p>
   </section>
   <section>
@@ -80,7 +80,7 @@
     <p>Two rare Herwig discards left 9,998 accepted events from a 10,000-event finite source. The same seed succeeds with 10,100 supplied hard events and 10,000 unique showered outputs.</p>
     <p>New Herwig workers use a 1% reserve. They retain original source identities, keep exceptions fatal, and never reopen the source. All three initial full-chain retries have passed.</p>
     <p>I also caused eight NFS failures by updating an executing shared script. Partial files were rejected. Runtime files are now frozen; new jobs and final recovery use an immutable snapshot.</p>
-    <p class="small">Controller 1645888 retries recognized failures once before summary 1636701. See <a href="PILOT_RESULTS.md#finite-herwig-input-and-runtime-deployment-failure">failure history and evidence</a>. No physics closure is inferred from these checks.</p>
+    <p class="small">Controller 1645888 has submitted all 16 remaining retries; summary 1636701 waits for them. See <a href="PILOT_RESULTS.md#finite-herwig-input-and-runtime-deployment-failure">failure history and evidence</a>. No physics closure is inferred from these checks.</p>
   </section>
   <section>
     <p class="eyebrow">Background / Larger pilot</p><h2>The ZZ chain also completes</h2>

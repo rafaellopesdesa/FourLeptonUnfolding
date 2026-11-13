@@ -208,3 +208,18 @@ is present. This confirms the need to validate the positive data-like intensity
 before constructing Poisson pseudo-experiments. Approximate acceptance is
 0.7–0.8%; this remains a timing pilot, not the five-million-selected background
 production. [Full signed sums, source counts and hashes](evidence/ZZ-summary-1653805.json).
+
+## 21:56 UTC checkpoint: original arrays finished, recovery running
+
+Wave one has 384/400 successful shards: 98 nominal, 96 scale-up, 98 scale-down,
+and 92 Herwig. These include the three initial successful Herwig retries.
+Controller 1645888 completed at 21:51 UTC and submitted 16 remaining retries
+on immutable code: arrays 1672510, 1672513, 1672518 and 1672519. Twelve tasks
+are running and four are queued. The seven additional EOF failures are from
+the original Slurm-spooled worker; recovery workers use the hard-event reserve.
+The other causes are eight NFS failures and one Pythia provenance rejection.
+
+Summary 1636701 is confirmed to wait for all four recovery arrays. The final
+selected-event totals and wave-wide persistence have not yet been produced.
+[Checkpoint and recovery task list](evidence/production-status-20261113-checkpoint3.json).
+The original wave is complete only after all required shards pass validation.
