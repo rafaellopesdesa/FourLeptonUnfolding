@@ -34,17 +34,17 @@ MODEL_FEATURE_ORDER = tuple(name.replace("reco_", "") for name in common.MODEL_F
 
 @dataclass(frozen=True)
 class RatioConfig:
-    """A compact ensemble with validation scheduled in optimizer updates."""
+    """Large-sample ensemble; override topology for the sparse-data reco pull."""
 
     ensemble_size: int = 4
-    hidden_layers: int = 2
-    neurons: int = 64
-    batch_size: int = 512
+    hidden_layers: int = 4
+    neurons: int = 1024
+    batch_size: int = 8192
     maximum_epochs: int = 100
     patience: int = 12
     learning_rate: float = 3.0e-4
     learning_rate_decay: float = 0.98
-    weight_decay: float = 1.0e-4
+    weight_decay: float = 0.0
     validation_interval_steps: int = 25
     learning_rate_decay_steps: int = 100
     validation_min_delta: float = 1.0e-5
@@ -238,6 +238,7 @@ class RatioEstimator:
         import torch
 
         config.validate()
+        common.validate_training_weight_decay(config.weight_decay)
         metadata = {} if metadata is None else metadata
         json.dumps(metadata, allow_nan=False)  # Fail before expensive training.
         target, target_stats = _checked_class(target_features, target_weights, target_splits, "target")

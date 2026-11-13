@@ -22,12 +22,28 @@ import uproot
 from BackgroundRemoval.common import (
     ANALYSIS_MASS_WINDOW, FEATURES, TREE_NAME, RAW_RATIO_ESTIMATOR, capture_file_provenance,
     assert_file_unchanged, deterministic_split, row_fingerprint_ids, sha256_file,
+    validate_training_weight_decay,
 )
 from .ratios import MODEL_FEATURE_ORDER, TRAINING_POLICY_VERSION, RatioConfig, RatioEstimator
 from .inputs import validate_background_weight_metadata
 
 TRUTH_FEATURES = tuple(name.replace("reco_", "truth_", 1) for name in FEATURES)
 FORMAT_VERSION = 3
+STAGES = ("reco_pull", "truth_push", "reco_likelihood")
+
+
+def _stage_configs(config: RatioConfig, overrides: dict[str, RatioConfig] | None) -> dict[str, RatioConfig]:
+    overrides = overrides or {}
+    if set(overrides) - set(STAGES):
+        raise ValueError(f"Unknown training stages: {sorted(set(overrides) - set(STAGES))}")
+    result = {name: overrides.get(name, config) for name in STAGES}
+    for value in result.values():
+        if not isinstance(value, RatioConfig):
+            raise ValueError("Stage settings must be RatioConfig instances")
+        value.validate()
+        if value.device != config.device:
+            raise ValueError("All stages must use the session device")
+    return result
 
 
 def _json_write(path: Path, payload: dict[str, Any]) -> None:
@@ -175,6 +191,10 @@ class OmniFoldSession:
         self.run_dir = run_dir
         self.manifest = manifest
         self.config = config
+        self.stage_configs = _stage_configs(config, {
+            name: replace(RatioConfig(**values), device=config.device)
+            for name, values in manifest.get("stage_configs", {}).items()
+        })
         self.iterations: list[IterationResult] = []
         self._truth: Sample | None = None
         self._manifest_sha = sha256_file(run_dir / "session.json")
@@ -198,6 +218,7 @@ class OmniFoldSession:
     @classmethod
     def create(cls, *, data_path: Path | str, mc_path: Path | str, run_dir: Path | str,
                truth_path: Path | str | None = None, config: RatioConfig | None = None,
+               stage_configs: dict[str, RatioConfig] | None = None,
                data_weight_branch: str = "weight_background_removed", mc_weight_branch: str = "weight",
                truth_weight_branch: str = "weight", seed: int = 12345) -> "OmniFoldSession":
         run_dir = Path(run_dir).expanduser().resolve()
@@ -207,6 +228,10 @@ class OmniFoldSession:
             raise ValueError("seed must be nonnegative")
         config = config or RatioConfig()
         config.validate()
+        validate_training_weight_decay(config.weight_decay)
+        stage_configs = _stage_configs(config, stage_configs)
+        for value in stage_configs.values():
+            validate_training_weight_decay(value.weight_decay)
         if mc_weight_branch in {"weight_nominal_pb", "weight_shape"} or truth_weight_branch in {"weight_nominal_pb", "weight_shape"}:
             raise ValueError("MC and truth weights must be expected event yields at the data luminosity; use 'weight'")
         if data_weight_branch == "background_removal_weight":
@@ -223,7 +248,9 @@ class OmniFoldSession:
                     "training_policy_version": TRAINING_POLICY_VERSION,
                     "ratio_estimator": dict(RAW_RATIO_ESTIMATOR),
                     "created_utc": datetime.now(timezone.utc).isoformat(), "inputs": inputs,
-                    "config": asdict(config), "features_reco": list(FEATURES),
+                    "config": asdict(config),
+                    "stage_configs": {name: asdict(value) for name, value in stage_configs.items()},
+                    "features_reco": list(FEATURES),
                     "features_truth": list(TRUTH_FEATURES),
                     "model_features": list(MODEL_FEATURE_ORDER),
                     "settings": {"seed": seed, "data_weight_branch": data_weight_branch,
@@ -323,6 +350,17 @@ class OmniFoldSession:
         saved_config = RatioConfig(**self.manifest["config"])
         if replace(self.config, device=saved_config.device) != saved_config:
             raise ValueError("Training settings changed; start a new campaign to change its training policy")
+        saved_stages = _stage_configs(saved_config, {
+            name: RatioConfig(**values)
+            for name, values in self.manifest.get("stage_configs", {}).items()
+        })
+        if set(self.stage_configs) != set(STAGES) or any(
+            replace(self.stage_configs[name], device=saved_config.device) != saved_stages[name]
+            for name in STAGES
+        ):
+            raise ValueError("Training settings changed; start a new campaign to change stage settings")
+        for value in self.stage_configs.values():
+            validate_training_weight_decay(value.weight_decay)
         # A kernel restart/concurrent notebook must never overwrite another run.
         index = len(self.iterations) + 1
         destination = self.run_dir / "iterations" / f"iteration_{index:04d}"
@@ -353,17 +391,20 @@ class OmniFoldSession:
             old = np.asarray(previous[matched])
             xs, zs, splits = mc.reco[matched], mc.truth[matched], mc.splits[matched]
             temporary = Path(tempfile.mkdtemp(prefix=f".iteration_{index:04d}_", dir=destination.parent))
-            config = replace(self.config, seed=self.config.seed + 10000 * index, overwrite=False)
+            configs = {name: replace(self.stage_configs[name],
+                                     seed=self.stage_configs[name].seed + 10000 * index + offset,
+                                     overwrite=False)
+                       for offset, name in enumerate(STAGES)}
             print(f"Iteration {index}: 1/3 reconstructed data / current signal MC", flush=True)
             pull = RatioEstimator.fit(data.reco, data.weights, xs, base * old,
                                       target_splits=data.splits, reference_splits=splits,
-                                      output_dir=temporary / "reco_pull", config=config,
+                                      output_dir=temporary / "reco_pull", config=configs["reco_pull"],
                                       metadata={"stage": "reco_pull", "iteration": index, "reference": "previous truth-weighted MC"})
             pulled = base * old * pull.predict(xs)["full_ratio"]
             print(f"Iteration {index}: 2/3 cumulative particle-level ratio", flush=True)
             push = RatioEstimator.fit(zs, pulled, zs, base,
                                       target_splits=splits, reference_splits=splits,
-                                      output_dir=temporary / "truth_push", config=replace(config, seed=config.seed + 1),
+                                      output_dir=temporary / "truth_push", config=configs["truth_push"],
                                       metadata={"stage": "truth_push", "iteration": index, "reference": "original matched fiducial MC", "cumulative": True})
             # This is already cumulative; do not multiply by previous again.
             cumulative = np.asarray(push.predict(mc.truth)["full_ratio"], dtype=np.float64)
@@ -372,7 +413,7 @@ class OmniFoldSession:
             print(f"Iteration {index}: 3/3 updated folded MC / original folded MC", flush=True)
             folded = RatioEstimator.fit(xs, base * cumulative[matched], xs, base,
                                         target_splits=splits, reference_splits=splits,
-                                        output_dir=temporary / "reco_likelihood", config=replace(config, seed=config.seed + 2),
+                                        output_dir=temporary / "reco_likelihood", config=configs["reco_likelihood"],
                                         metadata={"stage": "reco_likelihood", "iteration": index, "reference": "original unweighted-by-OmniFold MC", "cumulative": True})
             np.save(temporary / "truth_weights.npy", cumulative, allow_pickle=False)
             record = {"index": index, "session_sha256": self._manifest_sha,

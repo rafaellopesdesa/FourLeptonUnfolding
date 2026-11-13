@@ -87,11 +87,11 @@ in Training, so including it here would compare the purity-weighted data to a
 different target. The plotted values are nevertheless reconstruction-level
 variables in both samples. No `ZZ` sample enters this report.
 
-The eight decay variables used by the purity model are `Phi`, `Phi1`, `Psi`,
-the three polar-angle cosines, `m_Z1`, and `m_Z2`. The other four shared plots
-(`m_ZZ`, `y_ZZ`, `pT_ZZ`, and channel) are useful out-of-model validation
-projections, but the eight-dimensional density-ratio construction does not by
-itself guarantee exact background subtraction in those four observables.
+The seven decay variables used by the purity model are `Phi`, `Psi`,
+the three polar-angle cosines, `m_Z1`, and `m_Z2`. The other five shared plots
+(`Phi1`, `m_ZZ`, `y_ZZ`, `pT_ZZ`, and channel) are useful out-of-model validation
+projections, but the seven-dimensional density-ratio construction does not by
+itself guarantee exact background subtraction in those five observables.
 
 Run it after the directory-level Application command has produced the
 decorated directory:

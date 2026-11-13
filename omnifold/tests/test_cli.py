@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import io
 import json
 import os
@@ -105,7 +105,7 @@ class OmniFoldCLITest(unittest.TestCase):
         settings = dict(ensemble_size=5, hidden_layers=2, neurons=16, batch_size=64,
                         maximum_epochs=3, patience=2, learning_rate=.0007,
                         learning_rate_decay=.9, max_retries=1, seed=91, logit_clip=12.,
-                        weight_decay=2e-4, validation_interval_steps=7,
+                        weight_decay=0., validation_interval_steps=7,
                         learning_rate_decay_steps=40, validation_min_delta=3e-5,
                         baseline_tolerance=.015,
                         inference_batch_size=128, steps_per_epoch=2, device="cpu")
@@ -122,6 +122,36 @@ class OmniFoldCLITest(unittest.TestCase):
             "truth_weight_branch": "weight"})
         np.testing.assert_array_equal(session._data.weights, [162., -2., 96.])
         self.reports.assert_not_called()
+
+    def test_stage_override_reaches_only_pull_and_survives_resume(self):
+        path = self.root / "stages.json"
+        path.write_text(json.dumps({"reco_pull": {"hidden_layers": 2, "neurons": 32,
+                                                "batch_size": 64, "seed": 42}}))
+        self.train("--stage-config-json", path, "--device", "cpu", "--no-reports")
+        first = _HistogramRatio.calls[:3]
+        self.assertEqual([call["config"]["neurons"] for call in first], [32, 1024, 1024])
+        self.assertEqual([call["config"]["seed"] for call in first], [10042, 19120908, 19120909])
+        self.success("resume", "--run-dir", self.run_dir, "--device", "cpu", "--no-reports")
+        self.assertEqual([call["config"]["neurons"] for call in _HistogramRatio.calls[3:]], [32, 1024, 1024])
+        session = OmniFoldSession.load(self.run_dir, device="cpu")
+        session.stage_configs["reco_pull"] = replace(session.stage_configs["reco_pull"], neurons=64)
+        with self.assertRaisesRegex(ValueError, "Training settings changed"):
+            session.step()
+        self.assertFalse((self.run_dir / ".training.lock").exists())
+
+    def test_invalid_stage_overrides_fail_without_creating_campaign(self):
+        path = self.root / "stages.json"
+        for values in ({"unknown": {}}, {"reco_pull": {"dropout": .1}},
+                       {"reco_pull": {"weight_decay": .1}}, {"reco_pull": {"neurons": 0}},
+                       {"reco_pull": {"device": "cuda"}}, []):
+            with self.subTest(values=values):
+                path.write_text(json.dumps(values))
+                code, _, _ = self.invoke("train", "--run-dir", self.run_dir,
+                    "--data-root", self.data, "--gg-h-root", self.mc,
+                    "--stage-config-json", path, "--no-reports")
+                self.assertEqual(code, 1)
+                self.assertFalse(self.run_dir.exists())
+        self.assertEqual(_HistogramRatio.calls, [])
 
     def test_previous_raw_policy_can_report_but_cli_resume_requires_new_campaign(self):
         session = self.create_from_api()

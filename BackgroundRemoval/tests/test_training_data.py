@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from pathlib import Path
 import sys
 import tempfile
@@ -16,6 +17,7 @@ from BackgroundRemoval.common import (
     weight_measure_contract,
 )
 from BackgroundRemoval.Training.train_background_ratio import (
+    CachePaths,
     MemberResult,
     SelectedChunk,
     WeightedStatistics,
@@ -23,6 +25,7 @@ from BackgroundRemoval.Training.train_background_ratio import (
     _parser,
     _bad_members,
     _draw_absolute_weighted,
+    _load_cache,
     _scan_inputs,
     _selected_chunks,
     train,
@@ -65,6 +68,23 @@ class _FakeCorrectionBundle:
 
 
 class TrainingDataTest(unittest.TestCase):
+    def test_cache_mappings_close_before_directory_cleanup_even_on_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths = CachePaths(*(Path(directory) / name for name in (
+                "features.npy", "weights.npy", "splits.npy"
+            )))
+            for path in (paths.features, paths.weights, paths.splits):
+                np.save(path, np.arange(5))
+            with self.assertRaisesRegex(RuntimeError, "interrupted"):
+                with ExitStack() as resources:
+                    cache = _load_cache({"signal": paths}, resources)
+                    mappings = [array._mmap for array in (
+                        cache["signal"].features, cache["signal"].weights,
+                        cache["signal"].splits,
+                    )]
+                    raise RuntimeError("interrupted")
+            self.assertTrue(all(mapping.closed for mapping in mappings))
+
     def test_background_training_defaults_keep_topology_with_step_validation_controls(self):
         args = _parser().parse_args([
             "--gg-h-root", "gg_H.root",
@@ -75,7 +95,7 @@ class TrainingDataTest(unittest.TestCase):
         self.assertEqual(args.hidden_layers, 4)
         self.assertEqual(args.neurons, 1024)
         self.assertEqual(args.batch_size, 8192)
-        self.assertEqual(args.weight_decay, 1.0e-4)
+        self.assertEqual(args.weight_decay, 0.0)
         self.assertEqual(args.validation_interval_steps, 25)
         self.assertEqual(args.learning_rate_decay_steps, 100)
         self.assertEqual(args.validation_min_delta, 1.0e-5)

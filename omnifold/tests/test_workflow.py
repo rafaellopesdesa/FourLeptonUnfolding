@@ -399,7 +399,7 @@ class WorkflowTest(unittest.TestCase):
         path.write_text(json.dumps(original))
         self.assertEqual(OmniFoldSession.load(session.run_dir).manifest["ratio_estimator"], original["ratio_estimator"])
 
-    def test_shared_compact_config_reaches_all_three_stages(self):
+    def test_shared_large_config_reaches_all_three_stages(self):
         session = self.create()
         self.assertEqual(session.manifest["training_policy_version"], 1)
         session.step()
@@ -407,8 +407,8 @@ class WorkflowTest(unittest.TestCase):
             self.assertEqual(call["target"].shape[1], 7)
             self.assertEqual(call["reference"].shape[1], 7)
             config = call["config"]
-            self.assertEqual((config["hidden_layers"], config["neurons"], config["batch_size"]), (2, 64, 512))
-            self.assertEqual(config["weight_decay"], 1e-4)
+            self.assertEqual((config["hidden_layers"], config["neurons"], config["batch_size"]), (4, 1024, 8192))
+            self.assertEqual(config["weight_decay"], 0.0)
             self.assertEqual(config["validation_interval_steps"], 25)
             self.assertEqual(config["baseline_tolerance"], .01)
 
@@ -438,7 +438,7 @@ class WorkflowTest(unittest.TestCase):
 
     def test_live_training_policy_changes_require_new_campaign(self):
         session = self.create()
-        session.config = replace(session.config, weight_decay=0.0)
+        session.config = replace(session.config, weight_decay=1.0e-4)
         with self.assertRaisesRegex(ValueError, "Training settings changed"):
             session.step()
         self.assertEqual(_HistogramRatio.calls, [])

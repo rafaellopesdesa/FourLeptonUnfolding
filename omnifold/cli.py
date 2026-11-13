@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import fields
+from dataclasses import fields, replace
 import glob
 import json
 import os
@@ -63,6 +63,8 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--data-weight-branch", default="weight_background_removed")
     train.add_argument("--mc-weight-branch", default="weight")
     train.add_argument("--truth-weight-branch", default="weight")
+    train.add_argument("--stage-config-json", type=Path,
+                       help="JSON object of per-stage RatioConfig overrides; omitted fields inherit the common settings")
     train.add_argument("--split-seed", type=_nonnegative_int, default=12345,
                        help="Fixed event-partition seed (default: 12345)")
     network = train.add_argument_group("Network settings (same defaults as RatioConfig)")
@@ -71,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
         "patience": "Validation checks without sufficient improvement before stopping",
         "maximum_epochs": "Optimizer-update budget in nominal epochs (maximum_epochs times steps_per_epoch)",
         "learning_rate_decay": "Learning-rate multiplier per learning_rate_decay_steps optimizer updates",
-        "weight_decay": "L2 regularization coefficient",
+        "weight_decay": "Must be zero; NN regularization is disabled by project policy",
         "validation_interval_steps": "Maximum optimizer updates between validation checks (automatically reduced for the smaller fit bank)",
         "learning_rate_decay_steps": "Optimizer updates over which learning_rate_decay is applied",
         "validation_min_delta": "Minimum validation BCE improvement that resets patience",
@@ -206,9 +208,19 @@ def _run(args: argparse.Namespace) -> None:
         config = RatioConfig(**{field.name: getattr(args, field.name)
                                 for field in fields(RatioConfig) if field.name != "overwrite"})
         config.validate()
+        stage_configs = {}
+        if args.stage_config_json is not None:
+            overrides = json.loads(args.stage_config_json.read_text(encoding="utf-8"))
+            if not isinstance(overrides, dict):
+                raise ValueError("Stage configuration must be a JSON object")
+            allowed = {field.name for field in fields(RatioConfig)} - {"device", "overwrite"}
+            for name, values in overrides.items():
+                if not isinstance(values, dict) or set(values) - allowed:
+                    raise ValueError(f"Invalid stage configuration fields for {name}")
+                stage_configs[name] = replace(config, **values)
         session = OmniFoldSession.create(
             data_path=args.data_root, mc_path=args.gg_h_root, truth_path=args.truth_root,
-            run_dir=args.run_dir, config=config, seed=args.split_seed,
+            run_dir=args.run_dir, config=config, stage_configs=stage_configs, seed=args.split_seed,
             data_weight_branch=args.data_weight_branch, mc_weight_branch=args.mc_weight_branch,
             truth_weight_branch=args.truth_weight_branch)
     else:

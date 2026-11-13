@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 from datetime import datetime, timezone
 import json
 import math
@@ -37,6 +38,7 @@ from BackgroundRemoval.common import (
     sha256_file,
     toolkit_runtime_provenance,
     transformed_features,
+    validate_training_weight_decay,
     weight_measure_contract,
 )
 from BackgroundRemoval.Training.train_background_ratio import (
@@ -399,8 +401,7 @@ def _validate_args(args: argparse.Namespace) -> tuple[Path, Path, Path, Path, An
         0.0 < args.learning_rate_decay <= 1.0
     ):
         raise ValueError("learning-rate decay must be finite and lie in (0, 1]")
-    if not np.isfinite(args.weight_decay) or args.weight_decay < 0.0:
-        raise ValueError("weight decay must be finite and nonnegative")
+    validate_training_weight_decay(args.weight_decay)
     for name in ("validation_interval_steps", "learning_rate_decay_steps"):
         value = getattr(args, name)
         if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
@@ -515,7 +516,7 @@ def train(args: argparse.Namespace) -> Path:
     try:
         with tempfile.TemporaryDirectory(
             prefix="fourlepton-correction-cache-", dir=cache_parent
-        ) as cache_name:
+        ) as cache_name, ExitStack() as cache_resources:
             cache_directory = Path(cache_name)
             cache_paths, reference_component_path = _make_cache(
                 cache_directory,
@@ -534,10 +535,11 @@ def train(args: argparse.Namespace) -> Path:
                 ("ZZ_pythia", zz_path),
             ):
                 assert_file_unchanged(path, input_provenance[name])
-            cache: dict[str, CachedClass] = _load_cache(cache_paths)
+            cache: dict[str, CachedClass] = _load_cache(cache_paths, cache_resources)
             reference_components = np.load(
                 reference_component_path, mmap_mode="r"
             )
+            cache_resources.callback(reference_components._mmap.close)
             effective_steps_per_epoch = (
                 args.steps_per_epoch
                 if args.steps_per_epoch is not None
@@ -562,7 +564,7 @@ def train(args: argparse.Namespace) -> Path:
                 "sampling_coefficient": "sign(w) * sum(abs(w)) / sum(w)",
                 "dropout": 0.0,
                 "weight_decay": args.weight_decay,
-                "regularization": "coupled L2 on weight matrices; biases excluded",
+                "regularization": "none",
                 "optimizer": "NAdam",
                 "learning_rate": args.learning_rate,
                 "learning_rate_schedule": "exponential_per_optimizer_step",
@@ -875,8 +877,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="Validation checks without a meaningful improvement")
     parser.add_argument("--learning-rate", type=float, default=3.0e-4)
     parser.add_argument("--learning-rate-decay", type=float, default=0.98)
-    parser.add_argument("--weight-decay", type=float, default=1.0e-4,
-                        help="Coupled L2 on weight matrices; validation uses unpenalized signed BCE")
+    parser.add_argument("--weight-decay", type=float, default=0.0,
+                        help="Must be zero; NN regularization is disabled by project policy")
     parser.add_argument("--validation-interval-steps", type=int, default=25,
                         help="Maximum optimizer steps between validation checks")
     parser.add_argument("--learning-rate-decay-steps", type=int, default=100,

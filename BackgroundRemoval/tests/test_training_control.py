@@ -36,7 +36,7 @@ def _architecture(**updates):
         "learning_rate": 0.01,
         "learning_rate_decay": 0.8,
         "learning_rate_decay_steps": 4,
-        "weight_decay": 1.0e-4,
+        "weight_decay": 0.0,
         "validation_interval_steps": 5,
         "validation_min_delta": 1.0e-5,
         "baseline_tolerance": 0.01,
@@ -151,27 +151,17 @@ class TrainingControlTest(unittest.TestCase):
         # No NaN placeholder is allowed in persisted training histories.
         json.dumps(result.history, allow_nan=False)
 
-    def test_weight_decay_penalizes_only_matrix_weights_and_stays_out_of_validation(self):
-        cache = _cache()
-        for arrays in cache.values():
-            arrays.features.fill(0.0)
-        result, _, _ = self._run(
-            loss_at_step=None,
-            architecture=_architecture(weight_decay=0.2),
-            cache=cache,
-            steps_per_epoch=1,
-        )
-        parameter_groups = self.last_optimizers[0].param_groups
-        decays = [(parameter.ndim, group["weight_decay"]) for group in parameter_groups for parameter in group["params"]]
-        self.assertIn((2, 0.2), decays)
-        self.assertIn((1, 0.0), decays)
-        self.assertTrue(all(decay == 0.0 for ndim, decay in decays if ndim < 2))
-        initial_penalty = 0.5 * 0.2 * len(MODEL_FEATURES) * 0.01 ** 2
-        # Identity preprocessing keeps the zero fixture at zero: logit=0.
-        expected_bce = np.log(2.0)
-        self.assertAlmostEqual(result.history["validation_loss"][0], expected_bce, places=6)
-        self.assertAlmostEqual(result.history["regularization_loss"][0], initial_penalty, places=9)
-        self.assertAlmostEqual(result.history["objective_loss"][1] - result.history["training_loss"][1], initial_penalty, places=9)
+    def test_nonzero_weight_decay_is_rejected_before_model_construction(self):
+        with self.assertRaisesRegex(ValueError, "must be zero"):
+            self._run(loss_at_step=None, architecture=_architecture(weight_decay=0.2))
+
+    def test_optimizer_and_objective_have_no_regularization(self):
+        result, _, _ = self._run(loss_at_step=None, steps_per_epoch=1)
+        self.assertTrue(all(group["weight_decay"] == 0.0
+                            for group in self.last_optimizers[0].param_groups))
+        self.assertTrue(all(value == 0.0 for value in result.history["regularization_loss"]))
+        for bce, objective in zip(result.history["training_loss"], result.history["objective_loss"]):
+            self.assertEqual(bce, objective)
 
     def test_initial_checkpoint_is_kept_if_the_first_update_overfits(self):
         import torch

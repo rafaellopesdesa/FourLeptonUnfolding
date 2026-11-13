@@ -78,13 +78,13 @@ class RatioContractTests(unittest.TestCase):
             self.assertEqual(outputs["shape_ratio"][index], alone["shape_ratio"][0])
         self.assertNotAlmostEqual(outputs["shape_ratio"][0], np.mean(scores[0] / (1.0 - scores[0])))
 
-    def test_configuration_uses_compact_regularized_training_defaults(self):
+    def test_configuration_uses_large_unregularized_training_defaults(self):
         config = ratios.RatioConfig()
         config.validate()
-        self.assertEqual((config.ensemble_size, config.hidden_layers, config.neurons, config.batch_size), (4, 2, 64, 512))
+        self.assertEqual((config.ensemble_size, config.hidden_layers, config.neurons, config.batch_size), (4, 4, 1024, 8192))
         self.assertEqual((config.weight_decay, config.validation_interval_steps,
                           config.learning_rate_decay_steps, config.validation_min_delta,
-                          config.baseline_tolerance), (1e-4, 25, 100, 1e-5, .01))
+                          config.baseline_tolerance), (0.0, 25, 100, 1e-5, .01))
         replace(config, hidden_layers=3, neurons=128).validate()
         for replacement in ({"ensemble_size": 3}, {"batch_size": 7}, {"logit_clip": np.inf},
                             {"learning_rate": 0.0}, {"steps_per_epoch": 0}, {"max_retries": -1},
@@ -214,7 +214,7 @@ class RatioTrainingTests(unittest.TestCase):
                      "validation_min_delta", "baseline_tolerance"):
             with self.subTest(name=name):
                 changed = json.loads(json.dumps(original))
-                changed["architecture"][name] *= 2
+                changed["architecture"][name] += 1
                 path.write_text(json.dumps(changed))
                 with self.assertRaisesRegex(ValueError, "training policy mismatch"):
                     ratios.RatioEstimator.load(destination, device="cpu")
