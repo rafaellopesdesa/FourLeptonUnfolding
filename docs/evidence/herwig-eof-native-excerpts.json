@@ -1,0 +1,238 @@
+{
+  "source": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/herwig_eof/campaigns/herwig_eof_diagnostic_20261113/jobs/job_000000_seed40000005/intermediates/four-lepton-1642288-000000.fkRbTC/generation/FourLeptonLHERun-S40000005.log",
+  "sha256": "80094bce3f2012106595daa192c754d5bdd1949826be8a2129dfb8259d5beb83",
+  "lines": [
+    {
+      "number": 6,
+      "text": ">> Herwig 7.3.0 / ThePEG 2.3.0"
+    },
+    {
+      "number": 7,
+      "text": ""
+    },
+    {
+      "number": 8,
+      "text": "* A warning exception occurred in the initialization of EventGenerator: "
+    },
+    {
+      "number": 9,
+      "text": "LesHouchesReader LesHouchesReader has the IDWTUP flag set to -4 which is not supported by this reader, the produced events may not be sampled correctly. It is up to sub-classes of LesHouchesReader to correctly convert to match IDWTUP +/- 1. Will try to make intelligent guesses to get correct statistics."
+    },
+    {
+      "number": 10,
+      "text": "In most cases this should be sufficient. Unset <interface>WeightWarnings</interface> to avoid this message,or set <interface>Weighted</interface> to on."
+    },
+    {
+      "number": 11,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 3.23416) for g to b"
+    },
+    {
+      "number": 12,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.17046) for g to bbar"
+    },
+    {
+      "number": 13,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.08681) for g to b"
+    },
+    {
+      "number": 14,
+      "text": "** An event exception of type ThePEG::Exception occurred while generating event number 661: "
+    },
+    {
+      "number": 15,
+      "text": "Remnant extraction failed in ShowerHandler::cascade() from primary interaction. Please check the PDFs you are using and set/unset them if necessary."
+    },
+    {
+      "number": 16,
+      "text": "The event will be discarded."
+    },
+    {
+      "number": 17,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.59224) for g to bbar"
+    },
+    {
+      "number": 18,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.17698) for g to b"
+    },
+    {
+      "number": 19,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 3.46638) for g to b"
+    },
+    {
+      "number": 20,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.0193) for g to bbar"
+    },
+    {
+      "number": 21,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 6.39443) for g to b"
+    },
+    {
+      "number": 22,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 2.96817) for g to b"
+    },
+    {
+      "number": 23,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 3.64206) for g to b"
+    },
+    {
+      "number": 24,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.84577) for g to b"
+    },
+    {
+      "number": 25,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 2.77706) for g to b"
+    },
+    {
+      "number": 26,
+      "text": "** An event exception of type ThePEG::Exception occurred while generating event number 4687: "
+    },
+    {
+      "number": 27,
+      "text": "Too many tries 100000to generate decay of 458D_s0(2590)+  100431 [332]    "
+    },
+    {
+      "number": 28,
+      "text": "                                 6.189     1.597   -48.511    48.993     2.486"
+    },
+    {
+      "number": 29,
+      "text": "in HwDecayHandler::performDecay"
+    },
+    {
+      "number": 30,
+      "text": "The event will be discarded."
+    },
+    {
+      "number": 31,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 158.724) for g to b"
+    },
+    {
+      "number": 32,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.77089) for g to bbar"
+    },
+    {
+      "number": 33,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.68884) for g to b"
+    },
+    {
+      "number": 34,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 3.10252) for g to b"
+    },
+    {
+      "number": 35,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.06919) for g to b"
+    },
+    {
+      "number": 36,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 4.17217) for g to bbar"
+    },
+    {
+      "number": 37,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 2.74248) for g to b"
+    },
+    {
+      "number": 38,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 1.49013) for g to bbar"
+    },
+    {
+      "number": 39,
+      "text": "PDFVeto warning: Ratio > GtobbbarSudakov:PDFmax (by a factor of 14.2269) for g to bbar"
+    },
+    {
+      "number": 40,
+      "text": "*** An run exception of type ThePEG::Exception occurred while generating event number 9999: "
+    },
+    {
+      "number": 41,
+      "text": "More events requested than available in LesHouchesReader LesHouchesReader"
+    },
+    {
+      "number": 42,
+      "text": "This exception is too serious. Execution will be stopped."
+    },
+    {
+      "number": 43,
+      "text": "******************************************************************************"
+    },
+    {
+      "number": 44,
+      "text": "Event number 10000 (id: FourLeptonLHERun-S40000005) performed by LesHouchesHandler"
+    },
+    {
+      "number": 45,
+      "text": "Weight: 1"
+    },
+    {
+      "number": 46,
+      "text": "=============================================================================="
+    },
+    {
+      "number": 47,
+      "text": ""
+    },
+    {
+      "number": 48,
+      "text": "--- Colliding particles:"
+    },
+    {
+      "number": 49,
+      "text": "  1        p+    2212  (7,9,95,124,162,186,209,264,313,334,351)   "
+    },
+    {
+      "number": 50,
+      "text": "                                 0.000     0.000  6800.000  6800.000     0.938"
+    },
+    {
+      "number": 51,
+      "text": "  2        p+    2212  (8,22,96,131,165,197,214,271,318,341,356)   "
+    },
+    {
+      "number": 3643,
+      "text": "     Sum of momenta:                 0         0         0  1.36e+04  1.36e+04"
+    },
+    {
+      "number": 3644,
+      "text": ""
+    },
+    {
+      "number": 3645,
+      "text": "The following exception classes were reported in this run:"
+    },
+    {
+      "number": 3646,
+      "text": "ThePEG::Exception eventerror (2 times)"
+    },
+    {
+      "number": 3647,
+      "text": "ThePEG::Exception runerror (1 times)"
+    },
+    {
+      "number": 3648,
+      "text": "ThePEG::LesHouchesReader::LesHouchesInitError warning (1 times)"
+    },
+    {
+      "number": 3649,
+      "text": ""
+    },
+    {
+      "number": 3650,
+      "text": "Miscellaneous output from modules to the standard output:"
+    },
+    {
+      "number": 3651,
+      "text": ""
+    },
+    {
+      "number": 3652,
+      "text": "Statistics for the UE process: "
+    },
+    {
+      "number": 3653,
+      "text": "                                       generated    number of    Cross-section"
+    },
+    {
+      "number": 3654,
+      "text": "                                          events     attempts             (nb)"
+    }
+  ]
+}

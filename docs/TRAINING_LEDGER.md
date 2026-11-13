@@ -54,7 +54,7 @@ Together with **86 background-removal and 5 endpoint tests: 173 tests pass**.
 
 ## Analysis, generation and native matrix-element checks
 
-The final component outcomes total **422 passing checks**. This total combines
+The final component outcomes total **428 passing checks**. This total combines
 successful component runs, not one monolithic test invocation:
 
 | Component | Passed | Slurm evidence |
@@ -62,7 +62,8 @@ successful component runs, not one monolithic test invocation:
 | Endpoint / background / OmniFold | 5 / 86 / 82 | 1628168 |
 | Analysis | 132 | 1633505 |
 | Tools / Simulation | 11 / 36 | 1632409 |
-| Generation / BatchSubmit / Plotting | 18 / 7 / 13 | 1632409 |
+| Generation / BatchSubmit | 23 / 8 | 1644270 |
+| Plotting | 13 | 1632409 |
 | Native SMEFT | 32 | 1633186 |
 
 Job 1632409 passed its first six suites, then reported an SMEFT teardown
@@ -93,6 +94,18 @@ normalized signal configurations can be read by the systematic trainer in
 signal/extended regions, with and without fiducial selection. OmniFold reads
 234 fiducial Pythia MC events and 201 fiducial Herwig truth events with seven
 coordinates. No classifier fit is performed on these undersized samples.
+
+The latest targeted run 1644270 passes 23 Generation and 8 BatchSubmit checks.
+New regressions exercise separate hard/showered counts, skipped source IDs,
+finite-source exhaustion, invalid reserves, external-input restrictions, and
+native Herwig diagnostic retention. The real buffered-seed check 1643289
+produces 10,000 unique showered source identities from 10,100 supplied events;
+full-chain recovery tasks 1644720_4 and _10 also pass. The revised summary
+passes on the existing 10k signal pilot in 1646583, including its one repeated
+Herwig source occurrence. These runs contain no neural fits.
+
+Evidence: [targeted regression log](evidence/physics-checks-1644270.log) and
+[buffer provenance](evidence/herwig-buffer-1643289.json).
 
 ## Production fits: pending
 

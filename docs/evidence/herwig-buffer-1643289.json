@@ -1,0 +1,18 @@
+{
+  "association": "explicit source-event identity; not accepted-output ordinal",
+  "event_number": "lhe_event_index_1based",
+  "hard_decay_configuration": "qtilde_full_history_no_yfs",
+  "hard_decay_definition": "herwig_qtilde_original_decay",
+  "hepmc_event_count": 10000,
+  "hepmc_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/herwig_eof/buffer-1643289/events.hepmc",
+  "hepmc_format": "HepMC2",
+  "hepmc_repeated_source_events": 0,
+  "hepmc_sha256": "bae4ef0b93778b46b28ea4a2a214374e1e8116f2d4cff6b0856adfcfd2cc4029",
+  "hepmc_unique_source_events": 10000,
+  "lhe_event_count": 10100,
+  "lhe_file": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/herwig_eof/buffer-1643289/pwgevents.lhe",
+  "lhe_sha256": "60a94256f67db9874312c85847e1c422c8d307a65fb03bbb94a83a622424dd44",
+  "process": "gg_H",
+  "schema_version": 1,
+  "shower": "herwig"
+}

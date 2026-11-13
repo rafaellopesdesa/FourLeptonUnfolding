@@ -1,0 +1,936 @@
+{
+  "updated_utc": "2026-11-13T18:21:18.626700+00:00",
+  "jobs": [
+    {
+      "job_id": "1636684_0",
+      "state": "COMPLETED",
+      "elapsed": "00:12:26",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_1",
+      "state": "COMPLETED",
+      "elapsed": "00:12:25",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_2",
+      "state": "COMPLETED",
+      "elapsed": "00:11:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_3",
+      "state": "COMPLETED",
+      "elapsed": "00:11:33",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_4",
+      "state": "COMPLETED",
+      "elapsed": "00:12:14",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_5",
+      "state": "COMPLETED",
+      "elapsed": "00:10:13",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_6",
+      "state": "COMPLETED",
+      "elapsed": "00:11:59",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_7",
+      "state": "COMPLETED",
+      "elapsed": "00:11:28",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_8",
+      "state": "COMPLETED",
+      "elapsed": "00:10:42",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_9",
+      "state": "COMPLETED",
+      "elapsed": "00:10:54",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_10",
+      "state": "COMPLETED",
+      "elapsed": "00:12:12",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_11",
+      "state": "COMPLETED",
+      "elapsed": "00:12:12",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_12",
+      "state": "COMPLETED",
+      "elapsed": "00:11:42",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_13",
+      "state": "COMPLETED",
+      "elapsed": "00:10:58",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_14",
+      "state": "COMPLETED",
+      "elapsed": "00:12:14",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_15",
+      "state": "COMPLETED",
+      "elapsed": "00:12:14",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_16",
+      "state": "COMPLETED",
+      "elapsed": "00:11:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_17",
+      "state": "COMPLETED",
+      "elapsed": "00:11:43",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_18",
+      "state": "COMPLETED",
+      "elapsed": "00:12:16",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_19",
+      "state": "COMPLETED",
+      "elapsed": "00:12:17",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_20",
+      "state": "COMPLETED",
+      "elapsed": "00:11:43",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_21",
+      "state": "FAILED",
+      "elapsed": "00:03:22",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636684_22",
+      "state": "COMPLETED",
+      "elapsed": "00:11:57",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_23",
+      "state": "COMPLETED",
+      "elapsed": "00:11:50",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_24",
+      "state": "COMPLETED",
+      "elapsed": "00:11:21",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_25",
+      "state": "COMPLETED",
+      "elapsed": "00:11:38",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_26",
+      "state": "COMPLETED",
+      "elapsed": "00:11:05",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_27",
+      "state": "COMPLETED",
+      "elapsed": "00:12:02",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_28",
+      "state": "COMPLETED",
+      "elapsed": "00:11:50",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_29",
+      "state": "RUNNING",
+      "elapsed": "00:05:41",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_30",
+      "state": "RUNNING",
+      "elapsed": "00:01:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_31",
+      "state": "RUNNING",
+      "elapsed": "00:00:24",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_32",
+      "state": "RUNNING",
+      "elapsed": "00:00:24",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636684_[39-99%4]",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_0",
+      "state": "COMPLETED",
+      "elapsed": "00:11:25",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_1",
+      "state": "COMPLETED",
+      "elapsed": "00:11:38",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_2",
+      "state": "COMPLETED",
+      "elapsed": "00:11:39",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_3",
+      "state": "COMPLETED",
+      "elapsed": "00:11:56",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_4",
+      "state": "COMPLETED",
+      "elapsed": "00:11:40",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_5",
+      "state": "COMPLETED",
+      "elapsed": "00:11:40",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_6",
+      "state": "COMPLETED",
+      "elapsed": "00:11:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_7",
+      "state": "COMPLETED",
+      "elapsed": "00:11:32",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_8",
+      "state": "COMPLETED",
+      "elapsed": "00:11:40",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_9",
+      "state": "COMPLETED",
+      "elapsed": "00:10:52",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_10",
+      "state": "COMPLETED",
+      "elapsed": "00:11:32",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_11",
+      "state": "COMPLETED",
+      "elapsed": "00:11:32",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_12",
+      "state": "COMPLETED",
+      "elapsed": "00:11:41",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_13",
+      "state": "COMPLETED",
+      "elapsed": "00:10:57",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_14",
+      "state": "COMPLETED",
+      "elapsed": "00:11:35",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_15",
+      "state": "COMPLETED",
+      "elapsed": "00:11:12",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_16",
+      "state": "COMPLETED",
+      "elapsed": "00:11:09",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_17",
+      "state": "COMPLETED",
+      "elapsed": "00:11:11",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_18",
+      "state": "COMPLETED",
+      "elapsed": "00:11:18",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_19",
+      "state": "COMPLETED",
+      "elapsed": "00:10:56",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_20",
+      "state": "FAILED",
+      "elapsed": "00:03:15",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636696_21",
+      "state": "FAILED",
+      "elapsed": "00:03:15",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636696_22",
+      "state": "FAILED",
+      "elapsed": "00:03:20",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636696_23",
+      "state": "FAILED",
+      "elapsed": "00:03:16",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636696_24",
+      "state": "COMPLETED",
+      "elapsed": "00:11:41",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_25",
+      "state": "COMPLETED",
+      "elapsed": "00:10:20",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_26",
+      "state": "COMPLETED",
+      "elapsed": "00:11:19",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_27",
+      "state": "COMPLETED",
+      "elapsed": "00:11:25",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_28",
+      "state": "COMPLETED",
+      "elapsed": "00:11:28",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_29",
+      "state": "COMPLETED",
+      "elapsed": "00:11:30",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_30",
+      "state": "COMPLETED",
+      "elapsed": "00:11:22",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_31",
+      "state": "COMPLETED",
+      "elapsed": "00:11:33",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_32",
+      "state": "RUNNING",
+      "elapsed": "00:03:16",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_33",
+      "state": "RUNNING",
+      "elapsed": "00:01:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_34",
+      "state": "RUNNING",
+      "elapsed": "00:01:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_35",
+      "state": "RUNNING",
+      "elapsed": "00:01:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636696_[38-99%4]",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_0",
+      "state": "COMPLETED",
+      "elapsed": "00:11:56",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_1",
+      "state": "COMPLETED",
+      "elapsed": "00:16:58",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_2",
+      "state": "COMPLETED",
+      "elapsed": "00:11:21",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_3",
+      "state": "COMPLETED",
+      "elapsed": "00:11:33",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_4",
+      "state": "COMPLETED",
+      "elapsed": "00:11:35",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_5",
+      "state": "COMPLETED",
+      "elapsed": "00:11:07",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_6",
+      "state": "COMPLETED",
+      "elapsed": "00:11:27",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_7",
+      "state": "COMPLETED",
+      "elapsed": "00:11:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_8",
+      "state": "COMPLETED",
+      "elapsed": "00:11:31",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_9",
+      "state": "COMPLETED",
+      "elapsed": "00:11:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_10",
+      "state": "COMPLETED",
+      "elapsed": "00:09:50",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_11",
+      "state": "COMPLETED",
+      "elapsed": "00:11:56",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_12",
+      "state": "COMPLETED",
+      "elapsed": "00:11:46",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_13",
+      "state": "COMPLETED",
+      "elapsed": "00:11:02",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_14",
+      "state": "COMPLETED",
+      "elapsed": "00:11:17",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_15",
+      "state": "COMPLETED",
+      "elapsed": "00:09:51",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_16",
+      "state": "COMPLETED",
+      "elapsed": "00:10:26",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_17",
+      "state": "COMPLETED",
+      "elapsed": "00:11:15",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_18",
+      "state": "COMPLETED",
+      "elapsed": "00:10:57",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_19",
+      "state": "COMPLETED",
+      "elapsed": "00:10:22",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_20",
+      "state": "COMPLETED",
+      "elapsed": "00:10:45",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_21",
+      "state": "FAILED",
+      "elapsed": "00:03:10",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636697_22",
+      "state": "FAILED",
+      "elapsed": "00:03:10",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636697_23",
+      "state": "COMPLETED",
+      "elapsed": "00:10:22",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_24",
+      "state": "COMPLETED",
+      "elapsed": "00:11:25",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_25",
+      "state": "COMPLETED",
+      "elapsed": "00:11:24",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_26",
+      "state": "COMPLETED",
+      "elapsed": "00:11:10",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_27",
+      "state": "COMPLETED",
+      "elapsed": "00:11:34",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_28",
+      "state": "COMPLETED",
+      "elapsed": "00:11:33",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_29",
+      "state": "COMPLETED",
+      "elapsed": "00:11:42",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_30",
+      "state": "RUNNING",
+      "elapsed": "00:07:27",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_31",
+      "state": "RUNNING",
+      "elapsed": "00:03:16",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_32",
+      "state": "RUNNING",
+      "elapsed": "00:02:09",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_33",
+      "state": "RUNNING",
+      "elapsed": "00:00:59",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636697_[34-99%4]",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636701",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_0",
+      "state": "COMPLETED",
+      "elapsed": "00:11:22",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_1",
+      "state": "COMPLETED",
+      "elapsed": "00:11:20",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_2",
+      "state": "COMPLETED",
+      "elapsed": "00:11:22",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_3",
+      "state": "COMPLETED",
+      "elapsed": "00:11:22",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_4",
+      "state": "FAILED",
+      "elapsed": "00:05:23",
+      "exit_code": "1:0"
+    },
+    {
+      "job_id": "1636700_5",
+      "state": "COMPLETED",
+      "elapsed": "00:10:34",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_6",
+      "state": "COMPLETED",
+      "elapsed": "00:09:35",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_7",
+      "state": "COMPLETED",
+      "elapsed": "00:10:12",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_8",
+      "state": "COMPLETED",
+      "elapsed": "00:10:57",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_9",
+      "state": "COMPLETED",
+      "elapsed": "00:09:10",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_10",
+      "state": "FAILED",
+      "elapsed": "00:05:07",
+      "exit_code": "1:0"
+    },
+    {
+      "job_id": "1636700_11",
+      "state": "COMPLETED",
+      "elapsed": "00:11:03",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_12",
+      "state": "COMPLETED",
+      "elapsed": "00:11:13",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_13",
+      "state": "COMPLETED",
+      "elapsed": "00:11:40",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_14",
+      "state": "COMPLETED",
+      "elapsed": "00:10:32",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_15",
+      "state": "COMPLETED",
+      "elapsed": "00:10:23",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_16",
+      "state": "COMPLETED",
+      "elapsed": "00:11:17",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_17",
+      "state": "FAILED",
+      "elapsed": "00:04:56",
+      "exit_code": "1:0"
+    },
+    {
+      "job_id": "1636700_18",
+      "state": "COMPLETED",
+      "elapsed": "00:11:08",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_19",
+      "state": "COMPLETED",
+      "elapsed": "00:10:26",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_20",
+      "state": "COMPLETED",
+      "elapsed": "00:10:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_21",
+      "state": "COMPLETED",
+      "elapsed": "00:11:08",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_22",
+      "state": "COMPLETED",
+      "elapsed": "00:11:08",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_23",
+      "state": "FAILED",
+      "elapsed": "00:05:40",
+      "exit_code": "2:0"
+    },
+    {
+      "job_id": "1636700_24",
+      "state": "COMPLETED",
+      "elapsed": "00:10:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_25",
+      "state": "COMPLETED",
+      "elapsed": "00:11:14",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_26",
+      "state": "COMPLETED",
+      "elapsed": "00:11:20",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_27",
+      "state": "COMPLETED",
+      "elapsed": "00:11:09",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_28",
+      "state": "COMPLETED",
+      "elapsed": "00:11:12",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_29",
+      "state": "COMPLETED",
+      "elapsed": "00:09:25",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_30",
+      "state": "COMPLETED",
+      "elapsed": "00:11:11",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_31",
+      "state": "FAILED",
+      "elapsed": "00:05:26",
+      "exit_code": "1:0"
+    },
+    {
+      "job_id": "1636700_32",
+      "state": "RUNNING",
+      "elapsed": "00:08:36",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_33",
+      "state": "RUNNING",
+      "elapsed": "00:03:53",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_34",
+      "state": "RUNNING",
+      "elapsed": "00:03:16",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_35",
+      "state": "RUNNING",
+      "elapsed": "00:00:59",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1636700_[37-99%4]",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1644720_4",
+      "state": "COMPLETED",
+      "elapsed": "00:11:24",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1644720_10",
+      "state": "COMPLETED",
+      "elapsed": "00:11:08",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1644720_17",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1645888",
+      "state": "PENDING",
+      "elapsed": "00:00:00",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1646582",
+      "state": "RUNNING",
+      "elapsed": "00:00:59",
+      "exit_code": "0:0"
+    },
+    {
+      "job_id": "1646583",
+      "state": "COMPLETED",
+      "elapsed": "00:00:09",
+      "exit_code": "0:0"
+    }
+  ],
+  "array_state_counts": {
+    "1636684": {
+      "COMPLETED": 28,
+      "FAILED": 1,
+      "RUNNING": 4,
+      "PENDING": 1
+    },
+    "1636696": {
+      "COMPLETED": 28,
+      "FAILED": 4,
+      "RUNNING": 4,
+      "PENDING": 1
+    },
+    "1636697": {
+      "COMPLETED": 28,
+      "FAILED": 2,
+      "RUNNING": 4,
+      "PENDING": 1
+    },
+    "1636700": {
+      "COMPLETED": 27,
+      "FAILED": 5,
+      "RUNNING": 4,
+      "PENDING": 1
+    },
+    "1644720": {
+      "COMPLETED": 2,
+      "PENDING": 1
+    }
+  },
+  "pending_count_note": "Slurm may combine unstarted tasks into one pending record; completed/running/failed counts here are individual tasks."
+}

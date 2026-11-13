@@ -1,6 +1,6 @@
-# Signal pilot: measured results and attempt history
+# Production pilots: measured results and attempt history
 
-Snapshot: 2026-11-13, after successful summary 1634275 and native scan 1634795.
+Snapshot: 2026-11-13 18:21 UTC; includes signal production recovery and ZZ pilot.
 Each configuration contains 1,000 generated events. This is a software and
 production-sizing pilot, not an unfolding closure study.
 
@@ -94,7 +94,7 @@ two negative-weight rows inclusively and Herwig five, but none are selected;
 the selected signed-Poisson variance/net ratio remains one in this pilot.
 The positivity caveat for production therefore remains unresolved.
 
-The measured acceptance now suggests about 33–34 million generated events
+The measured acceptance now suggests about 33–34 million showered events
 per signal configuration to reach five million selected events. Roughly
 550–650 CPU hours per configuration is a naive throughput extrapolation,
 before retries, grid/setup cost and production variability. Compact signal
@@ -109,13 +109,69 @@ one hour; 100 GB of /work and 10 GB of /project headroom are required below
 the soft targets. A dependent job validates/persists every compact shard and
 appends selected totals to the working status. No further wave is automatic.
 Arrays 1636684 (nominal), 1636696 (up), 1636697 (down), and 1636700 (Herwig)
-are running; summary 1636701 waits for all four. This first wave has one
-million generated events per configuration and does
+are running; summary 1636701 now waits for the recovery controller and its
+dependent recovery jobs. This first wave requests one
+million showered events per configuration and does
 not satisfy the five-million-selected target by itself.
+
+At 18:21 UTC, original-array successes were 28/28/28/27. Two completed Herwig
+retries bring the total to 113/400 shards. A Slurm success is followed by the
+independent summary's validation and checksum-checked persistence. The raw
+[scheduler snapshot](evidence/production-status-20261113.json) retains failures;
+Slurm combines not-yet-started pending tasks into a single record.
+
+### Finite Herwig input and runtime deployment failure
+
+Original Herwig tasks 4, 10, 17 and 31 exhausted their finite hard-event input.
+Diagnostic 1642288 reproduced seed 40000005: one remnant-extraction failure
+and one meson-decay retry limit discarded two events, leaving 9,998 accepted
+events after 10,000 attempts. See [native statistics](evidence/herwig-eof-native-statistics.out)
+and [log excerpts with original SHA256](evidence/herwig-eof-native-excerpts.json).
+
+Check 1643289 supplied 10,100 hard events for 10,000 showered outputs. The
+first 10,000 hard-event blocks were byte-identical to the failed source.
+All 10,000 output source identities are unique, with zero repeats in this
+check. The implementation requests a 1% hard-event reserve only for Herwig;
+it never reopens the source or suppresses generator exceptions. Source and
+accepted counts remain explicit in [provenance](evidence/herwig-buffer-1643289.json).
+Targeted software checks pass (23 Generation + 8 BatchSubmit in 1644270).
+Recovery array 1644720 has completed tasks 4 and 10; task 17 is running.
+
+During deployment, I replaced the shared shell runner while workers were
+executing it on NFS. Eight tasks then failed with stale file handles (one
+nominal, four scale-up, two scale-down, one Herwig). Partial outputs were
+rejected. Runtime paths are now frozen; future jobs use the immutable
+[source/environment snapshot](evidence/runtime-snapshot.json). Diagnostics
+are preserved before retry. Controller 1645888 waits for the original arrays
+and initial retries, then retries known EOF/NFS failures once and updates the
+summary dependency. Unknown failures stop it for investigation. The original
+queued jobs retain the old Slurm-spooled worker, so additional EOF failures
+may still need that final recovery round.
+
+Summary 1646583 now distinguishes supplied hard events from showered rows and
+records repeated source occurrences. The original 10k Herwig pilot has 9,999
+unique source identities and one repeated occurrence. This is not removed;
+shared hard identities must remain in the same training/test partition.
 
 ## Background pilot
 
-ZZ integration 1631379 remains active, with CPU use verified; dependent
-jobs submit its four configurations. Its acceptance, signs and timing have
-not yet been measured. This background work is independent of the validated
-signal production wave.
+ZZ integration 1631379 completed in 1 h 35 min. Summary 1643989 validated and
+persisted all four 1,000-event configurations:
+
+| Configuration | Selected reco | Reco 115–130 GeV | Fiducial | Inclusive negative rows | Selected tau rows |
+|---|---:|---:|---:|---:|---:|
+| Pythia nominal | 12 | 5 | 19 | 7 | 4 |
+| Pythia scale up | 12 | 5 | 19 | 7 | 4 |
+| Pythia scale down | 12 | 5 | 19 | 7 | 4 |
+| Herwig nominal | 5 | 2 | 12 | 8 | 0 |
+
+All selected Born kinematics are valid and no selected negative rows occur
+in this pilot. The selected counts are too small for a reliable shower
+comparison or final production estimate. Full [summary](evidence/ZZ-summary-1643989.json)
+records signed yields, hashes and persistent paths.
+
+Launcher 1646582 checks the pilot hashes and storage headroom, then submits
+four 10k background shards with fresh seeds and the immutable runtime, one
+CPU / 3 GB / one hour each. The launcher completed and submitted jobs
+1646727–1646730, with dependent summary 1646731. The summary measures acceptance and
+validates/persists the compact outputs; no larger ZZ wave is automatic.
