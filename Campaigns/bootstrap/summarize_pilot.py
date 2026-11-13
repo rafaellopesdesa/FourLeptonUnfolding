@@ -38,8 +38,13 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
     records = []
     for shower, scale in [('pythia', 'nominal'), ('pythia', 'up'),
                           ('pythia', 'down'), ('herwig', 'nominal')]:
-        pattern = f'{process}_{shower}_*_{campaign_tag}_job_*.root'
-        paths = sorted((base / 'shards' / scale).glob(pattern))
+        patterns = [f'{process}_{shower}_*_{campaign_tag}_job_*.root']
+        if scale != 'nominal':
+            # Direct immutable-runtime submissions retain the scale suffix in
+            # CAMPAIGN_NAME as well as in the final task label.
+            patterns.append(f'{process}_{shower}_*_{campaign_tag}_muon_scale_{scale}_job_*.root')
+        paths = sorted({path for pattern in patterns
+                        for path in (base / 'shards' / scale).glob(pattern)})
         record = {'process': process, 'shower': shower, 'scale': scale,
                   'files': [], 'errors': []}
         if len(paths) != expected_shards:

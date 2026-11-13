@@ -89,7 +89,16 @@ dependency to the recovery jobs before exiting. Do not rerun the earlier
 retry launcher after this controller has been scheduled: it replaces the
 summary dependency. No recovery step launches a new production wave.
 
+The 19:35 checkpoint found one Pythia shard rejected because its HepMC file
+changed during provenance validation. Its cause is unresolved. The completion
+controller permits one same-seed rerun with the full integrity check retained;
+it preserves intermediates for that recovery campaign so a recurrence can be
+investigated. Repeated failure is never accepted as a complete output.
+
 After the successful 1k background pilot, `launch_zz_10k.sbatch` checks its
 persisted hashes and storage headroom, then submits one 10k shard per ZZ
 configuration using the immutable snapshot and fresh seeds. Each requests
 one CPU / 3 GB / one hour. The summary validates and persists compact results.
+The summary accepts the explicit scale suffix in immutable-runtime campaign
+names; the first ZZ summary missed these two completed outputs. Both naming
+forms retain the same expected-shard count and physics validation requirements.

@@ -57,6 +57,10 @@ def plan(allow_pending=False):
                 cause = 'runtime_script_replaced_on_nfs'
             elif 'More events requested than available in LesHouchesReader' in native_text:
                 cause = 'herwig_finite_lhe_exhaustion'
+            elif 'RuntimeError: HepMC changed while validating its source identities' in wrapper_text:
+                # Retry from the same seed with the full integrity check still
+                # enabled. This labels the observed failure, not its root cause.
+                cause = 'hepmc_changed_during_validation'
             else:
                 raise RuntimeError(f'Unknown failure requires investigation: {job}')
             failed.append({'index': index, 'job_directory': str(job),
@@ -92,6 +96,11 @@ def main():
         payload, count = re.subn(r'(?m)^REPO_ROOT=.*$',
             'REPO_ROOT=' + shlex.quote(str(SNAPSHOT)), (campaign / 'campaign.env').read_text())
         if count != 1: raise ValueError('Missing unique REPO_ROOT')
+        if any(f['cause'] == 'hepmc_changed_during_validation' for f in item['failed']):
+            # Keep evidence if the unexplained integrity failure recurs.
+            payload, count = re.subn(r'(?m)^KEEP_INTERMEDIATES=.*$',
+                                    'KEEP_INTERMEDIATES=1', payload)
+            if count != 1: raise ValueError('Missing unique KEEP_INTERMEDIATES')
         config.write_text(payload)
         config.chmod(0o444)
         indices = ','.join(str(f['index']) for f in item['failed'])
