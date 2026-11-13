@@ -119,6 +119,19 @@ once to rebuild the small PYTHIA bridge executable; PYTHIA and Herwig themselves
 do not need to be recompiled. The Herwig decay selection is generated at run
 time.
 
+The shower can reject a hard event because its shower, remnant or decay
+construction fails. To supply a finite reserve without reusing LHE events,
+request more hard events than accepted shower outputs, for example
+`--events 10000 --hard-events 10100`. `--hard-events` changes only POWHEG's
+generated count; the shower still requests 10000 outputs. It must be at
+least `--events` and cannot be combined with an external `--lhe` file. For
+external files, request fewer shower outputs than the available source
+events if a reserve is needed. Source indices, signs and hashes remain in
+the existing provenance manifest, including the full source event count.
+Exhausting the reserve remains a failure; no reader reopening or acceptance
+of incomplete shards is enabled. The native Herwig log should be inspected
+for the cause and frequency of discarded events.
+
 For PYTHIA matching, `POWHEG:nFinal` is set to 1 for `gg_H` and 2 for `ZZ`.
 The latter may look surprising because the LHE record contains four final-state
 leptons. POWHEG also records their two parent Z bosons as status-2 resonances;

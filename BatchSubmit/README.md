@@ -23,6 +23,17 @@ quartet comes from the shower's certified direct Z-decay record. An
 unsupported quartet is retained with `born_available=False`, and undefined
 angles are marked by `born_kinematics_valid=False`.
 
+For Herwig event jobs, the worker generates a 1% reserve of POWHEG hard
+events (rounded up) while keeping the requested shower/compact output count
+unchanged. Herwig can discard a hard event when its shower or a decay fails;
+without a reserve, a finite LHE file can end before the requested output
+count is reached. The reader still cannot reopen the file, and incomplete
+outputs still fail validation. Actual LHE counts and source identities are
+retained in provenance. Native `FourLeptonLHERun*.log` and `.out` diagnostics
+are preserved alongside the wrapper logs, so rejection causes remain
+auditable. Pythia event jobs and integration-grid jobs retain their existing
+hard-event count.
+
 Unity permits at most 1900 tasks in one array. Larger campaigns are split into
 dependent waves of at most 1900 tasks, with at most 100 running concurrently by
 default.
