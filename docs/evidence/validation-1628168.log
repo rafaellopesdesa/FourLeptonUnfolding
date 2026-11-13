@@ -1,0 +1,383 @@
+test_mislabeled_shower_scale_and_deformation_fail (test_endpoints.EndpointTests.test_mislabeled_shower_scale_and_deformation_fail) ... ok
+test_mismatched_luminosity_fails_before_training (test_endpoints.EndpointTests.test_mismatched_luminosity_fails_before_training) ... ok
+test_nonzero_penalty_fails_before_reading_inputs (test_endpoints.EndpointTests.test_nonzero_penalty_fails_before_reading_inputs) ... ok
+test_real_nsbi_artifact_retains_density_and_yield (test_endpoints.EndpointTests.test_real_nsbi_artifact_retains_density_and_yield) ... member=0 attempt=0 step=0/1 epoch=0 validation=0.7012514 baseline=0.6931472 validation_interval_steps=9
+member=0 attempt=0 step=1/1 epoch=1 train=0.6963537 regularization=0 validation=0.7012106 lr=0.0003
+member=0 selected_step=1 validation=0.7012106 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=1 attempt=0 step=0/1 epoch=0 validation=0.722112 baseline=0.6931472 validation_interval_steps=9
+member=1 attempt=0 step=1/1 epoch=1 train=0.7200094 regularization=0 validation=0.7220655 lr=0.0003
+member=1 selected_step=1 validation=0.7220655 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=2 attempt=0 step=0/1 epoch=0 validation=0.6956184 baseline=0.6931472 validation_interval_steps=9
+member=2 attempt=0 step=1/1 epoch=1 train=0.7043515 regularization=0 validation=0.6956032 lr=0.0003
+member=2 selected_step=1 validation=0.6956032 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=3 attempt=0 step=0/1 epoch=0 validation=0.7043062 baseline=0.6931472 validation_interval_steps=9
+member=3 attempt=0 step=1/1 epoch=1 train=0.6657764 regularization=0 validation=0.7044127 lr=0.0003
+member=3 selected_step=0 validation=0.7043062 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/validation/omnifold/ratios.py:305: RuntimeWarning: The raw mean-score ensemble is within the constant-classifier tolerance but does not meaningfully improve its validation BCE. This can indicate a near-unity ratio or insufficient learned discrimination; inspect held-out reliability and closure. No unity ratio was substituted.
+  ensemble_validation = training._ensemble_validation_summary(
+ok
+test_signed_weights_selection_and_pair_splits (test_endpoints.EndpointTests.test_signed_weights_selection_and_pair_splits) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 39.428s
+
+OK
+test_custom_weight_measure_pair_accepts_linked_training_override (test_application.ApplicationTest.test_custom_weight_measure_pair_accepts_linked_training_override) ... ok
+test_custom_weight_measure_pair_requires_training_override (test_application.ApplicationTest.test_custom_weight_measure_pair_requires_training_override) ... ok
+test_in_place_decoration_retains_pre_replacement_provenance (test_application.ApplicationTest.test_in_place_decoration_retains_pre_replacement_provenance) ... ok
+test_legacy_decoration_is_recomputed_only_with_explicit_replacement (test_application.ApplicationTest.test_legacy_decoration_is_recomputed_only_with_explicit_replacement) ... ok
+test_model_pair_checksum_and_kinds_are_verified (test_application.ApplicationTest.test_model_pair_checksum_and_kinds_are_verified) ... ok
+test_nominal_weight_branch_is_required (test_application.ApplicationTest.test_nominal_weight_branch_is_required) ... ok
+test_nonfinite_nominal_weight_is_rejected_without_diagnostics (test_application.ApplicationTest.test_nonfinite_nominal_weight_is_rejected_without_diagnostics) ... ok
+test_output_cannot_overlap_loaded_model_artifacts (test_application.ApplicationTest.test_output_cannot_overlap_loaded_model_artifacts) ... ok
+test_preserves_weights_vectors_metadata_and_writes_diagnostics (test_application.ApplicationTest.test_preserves_weights_vectors_metadata_and_writes_diagnostics) ... ok
+test_reconstructed_nonfinite_mass_fails_without_partial_output (test_application.ApplicationTest.test_reconstructed_nonfinite_mass_fails_without_partial_output) ... ok
+test_removed_phi1_is_optional_and_never_sent_to_either_network (test_application.ApplicationTest.test_removed_phi1_is_optional_and_never_sent_to_either_network) ... ok
+test_sample_specific_recipe_and_strict_analysis_region (test_application.ApplicationTest.test_sample_specific_recipe_and_strict_analysis_region) ... ok
+test_zero_zz_correction_factor_is_rejected (test_application.ApplicationTest.test_zero_zz_correction_factor_is_rejected) ... ok
+test_campaign_checksum_mismatch_requires_explicit_override (test_application_directory.DirectoryApplicationTest.test_campaign_checksum_mismatch_requires_explicit_override) ... ok
+test_corrupted_pseudo_data_weights_are_rejected (test_application_directory.DirectoryApplicationTest.test_corrupted_pseudo_data_weights_are_rejected) ... ok
+test_directory_commit_restores_previous_campaign_if_publish_rename_fails (test_application_directory.DirectoryApplicationTest.test_directory_commit_restores_previous_campaign_if_publish_rename_fails) ... ok
+test_discovery_is_sorted_and_never_includes_herwig (test_application_directory.DirectoryApplicationTest.test_discovery_is_sorted_and_never_includes_herwig) ... ok
+test_late_failure_preserves_complete_previous_campaign (test_application_directory.DirectoryApplicationTest.test_late_failure_preserves_complete_previous_campaign) ... ok
+test_legacy_v2_pseudo_manifest_without_sum_squared_weights_is_accepted (test_application_directory.DirectoryApplicationTest.test_legacy_v2_pseudo_manifest_without_sum_squared_weights_is_accepted) ... ok
+test_new_directory_commit_never_replaces_a_late_arrival (test_application_directory.DirectoryApplicationTest.test_new_directory_commit_never_replaces_a_late_arrival) ... ok
+test_one_loaded_model_pair_is_reused_and_summary_is_written (test_application_directory.DirectoryApplicationTest.test_one_loaded_model_pair_is_reused_and_summary_is_written) ... ok
+test_output_must_not_overlap_inputs_or_model_artifacts (test_application_directory.DirectoryApplicationTest.test_output_must_not_overlap_inputs_or_model_artifacts) ... ok
+test_pseudo_data_checksum_detects_same_weight_feature_corruption (test_application_directory.DirectoryApplicationTest.test_pseudo_data_checksum_detects_same_weight_feature_corruption) ... ok
+test_pseudo_manifest_is_authoritative_and_copied (test_application_directory.DirectoryApplicationTest.test_pseudo_manifest_is_authoritative_and_copied) ... ok
+test_pseudo_manifest_root_metadata_mismatch_is_rejected (test_application_directory.DirectoryApplicationTest.test_pseudo_manifest_root_metadata_mismatch_is_rejected) ... ok
+test_truncated_pseudo_manifest_is_rejected (test_application_directory.DirectoryApplicationTest.test_truncated_pseudo_manifest_is_rejected) ... ok
+test_loader_enforces_kind_checksums_and_independent_members (test_artifact_contract.ArtifactContractTest.test_loader_enforces_kind_checksums_and_independent_members) ... ok
+test_loader_rejects_previous_feature_and_calibrated_artifacts (test_artifact_contract.ArtifactContractTest.test_loader_rejects_previous_feature_and_calibrated_artifacts) ... ok
+test_loader_rejects_same_version_cosine_only_artifact (test_artifact_contract.ArtifactContractTest.test_loader_rejects_same_version_cosine_only_artifact) ... ok
+test_loader_requires_raw_ratio_contract_and_rejects_calibration_parameters (test_artifact_contract.ArtifactContractTest.test_loader_requires_raw_ratio_contract_and_rejects_calibration_parameters) ... ok
+test_loader_requires_versioned_inference_logit_bound (test_artifact_contract.ArtifactContractTest.test_loader_requires_versioned_inference_logit_bound) ... ok
+test_old_eleven_input_feature_contract_cannot_be_relabelled_as_current (test_artifact_contract.ArtifactContractTest.test_old_eleven_input_feature_contract_cannot_be_relabelled_as_current) ... ok
+test_overwrite_validation_rejects_the_other_artifact_kind (test_artifact_contract.ArtifactContractTest.test_overwrite_validation_rejects_the_other_artifact_kind) ... ok
+test_azimuth_boundaries_remain_distinct_stored_angles (test_common.CommonUtilitiesTest.test_azimuth_boundaries_remain_distinct_stored_angles) ... ok
+test_exact_saturated_scores_have_finite_logits (test_common.CommonUtilitiesTest.test_exact_saturated_scores_have_finite_logits) ... ok
+test_exact_seven_input_definition_preserves_azimuth_values_and_signs (test_common.CommonUtilitiesTest.test_exact_seven_input_definition_preserves_azimuth_values_and_signs) ... ok
+test_file_provenance_sha_detects_same_size_rewrite_with_restored_mtime (test_common.CommonUtilitiesTest.test_file_provenance_sha_detects_same_size_rewrite_with_restored_mtime) ... ok
+test_four_lepton_mass_is_selection_only (test_common.CommonUtilitiesTest.test_four_lepton_mass_is_selection_only) ... ok
+test_invalid_member_probabilities_are_rejected (test_common.CommonUtilitiesTest.test_invalid_member_probabilities_are_rejected) ... ok
+test_known_nominal_weight_measures_are_compatible (test_common.CommonUtilitiesTest.test_known_nominal_weight_measures_are_compatible) ... ok
+test_manifest_mass_window_contract_is_strict (test_common.CommonUtilitiesTest.test_manifest_mass_window_contract_is_strict) ... ok
+test_old_eight_observable_input_bank_is_rejected (test_common.CommonUtilitiesTest.test_old_eight_observable_input_bank_is_rejected) ... ok
+test_physical_ratio_keeps_large_yield_factor_without_output_rescaling (test_common.CommonUtilitiesTest.test_physical_ratio_keeps_large_yield_factor_without_output_rescaling) ... ok
+test_ratio_and_background_removal_formula (test_common.CommonUtilitiesTest.test_ratio_and_background_removal_formula) ... ok
+test_raw_ensemble_odds_are_not_recalibrated_or_mean_normalized (test_common.CommonUtilitiesTest.test_raw_ensemble_odds_are_not_recalibrated_or_mean_normalized) ... ok
+test_row_fingerprints_group_exact_bootstrap_duplicates (test_common.CommonUtilitiesTest.test_row_fingerprints_group_exact_bootstrap_duplicates) ... ok
+test_shape_ratio_is_distinct_from_purity_weight (test_common.CommonUtilitiesTest.test_shape_ratio_is_distinct_from_purity_weight) ... ok
+test_split_is_deterministic_and_source_salted (test_common.CommonUtilitiesTest.test_split_is_deterministic_and_source_salted) ... ok
+test_scan_uses_absolute_weights_only_for_scaler_moments (test_correction.CorrectionDataTest.test_scan_uses_absolute_weights_only_for_scaler_moments) ... ok
+test_selected_negative_data_weight_is_preserved (test_correction.CorrectionDataTest.test_selected_negative_data_weight_is_preserved) ... ok
+test_selected_negative_reference_weight_is_preserved (test_correction.CorrectionDataTest.test_selected_negative_reference_weight_is_preserved) ... ok
+test_strict_sideband_and_physical_reference_mixture (test_correction.CorrectionDataTest.test_strict_sideband_and_physical_reference_mixture) ... ok
+test_training_defaults_match_ensemble_prescription (test_correction.CorrectionDataTest.test_training_defaults_match_ensemble_prescription) ... ok
+test_comparison_pdf_accepts_negative_histogram_bins (test_diagnostics_signed.SignedDiagnosticsTest.test_comparison_pdf_accepts_negative_histogram_bins) ... ok
+test_histogram_uses_signed_sum_and_unsigned_sumw2 (test_diagnostics_signed.SignedDiagnosticsTest.test_histogram_uses_signed_sum_and_unsigned_sumw2) ... ok
+test_learning_curves_include_initial_checkpoint_and_irregular_updates (test_diagnostics_signed.SignedDiagnosticsTest.test_learning_curves_include_initial_checkpoint_and_irregular_updates) ... ok
+test_legacy_learning_curves_keep_epoch_coordinates (test_diagnostics_signed.SignedDiagnosticsTest.test_legacy_learning_curves_keep_epoch_coordinates) ... ok
+test_normalized_comparison_chi2_uses_singular_full_covariance (test_diagnostics_signed.SignedDiagnosticsTest.test_normalized_comparison_chi2_uses_singular_full_covariance) ... ok
+test_normalized_histogram_propagates_denominator_covariance (test_diagnostics_signed.SignedDiagnosticsTest.test_normalized_histogram_propagates_denominator_covariance) ... ok
+test_reliability_skips_nonpositive_net_bin_but_keeps_signed_metrics (test_diagnostics_signed.SignedDiagnosticsTest.test_reliability_skips_nonpositive_net_bin_but_keeps_signed_metrics) ... ok
+test_report_has_one_raw_reliability_curve_without_calibration_metadata (test_diagnostics_signed.SignedDiagnosticsTest.test_report_has_one_raw_reliability_curve_without_calibration_metadata) ... ok
+test_training_audit_distinguishes_failed_safeguard_and_reports_fit_statistics (test_diagnostics_signed.SignedDiagnosticsTest.test_training_audit_distinguishes_failed_safeguard_and_reports_fit_statistics) ... ok
+test_correction_then_training_artifact_contract (test_pipeline_smoke.PipelineSmokeTest.test_correction_then_training_artifact_contract) ... Scanning correction-sideband selections and yields...
+Selected yields (weight): data=180, MC=360, data/MC=0.5; reference ggH fraction=40.00000%
+/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/validation/BackgroundRemoval/Correction/train_data_mc_correction.py:655: RuntimeWarning: The raw mean-score ensemble is within the constant-classifier tolerance but does not meaningfully improve its validation BCE. This can indicate a near-unity ratio or insufficient learned discrimination; inspect held-out reliability and closure. No unity ratio was substituted.
+  ensemble_validation = _ensemble_validation_summary(
+Data-to-MC correction model written to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpf9rq0ly7/correction
+Scanning selections, yields, and deterministic splits...
+Selected yields (weight_nominal_pb): S=0.000307692308, B=0.00146153846, S/B=0.210526316
+Building bounded-memory cache in /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/fourlepton-background-cache-ruqc4epc...
+Predicting the held-out validation bank...
+/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/validation/BackgroundRemoval/Training/train_background_ratio.py:1371: RuntimeWarning: The raw mean-score ensemble is within the constant-classifier tolerance but does not meaningfully improve its validation BCE. This can indicate a near-unity ratio or insufficient learned discrimination; inspect held-out reliability and closure. No unity ratio was substituted.
+  ensemble_validation = _ensemble_validation_summary(
+Predicting the untouched closure bank...
+Background-removal model written to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpf9rq0ly7/background
+ok
+test_signed_training_raw_odds_and_diagnostics_pipeline (test_signed_training_smoke.SignedTrainingSmokeTest.test_signed_training_raw_odds_and_diagnostics_pipeline) ... Scanning selections, yields, and deterministic splits...
+Selected yields (weight_nominal_pb): S=116.25, B=232.5, S/B=0.5
+Building bounded-memory cache in /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/fourlepton-background-cache-zka9erbv...
+member=0 attempt=0 step=0/1 epoch=0 validation=0.6931499 baseline=0.6931472 validation_interval_steps=5
+member=0 attempt=0 step=1/1 epoch=1 train=0.6980452 regularization=0 validation=0.6931605 lr=0.0003
+member=0 selected_step=0 validation=0.6931499 improved_over_constant=False within_baseline_tolerance=True stop_reason=validation_patience
+member=1 attempt=0 step=0/1 epoch=0 validation=0.6932322 baseline=0.6931472 validation_interval_steps=5
+member=1 attempt=0 step=1/1 epoch=1 train=0.6982729 regularization=0 validation=0.6932062 lr=0.0003
+member=1 selected_step=1 validation=0.6932062 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=2 attempt=0 step=0/1 epoch=0 validation=0.6931712 baseline=0.6931472 validation_interval_steps=5
+member=2 attempt=0 step=1/1 epoch=1 train=0.6980696 regularization=0 validation=0.6931778 lr=0.0003
+member=2 selected_step=0 validation=0.6931712 improved_over_constant=False within_baseline_tolerance=True stop_reason=validation_patience
+member=3 attempt=0 step=0/1 epoch=0 validation=0.6931871 baseline=0.6931472 validation_interval_steps=5
+member=3 attempt=0 step=1/1 epoch=1 train=0.6980988 regularization=0 validation=0.6932083 lr=0.0003
+member=3 selected_step=0 validation=0.6931871 improved_over_constant=False within_baseline_tolerance=True stop_reason=validation_patience
+Predicting the held-out validation bank...
+/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/validation/BackgroundRemoval/Training/train_background_ratio.py:1371: RuntimeWarning: The raw mean-score ensemble is within the constant-classifier tolerance but does not meaningfully improve its validation BCE. This can indicate a near-unity ratio or insufficient learned discrimination; inspect held-out reliability and closure. No unity ratio was substituted.
+  ensemble_validation = _ensemble_validation_summary(
+Predicting the untouched closure bank...
+Background-removal model written to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmp5ju2d21d/background
+ok
+test_pinned_model_class_constructs_and_produces_logits (test_toolkit_smoke.ToolkitSmokeTest.test_pinned_model_class_constructs_and_produces_logits) ... ok
+test_baseline_gate_rejects_an_entire_consistently_bad_ensemble (test_training_control.TrainingControlTest.test_baseline_gate_rejects_an_entire_consistently_bad_ensemble) ... ok
+test_imbalanced_epoch_checks_initial_first_update_and_restores_earlier_best (test_training_control.TrainingControlTest.test_imbalanced_epoch_checks_initial_first_update_and_restores_earlier_best) ... member=0 attempt=0 step=0/200 epoch=0 validation=0.69 baseline=0.6931472 validation_interval_steps=5
+member=0 attempt=0 step=1/200 epoch=0.005 train=0.6827023 regularization=0 validation=0.66 lr=0.00946
+member=0 attempt=0 step=5/200 epoch=0.025 train=0.661285 regularization=0 validation=0.67 lr=0.00757
+member=0 attempt=0 step=10/200 epoch=0.05 train=0.634582 regularization=0 validation=0.68 lr=0.00572
+member=0 selected_step=1 validation=0.66 improved_over_constant=True within_baseline_tolerance=True stop_reason=validation_patience
+ok
+test_initial_checkpoint_is_kept_if_the_first_update_overfits (test_training_control.TrainingControlTest.test_initial_checkpoint_is_kept_if_the_first_update_overfits) ... member=0 attempt=0 step=0/20 epoch=0 validation=0.68 baseline=0.6931472 validation_interval_steps=5
+member=0 attempt=0 step=1/20 epoch=0.05 train=0.6827023 regularization=0 validation=0.7 lr=0.00946
+member=0 selected_step=0 validation=0.68 improved_over_constant=True within_baseline_tolerance=True stop_reason=validation_patience
+ok
+test_learning_rate_and_updates_do_not_depend_on_epoch_partition_or_validation_cadence (test_training_control.TrainingControlTest.test_learning_rate_and_updates_do_not_depend_on_epoch_partition_or_validation_cadence) ... member=0 attempt=0 step=0/6 epoch=0 validation=0.69 baseline=0.6931472 validation_interval_steps=1
+member=0 attempt=0 step=1/6 epoch=0.166667 train=0.6827023 regularization=0 validation=0.689 lr=0.00946
+member=0 attempt=0 step=2/6 epoch=0.333333 train=0.6717925 regularization=0 validation=0.688 lr=0.00894
+member=0 attempt=0 step=3/6 epoch=0.5 train=0.664243 regularization=0 validation=0.687 lr=0.00846
+member=0 attempt=0 step=4/6 epoch=0.666667 train=0.6576407 regularization=0 validation=0.686 lr=0.008
+member=0 attempt=0 step=5/6 epoch=0.833333 train=0.6514636 regularization=0 validation=0.685 lr=0.00757
+member=0 attempt=0 step=6/6 epoch=1 train=0.6455533 regularization=0 validation=0.684 lr=0.00716
+member=0 selected_step=6 validation=0.684 improved_over_constant=True within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=0 attempt=0 step=0/6 epoch=0 validation=0.69 baseline=0.6931472 validation_interval_steps=1
+member=0 attempt=0 step=1/6 epoch=0.5 train=0.6827023 regularization=0 validation=0.689 lr=0.00946
+member=0 attempt=0 step=2/6 epoch=1 train=0.6717925 regularization=0 validation=0.688 lr=0.00894
+member=0 attempt=0 step=3/6 epoch=1.5 train=0.664243 regularization=0 validation=0.687 lr=0.00846
+member=0 attempt=0 step=4/6 epoch=2 train=0.6576407 regularization=0 validation=0.686 lr=0.008
+member=0 attempt=0 step=5/6 epoch=2.5 train=0.6514636 regularization=0 validation=0.685 lr=0.00757
+member=0 attempt=0 step=6/6 epoch=3 train=0.6455533 regularization=0 validation=0.684 lr=0.00716
+member=0 selected_step=6 validation=0.684 improved_over_constant=True within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=0 attempt=0 step=0/6 epoch=0 validation=0.69 baseline=0.6931472 validation_interval_steps=4
+member=0 attempt=0 step=1/6 epoch=0.166667 train=0.6827023 regularization=0 validation=0.689 lr=0.00946
+member=0 attempt=0 step=4/6 epoch=0.666667 train=0.6645587 regularization=0 validation=0.686 lr=0.008
+member=0 attempt=0 step=6/6 epoch=1 train=0.6485085 regularization=0 validation=0.684 lr=0.00716
+member=0 selected_step=6 validation=0.684 improved_over_constant=True within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+ok
+test_near_null_fit_is_allowed_and_flagged_without_inventing_improvement (test_training_control.TrainingControlTest.test_near_null_fit_is_allowed_and_flagged_without_inventing_improvement) ... member=0 attempt=0 step=0/20 epoch=0 validation=0.6981472 baseline=0.6931472 validation_interval_steps=5
+member=0 attempt=0 step=1/20 epoch=0.05 train=0.6827023 regularization=0 validation=0.6981472 lr=0.00946
+member=0 selected_step=0 validation=0.6981472 improved_over_constant=False within_baseline_tolerance=True stop_reason=validation_patience
+ok
+test_nonzero_weight_decay_is_rejected_before_model_construction (test_training_control.TrainingControlTest.test_nonzero_weight_decay_is_rejected_before_model_construction) ... ok
+test_optimizer_and_objective_have_no_regularization (test_training_control.TrainingControlTest.test_optimizer_and_objective_have_no_regularization) ... member=0 attempt=0 step=0/1 epoch=0 validation=0.6827023 baseline=0.6931472 validation_interval_steps=5
+member=0 attempt=0 step=1/1 epoch=1 train=0.6827023 regularization=0 validation=0.6717925 lr=0.00946
+member=0 selected_step=1 validation=0.6717925 improved_over_constant=True within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+ok
+test_patience_counts_validation_checks_and_respects_minimum_improvement (test_training_control.TrainingControlTest.test_patience_counts_validation_checks_and_respects_minimum_improvement) ... member=0 attempt=0 step=0/20 epoch=0 validation=0.69 baseline=0.6931472 validation_interval_steps=3
+member=0 attempt=0 step=1/20 epoch=0.05 train=0.6827023 regularization=0 validation=0.66999 lr=0.00946
+member=0 attempt=0 step=3/20 epoch=0.15 train=0.6680177 regularization=0 validation=0.66997 lr=0.00846
+member=0 attempt=0 step=6/20 epoch=0.3 train=0.6515525 regularization=0 validation=0.66994 lr=0.00716
+member=0 selected_step=6 validation=0.66994 improved_over_constant=True within_baseline_tolerance=True stop_reason=validation_patience
+ok
+test_raw_ensemble_gate_rejects_consistent_bad_scores (test_training_control.TrainingControlTest.test_raw_ensemble_gate_rejects_consistent_bad_scores) ... ok
+test_raw_ensemble_gate_uses_signed_weights_and_accepts_near_null_scores (test_training_control.TrainingControlTest.test_raw_ensemble_gate_uses_signed_weights_and_accepts_near_null_scores) ... ok
+test_signed_ensemble_gate_can_fail_even_when_each_member_passes (test_training_control.TrainingControlTest.test_signed_ensemble_gate_can_fail_even_when_each_member_passes) ... ok
+test_absolute_weight_sampling_is_unbiased_for_signed_bce_risk (test_training_data.TrainingDataTest.test_absolute_weight_sampling_is_unbiased_for_signed_bce_risk) ... ok
+test_background_training_defaults_keep_topology_with_step_validation_controls (test_training_data.TrainingDataTest.test_background_training_defaults_keep_topology_with_step_validation_controls) ... ok
+test_cache_mappings_close_before_directory_cleanup_even_on_error (test_training_data.TrainingDataTest.test_cache_mappings_close_before_directory_cleanup_even_on_error) ... ok
+test_common_score_saturation_is_not_treated_as_a_failed_member (test_training_data.TrainingDataTest.test_common_score_saturation_is_not_treated_as_a_failed_member) ... ok
+test_custom_weight_measure_pair_is_rejected_without_override (test_training_data.TrainingDataTest.test_custom_weight_measure_pair_is_rejected_without_override) ... ok
+test_exact_signal_and_combined_background_masks (test_training_data.TrainingDataTest.test_exact_signal_and_combined_background_masks) ... ok
+test_negative_training_weight_is_preserved (test_training_data.TrainingDataTest.test_negative_training_weight_is_preserved) ... ok
+test_scan_uses_absolute_weights_only_for_scaler_moments (test_training_data.TrainingDataTest.test_scan_uses_absolute_weights_only_for_scaler_moments) ... ok
+test_signed_statistics_keep_net_sum_sumw2_and_absolute_sum_distinct (test_training_data.TrainingDataTest.test_signed_statistics_keep_net_sum_sumw2_and_absolute_sum_distinct) ... ok
+test_training_uses_strict_115_to_130_mass_window (test_training_data.TrainingDataTest.test_training_uses_strict_115_to_130_mass_window) ... ok
+
+----------------------------------------------------------------------
+Ran 86 tests in 47.218s
+
+OK
+test_campaign_luminosity_and_selected_features_cannot_be_silently_dropped (test_application.ApplicationTest.test_campaign_luminosity_and_selected_features_cannot_be_silently_dropped) ... ok
+test_failed_campaign_leaves_no_partial_output_and_overwrite_is_restricted (test_application.ApplicationTest.test_failed_campaign_leaves_no_partial_output_and_overwrite_is_restricted) ... ok
+test_input_collision_extra_objects_and_invalid_iterations_rejected (test_application.ApplicationTest.test_input_collision_extra_objects_and_invalid_iterations_rejected) ... ok
+test_invalid_model_predictions_fail_before_publication (test_application.ApplicationTest.test_invalid_model_predictions_fail_before_publication) ... ok
+test_legacy_background_weights_cannot_enter_toy_decoration (test_application.ApplicationTest.test_legacy_background_weights_cannot_enter_toy_decoration) ... ok
+test_metadata_free_custom_and_original_mc_weights_remain_supported (test_application.ApplicationTest.test_metadata_free_custom_and_original_mc_weights_remain_supported) ... ok
+test_real_data_has_no_fabricated_truth_and_supports_primary_purity_branch (test_application.ApplicationTest.test_real_data_has_no_fabricated_truth_and_supports_primary_purity_branch) ... ok
+test_three_cumulative_vectors_preserve_signed_weights_and_originals (test_application.ApplicationTest.test_three_cumulative_vectors_preserve_signed_weights_and_originals) ... ok
+test_apply_expands_directories_globs_and_files_preserving_physics_outputs (test_cli.OmniFoldCLITest.test_apply_expands_directories_globs_and_files_preserving_physics_outputs) ... ok
+test_apply_no_mc_overwrite_and_unmatched_pattern (test_cli.OmniFoldCLITest.test_apply_no_mc_overwrite_and_unmatched_pattern) ... ok
+test_cli_train_loads_from_notebook_api_and_reports_each_completed_iteration (test_cli.OmniFoldCLITest.test_cli_train_loads_from_notebook_api_and_reports_each_completed_iteration) ... ok
+test_cpu_threads_explicit_slurm_and_local_default (test_cli.OmniFoldCLITest.test_cpu_threads_explicit_slurm_and_local_default) ... ok
+test_exports_cannot_create_checkpoints_or_locks_through_direct_or_symlink_paths (test_cli.OmniFoldCLITest.test_exports_cannot_create_checkpoints_or_locks_through_direct_or_symlink_paths) ... ok
+test_failed_second_stage_preserves_checkpoint_and_cli_resume_recovers (test_cli.OmniFoldCLITest.test_failed_second_stage_preserves_checkpoint_and_cli_resume_recovers) ... ok
+test_history_and_likelihood_json_match_api_and_do_not_refit (test_cli.OmniFoldCLITest.test_history_and_likelihood_json_match_api_and_do_not_refit) ... ok
+test_invalid_stage_overrides_fail_without_creating_campaign (test_cli.OmniFoldCLITest.test_invalid_stage_overrides_fail_without_creating_campaign) ... ok
+test_notebook_campaign_resumes_with_one_additional_iteration_by_default (test_cli.OmniFoldCLITest.test_notebook_campaign_resumes_with_one_additional_iteration_by_default) ... ok
+test_parser_rejects_nonpositive_counts_and_resume_training_overrides (test_cli.OmniFoldCLITest.test_parser_rejects_nonpositive_counts_and_resume_training_overrides) ... ok
+test_previous_raw_policy_can_report_but_cli_resume_requires_new_campaign (test_cli.OmniFoldCLITest.test_previous_raw_policy_can_report_but_cli_resume_requires_new_campaign) ... ok
+test_python_module_help_is_available_in_a_fresh_process (test_cli.OmniFoldCLITest.test_python_module_help_is_available_in_a_fresh_process) ... ok
+test_report_failure_preserves_completed_fit_and_report_retry_never_refits (test_cli.OmniFoldCLITest.test_report_failure_preserves_completed_fit_and_report_retry_never_refits) ... ok
+test_report_latest_selected_and_all_iterations_without_training (test_cli.OmniFoldCLITest.test_report_latest_selected_and_all_iterations_without_training) ... ok
+test_stage_override_reaches_only_pull_and_survives_resume (test_cli.OmniFoldCLITest.test_stage_override_reaches_only_pull_and_survives_resume) ... ok
+test_train_cannot_overwrite_an_existing_campaign (test_cli.OmniFoldCLITest.test_train_cannot_overwrite_an_existing_campaign) ... ok
+test_train_default_is_one_iteration_and_all_ratio_settings_are_recorded (test_cli.OmniFoldCLITest.test_train_default_is_one_iteration_and_all_ratio_settings_are_recorded) ... ok
+test_angle_distributions_preserve_radians_and_distinguish_sign_flips (test_diagnostics.DiagnosticsTest.test_angle_distributions_preserve_radians_and_distinguish_sign_flips) ... ok
+test_distribution_default_is_absolute_and_pdf_is_saved (test_diagnostics.DiagnosticsTest.test_distribution_default_is_absolute_and_pdf_is_saved) ... ok
+test_explicit_shape_only_and_extra_observables (test_diagnostics.DiagnosticsTest.test_explicit_shape_only_and_extra_observables) ... ok
+test_histogram_preserves_signed_bins_sumw2_and_flow (test_diagnostics.DiagnosticsTest.test_histogram_preserves_signed_bins_sumw2_and_flow) ... ok
+test_learning_plot_labels_failed_safeguard_without_claiming_acceptance (test_diagnostics.DiagnosticsTest.test_learning_plot_labels_failed_safeguard_without_claiming_acceptance) ... ok
+test_learning_plot_uses_irregular_updates_and_preserves_initial_nn (test_diagnostics.DiagnosticsTest.test_learning_plot_uses_irregular_updates_and_preserves_initial_nn) ... ok
+test_legacy_learning_plot_uses_epochs_without_requiring_training_summary (test_diagnostics.DiagnosticsTest.test_legacy_learning_plot_uses_epochs_without_requiring_training_summary) ... ok
+test_ratio_diagnostics_predict_only_heldout_and_preserve_yields (test_diagnostics.DiagnosticsTest.test_ratio_diagnostics_predict_only_heldout_and_preserve_yields) ... ok
+test_reliability_and_scores_show_only_unchanged_raw_predictions (test_diagnostics.DiagnosticsTest.test_reliability_and_scores_show_only_unchanged_raw_predictions) ... ok
+test_reliability_identifies_zero_signed_denominator (test_diagnostics.DiagnosticsTest.test_reliability_identifies_zero_signed_denominator) ... ok
+test_shape_covariance_accounts_for_random_denominator (test_diagnostics.DiagnosticsTest.test_shape_covariance_accounts_for_random_denominator) ... ok
+test_shape_discrepancy_uses_full_covariance_and_null_mode (test_diagnostics.DiagnosticsTest.test_shape_discrepancy_uses_full_covariance_and_null_mode) ... ok
+test_shared_event_reliability_and_closure_include_cross_covariance (test_diagnostics.DiagnosticsTest.test_shared_event_reliability_and_closure_include_cross_covariance) ... ok
+test_shared_weight_ratio_has_zero_error_for_constant_multiplier (test_diagnostics.DiagnosticsTest.test_shared_weight_ratio_has_zero_error_for_constant_multiplier) ... ok
+test_signed_reliability_keeps_negative_and_above_one_fractions (test_diagnostics.DiagnosticsTest.test_signed_reliability_keeps_negative_and_above_one_fractions) ... ok
+test_validation_rejects_missing_target_and_heldout_events (test_diagnostics.DiagnosticsTest.test_validation_rejects_missing_target_and_heldout_events) ... ok
+test_configuration_uses_large_unregularized_training_defaults (test_ratios.RatioContractTests.test_configuration_uses_large_unregularized_training_defaults) ... ok
+test_full_ratio_is_exact_yield_times_shape_even_for_large_yield (test_ratios.RatioContractTests.test_full_ratio_is_exact_yield_times_shape_even_for_large_yield) ... ok
+test_invalid_features_splits_and_nonfinite_weights_are_rejected (test_ratios.RatioContractTests.test_invalid_features_splits_and_nonfinite_weights_are_rejected) ... ok
+test_negative_events_retained_and_each_split_requires_positive_net_measure (test_ratios.RatioContractTests.test_negative_events_retained_and_each_split_requires_positive_net_measure) ... ok
+test_raw_odds_use_mean_probability_without_rescaling_or_batch_dependence (test_ratios.RatioContractTests.test_raw_odds_use_mean_probability_without_rescaling_or_batch_dependence) ... ok
+test_scaler_uses_only_fit_bank_and_accepts_signed_weights (test_ratios.RatioContractTests.test_scaler_uses_only_fit_bank_and_accepts_signed_weights) ... ok
+member=0 attempt=0 step=0/4 epoch=0 validation=0.7051337 baseline=0.6931472 validation_interval_steps=4
+member=0 attempt=0 step=1/4 epoch=0.5 train=0.7302384 regularization=0 validation=0.7050577 lr=0.0003
+member=0 attempt=0 step=4/4 epoch=2 train=0.696532 regularization=0 validation=0.7050156 lr=0.0003
+member=0 selected_step=4 validation=0.7050156 improved_over_constant=False within_baseline_tolerance=False stop_reason=maximum_optimizer_steps
+member=1 attempt=0 step=0/4 epoch=0 validation=0.6948707 baseline=0.6931472 validation_interval_steps=4
+member=1 attempt=0 step=1/4 epoch=0.5 train=0.6983929 regularization=0 validation=0.6948666 lr=0.0003
+member=1 attempt=0 step=4/4 epoch=2 train=0.6980671 regularization=0 validation=0.6948463 lr=0.0003
+member=1 selected_step=4 validation=0.6948463 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=2 attempt=0 step=0/4 epoch=0 validation=0.6990789 baseline=0.6931472 validation_interval_steps=4
+member=2 attempt=0 step=1/4 epoch=0.5 train=0.7220461 regularization=0 validation=0.699048 lr=0.0003
+member=2 attempt=0 step=4/4 epoch=2 train=0.7007854 regularization=0 validation=0.6990176 lr=0.0003
+member=2 selected_step=4 validation=0.6990176 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=3 attempt=0 step=0/4 epoch=0 validation=0.6991257 baseline=0.6931472 validation_interval_steps=4
+member=3 attempt=0 step=1/4 epoch=0.5 train=0.730024 regularization=0 validation=0.699099 lr=0.0003
+member=3 attempt=0 step=4/4 epoch=2 train=0.7250495 regularization=0 validation=0.6990525 lr=0.0003
+member=3 selected_step=4 validation=0.6990525 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=0 attempt=1 step=0/4 epoch=0 validation=0.6980712 baseline=0.6931472 validation_interval_steps=4
+member=0 attempt=1 step=1/4 epoch=0.5 train=0.7222244 regularization=0 validation=0.6980588 lr=0.0003
+member=0 attempt=1 step=4/4 epoch=2 train=0.6569942 regularization=0 validation=0.6980323 lr=0.0003
+member=0 selected_step=4 validation=0.6980323 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/validation/omnifold/ratios.py:305: RuntimeWarning: The raw mean-score ensemble is within the constant-classifier tolerance but does not meaningfully improve its validation BCE. This can indicate a near-unity ratio or insufficient learned discrimination; inspect held-out reliability and closure. No unity ratio was substituted.
+  ensemble_validation = training._ensemble_validation_summary(
+test_closure_features_do_not_change_fitted_network_or_raw_odds (test_ratios.RatioTrainingTests.test_closure_features_do_not_change_fitted_network_or_raw_odds) ... member=0 attempt=0 step=0/4 epoch=0 validation=0.7051337 baseline=0.6931472 validation_interval_steps=4
+member=0 attempt=0 step=1/4 epoch=0.5 train=0.7302384 regularization=0 validation=0.7050577 lr=0.0003
+member=0 attempt=0 step=4/4 epoch=2 train=0.696532 regularization=0 validation=0.7050156 lr=0.0003
+member=0 selected_step=4 validation=0.7050156 improved_over_constant=False within_baseline_tolerance=False stop_reason=maximum_optimizer_steps
+member=1 attempt=0 step=0/4 epoch=0 validation=0.6948707 baseline=0.6931472 validation_interval_steps=4
+member=1 attempt=0 step=1/4 epoch=0.5 train=0.6983929 regularization=0 validation=0.6948666 lr=0.0003
+member=1 attempt=0 step=4/4 epoch=2 train=0.6980671 regularization=0 validation=0.6948463 lr=0.0003
+member=1 selected_step=4 validation=0.6948463 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=2 attempt=0 step=0/4 epoch=0 validation=0.6990789 baseline=0.6931472 validation_interval_steps=4
+member=2 attempt=0 step=1/4 epoch=0.5 train=0.7220461 regularization=0 validation=0.699048 lr=0.0003
+member=2 attempt=0 step=4/4 epoch=2 train=0.7007854 regularization=0 validation=0.6990176 lr=0.0003
+member=2 selected_step=4 validation=0.6990176 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=3 attempt=0 step=0/4 epoch=0 validation=0.6991257 baseline=0.6931472 validation_interval_steps=4
+member=3 attempt=0 step=1/4 epoch=0.5 train=0.730024 regularization=0 validation=0.699099 lr=0.0003
+member=3 attempt=0 step=4/4 epoch=2 train=0.7250495 regularization=0 validation=0.6990525 lr=0.0003
+member=3 selected_step=4 validation=0.6990525 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+member=0 attempt=1 step=0/4 epoch=0 validation=0.6980712 baseline=0.6931472 validation_interval_steps=4
+member=0 attempt=1 step=1/4 epoch=0.5 train=0.7222244 regularization=0 validation=0.6980588 lr=0.0003
+member=0 attempt=1 step=4/4 epoch=2 train=0.6569942 regularization=0 validation=0.6980323 lr=0.0003
+member=0 selected_step=4 validation=0.6980323 improved_over_constant=False within_baseline_tolerance=True stop_reason=maximum_optimizer_steps
+ok
+test_default_prediction_batches_use_saved_config_and_models_finish_on_cpu (test_ratios.RatioTrainingTests.test_default_prediction_batches_use_saved_config_and_models_finish_on_cpu) ... ok
+test_legacy_calibrated_artifacts_and_injected_corrections_are_rejected (test_ratios.RatioTrainingTests.test_legacy_calibrated_artifacts_and_injected_corrections_are_rejected) ... ok
+test_loading_detects_modified_weights_and_invalid_feature_contract (test_ratios.RatioTrainingTests.test_loading_detects_modified_weights_and_invalid_feature_contract) ... ok
+test_new_policy_training_controls_must_match_serialized_architecture (test_ratios.RatioTrainingTests.test_new_policy_training_controls_must_match_serialized_architecture) ... ok
+test_overwrite_requires_recognized_artifact_and_failed_publication_restores_old (test_ratios.RatioTrainingTests.test_overwrite_requires_recognized_artifact_and_failed_publication_restores_old) ... ok
+test_predictions_preserve_phi_and_psi_as_two_of_seven_inputs (test_ratios.RatioTrainingTests.test_predictions_preserve_phi_and_psi_as_two_of_seven_inputs) ... ok
+test_previous_raw_artifact_keeps_serialized_topology_and_inference (test_ratios.RatioTrainingTests.test_previous_raw_artifact_keeps_serialized_topology_and_inference) ... ok
+test_real_signed_training_raw_odds_diagnostics_and_round_trip (test_ratios.RatioTrainingTests.test_real_signed_training_raw_odds_diagnostics_and_round_trip) ... ok
+test_same_events_cannot_leak_between_target_and_reference_banks (test_ratios.RatioTrainingTests.test_same_events_cannot_leak_between_target_and_reference_banks) ... ok
+test_collision_is_rejected_before_writing_and_empty_input_is_a_noop (test_reporting.ReportingTest.test_collision_is_rejected_before_writing_and_empty_input_is_a_noop) ... ok
+test_failed_pdf_save_preserves_prior_file_removes_temporary_and_keeps_figure (test_reporting.ReportingTest.test_failed_pdf_save_preserves_prior_file_removes_temporary_and_keeps_figure) ... ok
+test_invalid_history_json_preserves_previous_snapshot_and_closes_figures (test_reporting.ReportingTest.test_invalid_history_json_preserves_previous_snapshot_and_closes_figures) ... ok
+test_partial_plot_generation_failure_closes_created_figures_only (test_reporting.ReportingTest.test_partial_plot_generation_failure_closes_created_figures_only) ... ok
+test_report_requires_a_completed_integer_iteration (test_reporting.ReportingTest.test_report_requires_a_completed_integer_iteration) ... ok
+test_report_save_failure_closes_all_generated_figures (test_reporting.ReportingTest.test_report_save_failure_closes_all_generated_figures) ... ok
+test_reports_latest_and_explicit_iteration_layout_history_and_cleanup (test_reporting.ReportingTest.test_reports_latest_and_explicit_iteration_layout_history_and_cleanup) ... ok
+test_separate_vector_pdfs_sanitize_names_and_keep_notebook_figures_open (test_reporting.ReportingTest.test_separate_vector_pdfs_sanitize_names_and_keep_notebook_figures_open) ... ok
+test_background_metadata_guard_accepts_raw_and_generic_weighted_inputs (test_workflow.WorkflowTest.test_background_metadata_guard_accepts_raw_and_generic_weighted_inputs) ... ok
+test_changed_input_is_rejected_before_training_and_on_reload (test_workflow.WorkflowTest.test_changed_input_is_rejected_before_training_and_on_reload) ... ok
+test_checkpoint_corruption_is_rejected_live_and_on_reload (test_workflow.WorkflowTest.test_checkpoint_corruption_is_rejected_live_and_on_reload) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmp69w_ltkw/run/iterations/iteration_0001
+ok
+test_closure_cannot_use_selected_mixed_data_as_truth (test_workflow.WorkflowTest.test_closure_cannot_use_selected_mixed_data_as_truth) ... ok
+test_export_preserves_misses_and_truthless_data (test_workflow.WorkflowTest.test_export_preserves_misses_and_truthless_data) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmppg_spuz9/run/iterations/iteration_0001
+Iteration 2: 1/3 reconstructed data / current signal MC
+Iteration 2: 2/3 cumulative particle-level ratio
+Iteration 2: 3/3 updated folded MC / original folded MC
+Committed iteration 2 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmppg_spuz9/run/iterations/iteration_0002
+ok
+test_failed_step_does_not_change_previous_checkpoint_and_can_retry (test_workflow.WorkflowTest.test_failed_step_does_not_change_previous_checkpoint_and_can_retry) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpo2c6b1xw/run/iterations/iteration_0001
+Iteration 2: 1/3 reconstructed data / current signal MC
+Iteration 2: 2/3 cumulative particle-level ratio
+Iteration 2: 1/3 reconstructed data / current signal MC
+Iteration 2: 2/3 cumulative particle-level ratio
+Iteration 2: 3/3 updated folded MC / original folded MC
+Committed iteration 2 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpo2c6b1xw/run/iterations/iteration_0002
+ok
+test_fixed_reference_likelihood_and_frozen_toy_evaluation (test_workflow.WorkflowTest.test_fixed_reference_likelihood_and_frozen_toy_evaluation) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmptjuqt5rt/run/iterations/iteration_0001
+Iteration 2: 1/3 reconstructed data / current signal MC
+Iteration 2: 2/3 cumulative particle-level ratio
+Iteration 2: 3/3 updated folded MC / original folded MC
+Committed iteration 2 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmptjuqt5rt/run/iterations/iteration_0002
+ok
+test_frozen_likelihood_rejects_known_legacy_toy_background_weights (test_workflow.WorkflowTest.test_frozen_likelihood_rejects_known_legacy_toy_background_weights) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpexwvur7x/run/iterations/iteration_0001
+ok
+test_identity_closure_and_direct_data_weight (test_workflow.WorkflowTest.test_identity_closure_and_direct_data_weight) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpcofpc5la/run/iterations/iteration_0001
+Iteration 2: 1/3 reconstructed data / current signal MC
+Iteration 2: 2/3 cumulative particle-level ratio
+Iteration 2: 3/3 updated folded MC / original folded MC
+Committed iteration 2 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpcofpc5la/run/iterations/iteration_0002
+ok
+test_inefficient_response_two_updates_resume_and_fixed_reference (test_workflow.WorkflowTest.test_inefficient_response_two_updates_resume_and_fixed_reference) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpzof6f7o4/run/iterations/iteration_0001
+Iteration 2: 1/3 reconstructed data / current signal MC
+Iteration 2: 2/3 cumulative particle-level ratio
+Iteration 2: 3/3 updated folded MC / original folded MC
+Committed iteration 2 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpzof6f7o4/run/iterations/iteration_0002
+ok
+test_known_legacy_background_weights_rejected_before_training (test_workflow.WorkflowTest.test_known_legacy_background_weights_rejected_before_training) ... ok
+test_legacy_campaign_and_nonraw_estimator_cannot_resume (test_workflow.WorkflowTest.test_legacy_campaign_and_nonraw_estimator_cannot_resume) ... ok
+test_live_session_and_iteration_manifest_changes_are_rejected (test_workflow.WorkflowTest.test_live_session_and_iteration_manifest_changes_are_rejected) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpj0bzhmxl/run/iterations/iteration_0001
+ok
+test_live_training_policy_changes_require_new_campaign (test_workflow.WorkflowTest.test_live_training_policy_changes_require_new_campaign) ... ok
+test_model_manifest_corruption_is_rejected_on_reload (test_workflow.WorkflowTest.test_model_manifest_corruption_is_rejected_on_reload) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpmxarq2sj/run/iterations/iteration_0001
+ok
+test_previous_raw_training_policy_allows_inference_but_requires_new_campaign (test_workflow.WorkflowTest.test_previous_raw_training_policy_allows_inference_but_requires_new_campaign) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmp3xwpbewr/run/iterations/iteration_0001
+ok
+test_shared_large_config_reaches_all_three_stages (test_workflow.WorkflowTest.test_shared_large_config_reaches_all_three_stages) ... Iteration 1: 1/3 reconstructed data / current signal MC
+Iteration 1: 2/3 cumulative particle-level ratio
+Iteration 1: 3/3 updated folded MC / original folded MC
+Committed iteration 1 to /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/validation-1628168/tmpx64g__gf/run/iterations/iteration_0001
+ok
+
+----------------------------------------------------------------------
+Ran 82 tests in 37.484s
+
+OK

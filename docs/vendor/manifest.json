@@ -1,0 +1,17 @@
+[
+  {
+    "file": "reveal.css",
+    "source": "https://raw.githubusercontent.com/hakimel/reveal.js/5.2.1/dist/reveal.css",
+    "sha256": "68f915a11ebf7203c0446576b7e952ff61c5dd02134a8a226ffaf62ed42136d2"
+  },
+  {
+    "file": "reveal.js",
+    "source": "https://raw.githubusercontent.com/hakimel/reveal.js/5.2.1/dist/reveal.js",
+    "sha256": "46538b52db48724192f59bf46f5e851a18e302777c46f4a34c32709d010d6a29"
+  },
+  {
+    "file": "LICENSE",
+    "source": "https://raw.githubusercontent.com/hakimel/reveal.js/5.2.1/LICENSE",
+    "sha256": "34014800f4126ac2525e224166f099f26628612e95c41f76d70841b63138c989"
+  }
+]

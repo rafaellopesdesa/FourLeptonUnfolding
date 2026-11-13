@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Living research report for Higgs four-lepton unfolding on Unity. Methods, validation, and production status.">
+  <title>Four-lepton unfolding · Research log</title>
+  <link rel="stylesheet" href="vendor/reveal.css">
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+<div class="report-label">FOUR LEPTON STUDY <span>UNITY · 13 NOV 2026</span></div>
+<div class="reveal"><div class="slides">
+  <section class="cover">
+    <p class="eyebrow">Research notebook / 01</p>
+    <h1>Unfolding the<br>Higgs decay.</h1>
+    <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
+    <div class="rule"></div>
+    <p><strong>Current phase:</strong> software validation and generation bootstrap.</p>
+    <p class="small">No generated physics sample or unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
+    <div class="columns"><div>
+      <p class="equation">c<sub>HB</sub> = +0.1<br><span>Λ = 1 TeV</span></p>
+      <p>User-confirmed injection.<br>Controls: c<sub>HB</sub> = 0 and −0.1.</p>
+    </div><div>
+      <p class="equation compact">cos θ₁, cos θ₂, cos θ*,<br>Ψ, Φ, m<sub>Z1</sub>, m<sub>Z2</sub></p>
+      <p>Phi and Psi remain signed angles in radians. m₄ℓ defines selections; m₄ℓ, y₄ℓ and pT₄ℓ never enter these networks.</p>
+      <p class="small">13.6 TeV pp; repository luminosity convention 312 fb⁻¹. The detector is an ATLAS-inspired Delphes approximation.</p>
+    </div></div>
+    <p class="source"><a href="https://arxiv.org/abs/1208.4018">Angular definitions</a> · <a href="https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/main/SMEFT">SMEFT implementation</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">02 / Evidence so far</p><h2>Infrastructure is taking shape</h2>
+    <table><thead><tr><th>Component</th><th>Observed state</th><th>Evidence</th></tr></thead><tbody>
+      <tr><td>Delphes 3.5.1 + project patches</td><td class="pass">Built successfully</td><td>Slurm 1626425</td></tr>
+      <tr><td>Analysis environment</td><td class="pass">Installed; imports pass</td><td>Slurm 1626360</td></tr>
+      <tr><td>NSBI / PyTorch environment</td><td class="pass">Installed; imports pass</td><td>Slurm 1626671</td></tr>
+      <tr><td>Generator stack</td><td class="pending">Build in progress</td><td>Slurm 1631091</td></tr>
+      <tr><td>Updated code validation</td><td class="pass">173 tests passed</td><td>Slurm 1628168</td></tr>
+      <tr><td>Clean-worker ROOT/Delphes environment</td><td class="pass">Validated</td><td>Slurm 1629782</td></tr>
+      <tr><td>Eight-configuration pilot launcher</td><td class="pending">Waiting for generator build</td><td>Slurm 1631123</td></tr>
+      <tr><td>Physics closure / c<sub>HB</sub> fit</td><td>Not started</td><td>No samples yet</td></tr>
+    </tbody></table>
+    <p class="small">Snapshot updated manually from job output. See <a href="CURRENT_STATUS.md">current status</a> for the latest recorded update.</p>
+  </section>
+  <section>
+    <p class="eyebrow">03 / Production design</p><h2>Measure acceptance before scaling</h2>
+    <p class="flow">POWHEG <b>→</b> shower <b>→</b> Delphes <b>→</b> compact ROOT</p>
+    <table><thead><tr><th>Process</th><th>Shower / detector settings</th><th>Required selected reco events</th></tr></thead><tbody>
+      <tr><td>gg_H</td><td>Pythia nominal, scale up, scale down</td><td>≥5M per setting</td></tr>
+      <tr><td>ZZ</td><td>Pythia nominal, scale up, scale down</td><td>≥5M per setting</td></tr>
+      <tr><td>gg_H</td><td>Herwig nominal</td><td>≥5M</td></tr>
+      <tr><td>ZZ</td><td>Herwig nominal</td><td>≥5M</td></tr>
+    </tbody></table>
+    <p>First: one 1,000-event shard per configuration. Record selected counts, Born coverage, negative-weight fractions, CPU time and bytes/event. Generated counts are not reconstructed counts.</p>
+    <p class="small">Persist compact samples and models on /project. Stage active I/O on /work; remove validated intermediates. Soft storage targets: 300 GB /work and 2 TB /project.</p>
+  </section>
+  <section>
+    <p class="eyebrow">04 / Deformation convention</p><h2>Define the injected target exactly</h2>
+    <p class="equation compact">r(x; c) = 1 + c a(x) + c² b(x), &nbsp; c = C<sub>HB</sub> / (Λ/TeV)²</p>
+    <p>The repository uses the full LO decay amplitude with one dimension-six insertion, including its square. Dimension-eight interference and a changed Higgs width are absent.</p>
+    <div class="columns"><div><h3>Source identity</h3><p>gg_H LHE contains an undecayed Higgs. Certified pre-QED shower decay records supply Born leptons. Keep source hashes and event indices.</p></div><div><h3>Closure interpretation</h3><p>The target is generated Herwig density × r. Unity at c = 0 validates the ratio; it does not prove the shower decay equals the exact matrix-element denominator.</p></div></div>
+    <p class="small">Direct e/μ channels are supported. Count unsupported τ-derived decays and undefined angular configurations explicitly before choosing their treatment.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2012.11343">SMEFTsim</a> · <a href="https://arxiv.org/abs/1405.0301">MG5_aMC@NLO</a> · <a href="https://arxiv.org/abs/2606.11083">Born projection, §2.3</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">05 / Statistical construction</p><h2>Signed MC is not Poisson data</h2>
+    <div class="columns"><div><h3>Existing signed resampling</h3><p class="equation compact">E[N₊ − N₋] = μ₊ − μ₋<br>Var[N₊ − N₋] = μ₊ + μ₋</p><p>Its variance exceeds the physical net expectation when negative weights are present.</p></div><div><h3>Required closure check</h3><p>Measure the discrepancy in the pilot. Construct a positive reference for the signed target if needed, validate multivariate closure, then Poisson-sample the deformed intensity.</p></div></div>
+    <p>Deforming an already sampled toy also changes its variance. The c<sub>HB</sub> deformation must enter the sampling intensity for toys intended to reproduce data variance.</p>
+    <p class="small">No absolute-value replacement or dropping negative MC events. Positive-resampling methods need their own bias and correlation validation.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2412.01600">ATLAS NSBI, §6</a> · <a href="https://arxiv.org/abs/2005.09375">Positive Resampler</a> · <a href="https://arxiv.org/abs/2109.07851">Cell resampling</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">06 / Background removal</p><h2>One frozen correction pair</h2>
+    <ol><li>Fit data/(gg_H + ZZ) in 130 &lt; m₄ℓ &lt; 160 GeV; apply the correction to ZZ.</li><li>Fit fiducial signal / contamination in 115 &lt; m₄ℓ &lt; 130 GeV using corrected ZZ.</li><li>Derive both models on one nominal pseudo-data sample. Freeze them for the full pseudo-data ensemble.</li></ol>
+    <p>Validate residual gg_H contamination in the sideband and transport into the signal window. Refit OmniFold for every statistical toy; evaluating frozen OmniFold models does not reproduce unfolding statistical uncertainty.</p>
+    <p class="source"><a href="https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/main/BackgroundRemoval">Repository background-removal contract</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">07 / Implemented code</p><h2>Unregularized, stage-specific fits</h2>
+    <table><thead><tr><th>Stage</th><th>Default</th><th>Purpose</th></tr></thead><tbody>
+      <tr><td>reco_pull</td><td>4 × (4 layers, 1024 neurons); scan smaller</td><td>Data / folded current MC</td></tr>
+      <tr><td>truth_push</td><td>4 × (4 layers, 1024 neurons)</td><td>Cumulative truth reweighting</td></tr>
+      <tr><td>reco_likelihood</td><td>4 × (4 layers, 1024 neurons)</td><td>Updated / original folded MC</td></tr>
+    </tbody></table>
+    <p>New per-stage settings survive resume and cannot silently change mid-run. Nonzero weight decay is rejected. No dropout, penalty, fitted score calibration, or empirical ratio renormalization is introduced.</p>
+    <p class="small">Existing validation stopping and numerical logit bounds remain recorded controls. Raw-score reliability is a diagnostic, never a fitted correction.</p>
+  </section>
+  <section>
+    <p class="eyebrow">08 / Implemented code</p><h2>Systematic endpoint training</h2>
+    <p class="equation compact">R(x) = K · r(x), &nbsp; K = Σw<sub>varied</sub>/Σw<sub>nominal</sub></p>
+    <p>New <code>Systematics.train</code> reuses the pinned NSBI estimator. It trains Herwig/Pythia and muon-scale up/nominal or down/nominal ratios, keeping shape and yield separate.</p>
+    <ul><li>Require explicit process, shower, scale, luminosity and LHE provenance.</li><li>Reject deformed, background-subtracted and pseudo-data inputs.</li><li>Keep repetitions of a hard event in one split across endpoints.</li><li>Store ensemble, raw reliability, normalization and held-out closure diagnostics.</li></ul>
+    <p class="small">These are marginal reco-space endpoints. A fixed marginal ratio is not yet a validated conditional response model for Profile OmniFold.</p>
+  </section>
+  <section>
+    <p class="eyebrow">09 / Software evidence</p><h2>Failures are part of the record</h2>
+    <table><thead><tr><th>Attempt</th><th>Outcome</th><th>Action</th></tr></thead><tbody>
+      <tr><td>1627364</td><td>5 endpoint checks passed; 2 BR errors</td><td>Close mmap caches before NFS cleanup</td></tr>
+      <tr><td>1627826</td><td>5 endpoint + 86 BR passed; 1 OF failure</td><td>Update a test that tried to mutate zero by multiplying it</td></tr>
+      <tr><td>1628168</td><td>173 tests passed</td><td>Separate-stage and resume tests included</td></tr>
+    </tbody></table>
+    <p>The endpoint smoke fit uses four tiny networks and one optimizer step, with deliberately relaxed acceptance tolerance. It checks artifact mechanics; it establishes no modeling accuracy.</p>
+    <p class="small"><a href="TRAINING_LEDGER.md">Training ledger</a> records HPO, ensemble selection, reweighting, reliability and normalization status for each attempted fit category.</p>
+  </section>
+  <section>
+    <p class="eyebrow">10 / Planned ordinary OmniFold study</p><h2>Choose capacity before final closure</h2>
+    <div class="columns"><div><h3>Initial candidates</h3><p>reco_pull: 1–3 layers, 16–128 neurons; batches 32–256 subject to usable fit statistics. Four independent members. Scan optimizer budget and iterations.</p><p>These are proposed candidates, not results. Larger truth and likelihood fits retain the requested baseline.</p></div><div><h3>Selection and assessment</h3><p>Use development pseudo-experiments for predictive validation and stopping. Reserve independent pseudo-experiments and truth events for final closure.</p><p>Track all seven marginals, joint two-sample tests, yields, effective entries, ratio tails and coefficient bias.</p></div></div>
+    <p class="small">Hold input identities and splits fixed across comparable candidates. No hyperparameter selection using the final Herwig truth test sample.</p>
+  </section>
+  <section>
+    <p class="eyebrow">11 / Profile OmniFold gate</p><h2>The response must transport with truth</h2>
+    <p class="equation compact">q(x | z, θ) / q(x | z, 0)</p>
+    <p>The Profile OmniFold update depends on a conditional detector response. Theory variation may change both the truth density and response. A ratio integrated over the original truth mixture may fail after unfolding changes that mixture.</p>
+    <p>Test endpoint transport under controlled truth reweightings. Implement the profiling step only after ordinary closure and a response-model validation.</p>
+    <p class="small">Evaluate several nuisance initializations, objective histories, nuisance trajectories and held-out discriminator performance. The paper's V = 1 − 2|accuracy − ½| is not sufficient if the test classifier is weak; signed weights also need special treatment.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2512.07074">Profile OmniFold, §§2–4</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">12 / Likelihood and inference</p><h2>Keep yields, shapes and constraints distinct</h2>
+    <p class="equation compact">−2 log L = 2ν − 2Σ log λ(xᵢ; c, θ)<br>+ (θ<sub>theory</sub> − a<sub>theory</sub>)² + (θ<sub>exp</sub> − a<sub>exp</sub>)² + const.</p>
+    <p>This is the extended point-process form for unweighted observed events with intensity λ and integral ν. Auxiliary observations a constrain nuisance parameters θ; they are not fixed nuisance values.</p>
+    <p>Background-subtracted weighted events give a pseudo-likelihood, not automatically this ordinary Poisson likelihood. Validate inference using the complete toy procedure or an explicitly modeled signal-plus-background likelihood.</p>
+    <p class="small">c<sub>HB</sub> inference needs normalized coefficient-dependent densities, yield dependence and a demonstrated Neyman/coverage construction where asymptotic assumptions fail.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2412.01548">ATLAS HIGP-2024-14</a> · <a href="https://arxiv.org/abs/2412.01600">ATLAS SOFT-2023-01</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">13 / Ensemble specification</p><h2>Two ensembles, two interpretations</h2>
+    <table><thead><tr><th>Ensemble</th><th>Draw</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td>Statistical: ≥100</td><td>Independent pseudo-data realizations</td><td>Refit unfolding with frozen BR models</td></tr>
+      <tr><td>Auxiliary: 100</td><td>Uniform (a<sub>theory</sub>, a<sub>exp</sub>) ∈ [−2,2]²</td><td>User-requested sensitivity ensemble</td></tr>
+    </tbody></table>
+    <p>Store seeds, observable draws, nuisance estimates, failed fits and all unfolded replicas. Do not interpret uniform-box replica quantiles as Gaussian 68% coverage without a separate construction.</p>
+    <p class="small">NNPDF-style deliverable: event weights and provenance for every accepted replica, plus the failure record. No successful replicas selected by favorable truth agreement.</p>
+  </section>
+  <section>
+    <p class="eyebrow">14 / Reading record</p><h2>Sources tied to implementation decisions</h2>
+    <p>Repository documentation reviewed at <code>48a960a</code>: Generation, PowhegCards, BatchSubmit, Simulation, Analysis, Tools, SMEFT, BackgroundRemoval, Plotting and OmniFold, including subdirectory READMEs.</p>
+    <p>Fourteen cited papers were cached with checksums. Core unfolding and inference methods, angular conventions, generator reweighting, signed-weight treatment and detector-performance sections have been studied.</p>
+    <p>Long reference works were read selectively for this implementation. Caching a complete paper does not mean every page, appendix, or reference was read.</p>
+    <p><a href="READING_NOTES.md">Detailed source register, scope and implications →</a></p>
+    <p class="small">Unity partitions, account, limits, modules and storage guidance were checked on the live cluster. Existing allocations constrain all interactive work.</p>
+  </section>
+  <section class="cover">
+    <p class="eyebrow">Next checkpoint</p><h2>One validated shard<br>from every configuration.</h2>
+    <p class="lead">Finish generator installation → measure full-chain performance → validate signed yields and Born coverage → set the production budget.</p>
+    <div class="rule"></div>
+    <p><a href="CURRENT_STATUS.md">Current status</a> · <a href="TRAINING_LEDGER.md">Training ledger</a> · <a href="READING_NOTES.md">Reading notes</a></p>
+    <p class="small">Living report branch: <code>codex_report</code><br>Code and documentation on main; campaign files and tests on codex branches.</p>
+  </section>
+</div></div>
+<script src="vendor/reveal.js"></script>
+<script src="report.js"></script>
+</body></html>
