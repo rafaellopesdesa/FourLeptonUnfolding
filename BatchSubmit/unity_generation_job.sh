@@ -125,6 +125,12 @@ collect_diagnostics() {
     "$diagnostic_dir/powheg.input"
   copy_if_present "$ACTIVE_WORK_DIR/generation/herwig.in" \
     "$diagnostic_dir/herwig.in"
+  local native_log
+  for native_log in "$ACTIVE_WORK_DIR/generation"/FourLeptonLHERun*.log \
+                    "$ACTIVE_WORK_DIR/generation"/FourLeptonLHERun*.out; do
+    [[ -f "$native_log" ]] || continue
+    copy_if_present "$native_log" "$diagnostic_dir/generation-$(basename "$native_log")"
+  done
   copy_if_present "$ACTIVE_WORK_DIR/generation/run-metadata.txt" \
     "$diagnostic_dir/generation-metadata.txt"
   copy_if_present "$ACTIVE_WORK_DIR/generation/lhe-provenance.json" \
@@ -338,8 +344,15 @@ run_event_stage() {
   }
 
   ACTIVE_STAGE=generation
+  local -a hard_event_options=()
+  if [[ "$SHOWER" == herwig ]]; then
+    # Herwig may discard a hard event during shower/decay generation. Supply
+    # fresh source events instead of recycling the LHE or accepting a short shard.
+    hard_event_options=(--hard-events "$((EVENTS_PER_JOB + (EVENTS_PER_JOB + 99) / 100))")
+  fi
   "$GENERATION_RUNNER" "$PROCESS" "$SHOWER" \
     --events "$EVENTS_PER_JOB" \
+    "${hard_event_options[@]}" \
     --seed "$seed" \
     --run-card "$RUN_CARD" \
     --output-dir "$generation_dir" \

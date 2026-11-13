@@ -50,10 +50,12 @@ class FullChainWorkerTest(unittest.TestCase):
             set -euo pipefail
             output=""
             seed=""
+            hard_events="default"
             while (($#)); do
               case "$1" in
                 --output-dir) output="$2"; shift 2 ;;
                 --seed) seed="$2"; shift 2 ;;
+                --hard-events) hard_events="$2"; shift 2 ;;
                 *) shift ;;
               esac
             done
@@ -62,6 +64,8 @@ class FullChainWorkerTest(unittest.TestCase):
             printf 'process=gg_H\nseed=%s\n' "$seed" >"$output/run-metadata.txt"
             printf '{"schema_version": 1}\n' >"$output/lhe-provenance.json"
             printf 'generation log\n' >"$output/powheg.log"
+            printf 'hard_events=%s\n' "$hard_events" >>"$output/powheg.log"
+            printf 'native rejection details\n' >"$output/FourLeptonLHERun-S1.log"
             """,
         )
         simulation_body = "exit 17" if fail_simulation else """
@@ -236,6 +240,21 @@ class FullChainWorkerTest(unittest.TestCase):
             status = (job / "slurm-status.txt").read_text(encoding="utf-8")
             self.assertIn("stage=simulation", status)
             self.assertFalse(any((root / "scratch").iterdir()))
+
+    def test_herwig_reserve_preserves_requested_compact_count_and_native_logs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, outputs = self.make_campaign(root)
+            config.write_text(config.read_text().replace('SHOWER=pythia', 'SHOWER=herwig'))
+            result = self.run_worker(config)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            output = outputs / 'gg_H_herwig_campaign_job_000000_seed1001.root'
+            with uproot.open(output) as source:
+                self.assertEqual(source['Analysis'].num_entries, 3)
+            diagnostics = root / 'campaign/jobs/job_000000_seed1001/diagnostics'
+            self.assertIn('hard_events=4', (diagnostics / 'generation-powheg.log').read_text())
+            self.assertEqual((diagnostics / 'generation-FourLeptonLHERun-S1.log').read_text(),
+                             'native rejection details\n')
 
     def test_muon_scale_variants_coexist_with_distinct_outputs_and_diagnostics(self):
         with tempfile.TemporaryDirectory() as temporary:
