@@ -20,6 +20,7 @@ Required positional arguments:
 
 Options:
   --events N          Number of events (default: 1000; 0 means all input LHE events)
+  --hard-events N     Generate N POWHEG events before showering (default: --events)
   --seed N            Positive random seed (default: 1)
   --run-card FILE     Override the default PowhegCards/PROCESS.powheg.input card
   --lhe FILE          Skip POWHEG and shower this existing LHE file
@@ -49,6 +50,7 @@ SHOWER="$2"
 shift 2
 
 EVENTS=1000
+HARD_EVENTS=""
 SEED=1
 RUN_CARD=""
 INPUT_LHE=""
@@ -72,6 +74,10 @@ while (($#)); do
   case "$1" in
     --events)
       EVENTS="$2"
+      shift 2
+      ;;
+    --hard-events)
+      HARD_EVENTS="${2:?--hard-events requires a value}"
       shift 2
       ;;
     --seed)
@@ -126,6 +132,19 @@ done
   echo "--seed must be a positive integer" >&2
   exit 2
 }
+if [[ -n "$HARD_EVENTS" ]]; then
+  [[ -z "$INPUT_LHE" ]] || {
+    echo "--hard-events cannot be combined with --lhe." >&2
+    exit 2
+  }
+  [[ "$HARD_EVENTS" =~ ^[1-9][0-9]*$ ]] && ((EVENTS > 0 && HARD_EVENTS >= EVENTS)) || {
+    echo "--hard-events must be a positive integer at least as large as --events." >&2
+    exit 2
+  }
+else
+  HARD_EVENTS="$EVENTS"
+  [[ -z "$INPUT_LHE" ]] || HARD_EVENTS=0
+fi
 
 if [[ ! -f "$SCRIPT_DIR/env.sh" ]]; then
   echo "Missing $SCRIPT_DIR/env.sh; run install_generators.sh first." >&2
@@ -271,7 +290,7 @@ run_powheg() {
   fi
 
   cp "$RUN_CARD" "$OUTPUT_DIR/powheg.input"
-  set_powheg_value numevts "$EVENTS" "$OUTPUT_DIR/powheg.input"
+  set_powheg_value numevts "$HARD_EVENTS" "$OUTPUT_DIR/powheg.input"
   set_powheg_value iseed "$SEED" "$OUTPUT_DIR/powheg.input"
   set_powheg_value lhans1 "$PDF_ID" "$OUTPUT_DIR/powheg.input"
   set_powheg_value lhans2 "$PDF_ID" "$OUTPUT_DIR/powheg.input"
@@ -466,6 +485,7 @@ cat >"$OUTPUT_DIR/run-metadata.txt" <<EOF
 process=$PROCESS
 shower=$SHOWER
 events=$EVENTS
+requested_hard_events=$HARD_EVENTS
 shower_events=$SHOWER_EVENTS
 seed=$SEED
 input_lhe=$INPUT_LHE

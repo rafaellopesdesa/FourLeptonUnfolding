@@ -66,5 +66,30 @@ with fresh seeds, one CPU / 3 GB / one hour per worker. The 3 GB request
 provides headroom above the approximately 2 GB recorded by the 10k pilots.
 The dependent summary validates every shard, persists compact files, records
 actual selected totals and reports missing/failed shards. No subsequent
-production wave is launched automatically. One million generated events is
-not the five-million-selected-event target.
+production wave is launched automatically. One million showered events is
+only the first installment toward the five-million-selected-event target.
+
+Production exposed rare Herwig event discards that exhaust a finite LHE
+source before the requested accepted count. `debug_herwig_eof.sbatch` retains
+the failing seed; `check_herwig_buffer.sbatch` checks a 1% hard-event reserve
+with the original 10,000 hard events unchanged. The reusable worker now supplies
+that reserve for Herwig while retaining the requested showered output count.
+It records actual source/accepted/repeated counts and does not reopen the source.
+The summary reports supplied hard events and showered rows separately.
+
+Updating an executing shell script on NFS caused eight additional failures.
+Do not replace runtime files while jobs use them. New runs and the final
+recovery use the immutable code snapshot recorded in their configuration;
+environment scripts and their checksums are retained with the snapshot.
+`retry_herwig_shards.sbatch` submitted the first three known EOF retries.
+`finish_signal_wave1.sbatch` waits for the original arrays and those retries,
+then makes one recovery attempt for recognized EOF or NFS failures. It
+archives diagnostics, rejects unknown failures, and moves the final summary
+dependency to the recovery jobs before exiting. Do not rerun the earlier
+retry launcher after this controller has been scheduled: it replaces the
+summary dependency. No recovery step launches a new production wave.
+
+After the successful 1k background pilot, `launch_zz_10k.sbatch` checks its
+persisted hashes and storage headroom, then submits one 10k shard per ZZ
+configuration using the immutable snapshot and fresh seeds. Each requests
+one CPU / 3 GB / one hour. The summary validates and persists compact results.

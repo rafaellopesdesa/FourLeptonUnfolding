@@ -49,6 +49,10 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                 checked = validate_analysis_output(path, expected_entries=expected_entries,
                                                     require_lhe=True, require_born=True)
                 with uproot.open(path) as source:
+                    sources = json.loads(str(source['lhe_metadata']))['sources']
+                    if len(sources) != 1:
+                        raise ValueError('Expected one hard-event source per unmerged shard')
+                    provenance = sources[0]
                     arrays = source['Analysis'].arrays(
                         ['reconstructed', 'fiducial', 'reco_m_ZZ', 'weight',
                          'born_available', 'born_kinematics_valid', 'born_n_taus'], library='np')
@@ -56,6 +60,10 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                 signal = selected & (arrays['reco_m_ZZ'] > 115) & (arrays['reco_m_ZZ'] < 130)
                 weights = arrays['weight']
                 item = {'path': str(path), 'validation': asdict(checked),
+                        'hard_source_events': int(provenance['lhe_event_count']),
+                        'hard_source_sha256': provenance['lhe_sha256'],
+                        'showered_events': checked.entries,
+                        'repeated_showered_sources': int(provenance['hepmc_repeated_source_events']),
                         'bytes': path.stat().st_size, 'sha256': digest(path),
                         'reconstructed': int(selected.sum()),
                         'reconstructed_signal_window': int(signal.sum()),
@@ -90,13 +98,17 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                 record['errors'].append(f'{path.name}: {type(error).__name__}: {error}')
         record['totals'] = {name: sum(item[name] for item in record['files'])
                             for name in ('reconstructed', 'reconstructed_signal_window',
-                                         'fiducial', 'negative_weight_entries', 'bytes')}
-        record['totals']['generated'] = sum(item['validation']['entries'] for item in record['files'])
+                                         'fiducial', 'negative_weight_entries', 'bytes',
+                                         'showered_events', 'repeated_showered_sources')}
+        hard_sources = {item['hard_source_sha256']: item['hard_source_events'] for item in record['files']}
+        record['totals']['distinct_hard_sources'] = len(hard_sources)
+        record['totals']['hard_source_events'] = sum(hard_sources.values())
         records.append(record)
     result = {'updated_utc': datetime.now(timezone.utc).isoformat(), 'process': process,
               'samples': records, 'physics_closure_performed': False}
     result['expected_entries_per_shard'] = expected_entries
     result['expected_shards_per_configuration'] = expected_shards
+    result['count_semantics'] = 'Showered/compact rows are distinct from supplied POWHEG hard events; hard sources are deduplicated by SHA256 within each configuration.'
     output = base / f'{process}-summary.json'
     payload = json.dumps(result, indent=2, allow_nan=False) + '\n'
     history = base / f'{process}-summary-{os.environ.get("SLURM_JOB_ID", "interactive")}.json'
@@ -113,7 +125,9 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
             for record in records:
                 status.write(f'- {record["shower"]} {record["scale"]}: '
                              f'{record["totals"]["reconstructed"]} selected / '
-                             f'{record["totals"]["generated"]} generated in validated persisted shards.\n')
+                             f'{record["totals"]["showered_events"]} showered rows from '
+                             f'{record["totals"]["hard_source_events"]} supplied hard events; '
+                             f'{record["totals"]["repeated_showered_sources"]} repeated source occurrences.\n')
     print(json.dumps(result, indent=2))
     return int(any(r['errors'] for r in records))
 
