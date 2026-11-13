@@ -13,4 +13,4 @@ cd "$STUDY/repository"
 export PYTHONPATH="$PWD"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 "$STUDY/repository/Analysis/.pixi/envs/default/bin/python" \
-  Campaigns/bootstrap/summarize_pilot.py "${1:?process required}"
+  Campaigns/bootstrap/summarize_pilot.py "$@"

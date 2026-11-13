@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -23,21 +24,26 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def summarize(process):
+def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected_entries=1000):
     if process not in {'gg_H', 'ZZ'}:
         raise ValueError('Expected gg_H or ZZ')
+    if not all(re.fullmatch(r'[a-zA-Z0-9_]+', value) for value in (run_area, campaign_tag)):
+        raise ValueError('Run area and campaign tag must be simple identifiers')
+    if expected_entries not in (1000, 10000):
+        raise ValueError('Only bounded 1000/10000-event pilots are supported')
+    base = STUDY / 'runs' / run_area
     records = []
     for shower, scale in [('pythia', 'nominal'), ('pythia', 'up'),
                           ('pythia', 'down'), ('herwig', 'nominal')]:
-        pattern = f'{process}_{shower}_*_pilot_20261113_job_*.root'
-        paths = sorted((STUDY / 'runs/pilot/shards' / scale).glob(pattern))
+        pattern = f'{process}_{shower}_*_{campaign_tag}_job_*.root'
+        paths = sorted((base / 'shards' / scale).glob(pattern))
         record = {'process': process, 'shower': shower, 'scale': scale,
                   'files': [], 'errors': []}
         if len(paths) != 1:
             record['errors'].append(f'Expected one shard; found {len(paths)}')
         for path in paths:
             try:
-                checked = validate_analysis_output(path, expected_entries=1000,
+                checked = validate_analysis_output(path, expected_entries=expected_entries,
                                                     require_lhe=True, require_born=True)
                 with uproot.open(path) as source:
                     arrays = source['Analysis'].arrays(
@@ -58,7 +64,7 @@ def summarize(process):
                         'born_available_reco': int((selected & arrays['born_available']).sum()),
                         'born_valid_reco': int((selected & arrays['born_kinematics_valid']).sum()),
                         'born_tau_reco': int((selected & (arrays['born_n_taus'] > 0)).sum())}
-                destination = PROJECT / 'samples/pilot_20261113' / scale / path.name
+                destination = PROJECT / 'samples' / campaign_tag / scale / path.name
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 used = int(subprocess.check_output(['du', '-sb', str(PROJECT)]).split()[0])
                 if used + item['bytes'] > 2_000_000_000_000:
@@ -67,7 +73,7 @@ def summarize(process):
                     if digest(destination) != item['sha256']:
                         raise ValueError(f'Existing persisted shard differs: {destination}')
                 else:
-                    # Only a bounded 1,000-event compact shard is copied here.
+                    # Only a bounded compact pilot shard is copied here.
                     temporary = destination.with_suffix('.partial')
                     if temporary.exists():
                         raise FileExistsError(temporary)
@@ -82,9 +88,10 @@ def summarize(process):
         records.append(record)
     result = {'updated_utc': datetime.now(timezone.utc).isoformat(), 'process': process,
               'samples': records, 'physics_closure_performed': False}
-    output = STUDY / f'runs/pilot/{process}-summary.json'
+    result['expected_entries_per_shard'] = expected_entries
+    output = base / f'{process}-summary.json'
     payload = json.dumps(result, indent=2, allow_nan=False) + '\n'
-    history = STUDY / f'runs/pilot/{process}-summary-{os.environ.get("SLURM_JOB_ID", "interactive")}.json'
+    history = base / f'{process}-summary-{os.environ.get("SLURM_JOB_ID", "interactive")}.json'
     with history.open('x') as stream:
         stream.write(payload)
     output.write_text(payload)
@@ -94,10 +101,14 @@ def summarize(process):
         with (STUDY / 'docs/CURRENT_STATUS.md').open('a') as status:
             status.write(f'\nPilot update {result["updated_utc"]}: {process}; '
                          f'{sum(bool(r["errors"]) for r in records)} configurations with errors. '
-                         f'Measured details: `runs/pilot/{process}-summary.json`.\n')
+                         f'Measured details: `runs/{run_area}/{process}-summary.json`.\n')
     print(json.dumps(result, indent=2))
     return int(any(r['errors'] for r in records))
 
 
 if __name__ == '__main__':
-    raise SystemExit(summarize(sys.argv[1]))
+    if len(sys.argv) == 2:
+        raise SystemExit(summarize(sys.argv[1]))
+    if len(sys.argv) == 5:
+        raise SystemExit(summarize(*sys.argv[1:4], int(sys.argv[4])))
+    raise SystemExit('Expected PROCESS [RUN_AREA CAMPAIGN_TAG ENTRIES]')
