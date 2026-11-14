@@ -1,0 +1,23 @@
+--- a/Born_phsp.f
++++ b/Born_phsp.f
+@@ -149,6 +149,20 @@
+ c this map from 0 to 1 has vanishing derivatives in 0 and 1
+ c (needs some importance sampling for costh near -1 and 1
+       z = 3*xborn(3)**2-2*xborn(3)**3
++c     The smoothstep map is in [0,1] for physical inputs. Floating
++c     point cancellation near one can overshoot by a few ulps, making
++c     phi1_2 evaluate sqrt(1-costh**2) at a negative argument.
++      if(z.lt.0d0.or.z.gt.1d0) then
++         if(xborn(3).lt.0d0.or.xborn(3).gt.1d0.or.
++     1      z.lt.-8d0*epsilon(1d0).or.
++     2      z.gt.1d0+8d0*epsilon(1d0)) then
++            write(*,*) 'ZZ Born angle outside roundoff bounds',
++     1                  xborn(3),z
++            call pwhg_exit(-1)
++         endif
++         z=max(0d0,min(1d0,z))
++         call addtocnt('ZZ angle roundoff clamp',1d0)
++      endif
+       xjac = xjac*6*xborn(3)*(1-xborn(3))
+ 
+       call phi1_2(z,xborn(4),p12,p34,p56,m34,m56,wt)

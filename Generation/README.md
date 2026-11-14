@@ -12,6 +12,16 @@ POWHEG is cloned from its official GitLab repository at core commit
 repositories are initialized as pinned submodules, and the resolved commits are
 recorded in `software/versions.txt`. The installer also creates the process
 object/module directories expected by the upstream make-only build system;
+The ZZ build also applies [a bounded-angle correction](patches/powheg-zz-angle-bound.patch).
+Its smoothstep angular map can round just above one near an endpoint, giving
+an unphysical cosine, non-finite daughter momenta and a subsequent LHAPDF
+`Unphysical Q2 given: nan` exception. The correction clips only an overshoot
+within eight floating-point epsilons for an input in [0,1]; larger violations
+remain fatal. It preserves random seeds, integration weights, cuts and all
+in-range calculations. The installer records the patch checksum in
+`versions.txt`. Validation reproduced the failed seed through its full LHE
+sample and matched three successful production LHE controls byte for byte.
+
 POWHEG does not use a separate `configure` step. Its build is explicitly bound
 to the locally installed `lhapdf-config` and `fastjet-config`. The LHAPDF
 include flags and library directory are passed to the POWHEG compiler and

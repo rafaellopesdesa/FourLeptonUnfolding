@@ -28,6 +28,7 @@ LHAPDF_SET_BASE_URL="${LHAPDF_SET_BASE_URL:-https://lhapdfsets.web.cern.ch/curre
 POWHEG_URL="${POWHEG_URL:-https://gitlab.com/POWHEG-BOX/V2/POWHEG-BOX-V2.git}"
 POWHEG_REF="${POWHEG_REF:-9c3cd9ec74f7c804ea521ef21835ca5db5d3bf9e}"
 POWHEG_ZZ_PATCH="$SCRIPT_DIR/patches/powheg-zz-m4lmin.patch"
+POWHEG_ZZ_ANGLE_PATCH="$SCRIPT_DIR/patches/powheg-zz-angle-bound.patch"
 
 usage() {
   cat <<'EOF'
@@ -506,19 +507,22 @@ install_powheg() {
   git -C "$root" checkout "$POWHEG_REF"
   git -C "$root" submodule update --init gg_H ZZ
 
-  [[ -r "$POWHEG_ZZ_PATCH" ]] || {
-    echo "Missing POWHEG ZZ patch: $POWHEG_ZZ_PATCH" >&2
-    exit 1
-  }
-  if git -C "$root/ZZ" apply --reverse --check "$POWHEG_ZZ_PATCH" >/dev/null 2>&1; then
-    log "POWHEG ZZ m4lmin patch is already applied"
-  elif git -C "$root/ZZ" apply --check "$POWHEG_ZZ_PATCH"; then
-    log "Applying POWHEG ZZ m4lmin patch"
-    git -C "$root/ZZ" apply "$POWHEG_ZZ_PATCH"
-  else
-    echo "The POWHEG ZZ m4lmin patch does not apply cleanly to $root/ZZ" >&2
-    exit 1
-  fi
+  local patch_file
+  for patch_file in "$POWHEG_ZZ_PATCH" "$POWHEG_ZZ_ANGLE_PATCH"; do
+    [[ -r "$patch_file" ]] || {
+      echo "Missing POWHEG ZZ patch: $patch_file" >&2
+      exit 1
+    }
+    if git -C "$root/ZZ" apply --reverse --check "$patch_file" >/dev/null 2>&1; then
+      log "POWHEG ZZ patch already applied: $(basename -- "$patch_file")"
+    elif git -C "$root/ZZ" apply --check "$patch_file"; then
+      log "Applying POWHEG ZZ patch: $(basename -- "$patch_file")"
+      git -C "$root/ZZ" apply "$patch_file"
+    else
+      echo "POWHEG ZZ patch does not apply cleanly: $patch_file" >&2
+      exit 1
+    fi
+  done
 
   for process in gg_H ZZ; do
     local process_dir="$root/$process"
@@ -596,6 +600,8 @@ write_versions() {
     printf 'POWHEG ZZ %s\n' "$(git -C "$powheg_root/ZZ" rev-parse HEAD)"
     printf 'POWHEG ZZ m4lmin patch %s\n' \
       "$(sha256sum "$POWHEG_ZZ_PATCH" | awk '{print $1}')"
+    printf 'POWHEG ZZ angle-bound patch %s\n' \
+      "$(sha256sum "$POWHEG_ZZ_ANGLE_PATCH" | awk '{print $1}')"
   } >"$PREFIX/versions.txt"
 }
 
