@@ -1,0 +1,13 @@
+test_caps_and_all_dependencies_recorded_before_release (test_day.DayTest.test_caps_and_all_dependencies_recorded_before_release) ... ok
+test_changed_prerequisite_prevents_launch (test_day.DayTest.test_changed_prerequisite_prevents_launch) ... ok
+test_deadline_and_stop_file_prevent_submissions (test_day.DayTest.test_deadline_and_stop_file_prevent_submissions) ... ok
+test_fresh_wave_seed_ranges_and_correlated_scales (test_day.DayTest.test_fresh_wave_seed_ranges_and_correlated_scales) ... ok
+test_maximum_wave_count_is_bounded (test_day.DayTest.test_maximum_wave_count_is_bounded) ... ok
+test_monitor_stops_at_its_own_deadline (test_day.DayTest.test_monitor_stops_at_its_own_deadline) ... ok
+test_partial_submission_cancels_only_own_held_jobs (test_day.DayTest.test_partial_submission_cancels_only_own_held_jobs) ... ok
+test_unknown_failure_stops_without_retry (test_day.DayTest.test_unknown_failure_stops_without_retry) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 5.745s
+
+OK

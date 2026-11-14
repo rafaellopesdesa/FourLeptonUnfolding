@@ -1,16 +1,35 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-14 11:25 UTC. The larger wave finished with **1,598/1,600 shards
-validated and persisted (99.875%)**. Two gg_H shards crashed in Delphes
-`SimpleCalorimeter::Process`; the automatic controller stopped on this unknown
-failure, and duplicate cleanup did not run. No bulk production is running.
-The fixed build and neutral-only regression passed. Both failed seeds now
-complete 10,000 events in diagnostic reruns; eight successful-control
-comparisons still gate production recovery. Existing
-samples are retained; their use for training awaits this detector-code check.
-No physics NN training, HPO, unfolding or coefficient measurement has run yet.
+<!-- DAY_PRODUCTION_BEGIN -->
+## Production scheduled for 14 November
 
-## Latest production checkpoint
+Updated: 2026-11-14T12:30:36.924633+00:00
+
+State: **waiting_for_repair**. Queued after two repaired shards, full-wave validation and verified duplicate cleanup.
+New waves stop at 2026-11-15T00:00:00+00:00; running jobs finish. Maximum eight waves, 16M showered rows each.
+Concurrency cap: 100 gg_H + 100 ZZ. One CPU and 4 GiB per task.
+Validated waves completed: 0.
+Control record: `/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_day_20261114/state.json`.
+
+<!-- DAY_PRODUCTION_END -->
+
+
+
+Checkpoint updated 2026-11-14 12:36 UTC. All eight detector controls are now certified:
+seven match across nodes exactly, and the remaining control matches exactly
+when both outputs are analyzed on the same node. Its cross-node difference
+is restricted to six Born angles, at most 8.88e-16. The neutral-only crash
+regression also passes. No physics NN training or unfolding has run yet.
+
+The two production repairs (1707700/1707701) completed. Full-wave validation
+1707702 is running, followed by archive 1707703. Day launcher **1708008** waits
+for that archive to succeed, then automatically runs further bounded waves.
+Monitor **1708012** starts the 30-minute status updates. The active fixed runtime is
+`runs/calorimeter_diagnosis_20261114/runtime`, with detector installation
+`install/delphes-neutral-energy-20261114`; both remain frozen throughout this run. The automated block
+above is authoritative for subsequent wave status and cumulative counts.
+
+## Saved checkpoint before the day run
 
 Counts below exclude pilots and combine signal waves one and two. These are
 selected reconstructed events in the extended analysis region, not showered
@@ -40,18 +59,18 @@ Inspection identifies a particle index used on `fTrackFractions` in Delphes
 [7f2b717](https://github.com/delphes/delphes/commit/7f2b717c96671e78b6724b27aceea2580c9ce73a).
 The neutral-only regression reproduces the original crash and passes with
 the fix (expected/measured energy 16.56550469/16.56550407 GeV). Both failed
-production seeds complete with the fixed build. Comparisons of every compact
-analysis branch in eight successful controls remain in progress.
+production seeds complete with the fixed build. All eight controls are certified. The one non-identical cross-node comparison
+was resolved by same-node analysis (1707521), exact across all 78 branches.
 
 Diagnostic run: `runs/calorimeter_diagnosis_20261114`. Build 1706140; ten
 original-code reproductions 1706142/1706144–1706152; fixed comparisons
 1706181/1706183–1706191; neutral-only regression 1706192. The ten cases cover
 the two failures and one successful control from each configuration. They
 retain bounded intermediate inputs on /work for reuse, with 50 GB headroom
-checked before the build. The original production runtime is untouched. Gate 1706261 will submit exactly
-two production repairs only after all eleven checks pass and all ten input
-LHE/HepMC hashes match the originals. It will then queue full-wave validation
-and checksum-protected duplicate cleanup. No next bulk wave is scheduled.
+checked before the build. The original production runtime is untouched. The original strict comparison stopped gate 1706261. The same-node certificate
+and explicit eight-epsilon bound allowed gate 1707522 to verify all ten input
+LHE/HepMC hashes and submit the two repairs. Validation and cleanup gate the
+day-long continuation described above.
 
 
 Slurm accounting confirms a peak of **200 simultaneous tasks**, exactly 100
@@ -151,7 +170,8 @@ The gate checks output checksums, successful cleanup and sampled temporary
 size below 5 GB. It repeats project storage checks before releasing bulk arrays.
 Eight arrays have a 25-task limit each: at most 200 production jobs in total.
 Normal QOS currently allows 1,000 running / 2,000 submitted jobs per user;
-this bounded wave fits within those limits. No further wave is automatic.
+this bounded wave fits within those limits. Its original stop after one wave
+is superseded by the user-authorized day controller above.
 
 The completion controller permits one bounded same-seed recovery for recognized
 finite-LHE or HepMC-integrity failures, up to 32 tasks; unknown failures stop
@@ -180,15 +200,16 @@ not Slurm disk reservations; other users can affect free space.
 
 - Published main: `e966bd655a5a5e38d79f8bc331083dd17a5dc88b`.
 - Physics tests: `codex_validation`, `100417897f52e1e369b1f66ae611d284de6de952`.
-- Published campaign: `codex_bootstrap_20261113`, `efaf0749e07099ed308f37ecdb6ff9a4c30ff2b3`.
-- Unique report: `codex_report`, 22 reveal.js slides under `/docs`, ready for
+- Published campaign: `codex_bootstrap_20261113`, `2e7cb02f777e6f31e6f355c831b4e5f695e64ea4`.
+- Unique report: `codex_report`, 23 reveal.js slides under `/docs`, ready for
   GitHub Pages. Live hosting has not been configured.
 - Runtime snapshot: `runs/runtime_snapshots/e07de718c4d3967c8efd8f752f5ed1f282be9305`,
   tree equal to main 29a5e30. New wave controls are frozen in the run's `control/`.
   Do not replace executing scripts or installed dependencies while jobs use them.
 - 428 passing component checks, seven campaign/cleanup checks, and the new
-  executable neutral-only calorimeter regression. Eight full-sample equivalence
-  controls are still running; no additional physics training has occurred.
+  executable neutral-only calorimeter regression. Eight detector controls are certified, with an exact same-node check for
+  one cross-node rounding difference. Eight additional day-controller checks
+  pass; no additional physics training has occurred.
   Real-input normalization, native −0.1/0/+0.1 SMEFT ratios and NN readers passed
   earlier pilot checks; these are not HPO or unfolding closure results.
 - Main includes systematic endpoint shape/yield training through NSBI,
@@ -229,3 +250,11 @@ Pilot update 2026-11-14T01:51:12.025783+00:00: ZZ; 0 configurations with errors.
 - pythia up: 14792 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
 - pythia down: 14843 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
 - herwig nominal: 14837 selected / 2000000 showered rows from 2020000 supplied hard events; 0 repeated source occurrences.
+
+2026-11-14T12:21:06.326774+00:00: Calorimeter fix passed a neutral-only regression, two exact-input crash reproductions and eight identical-output controls. Two same-seed repairs submitted, followed by summary 1707702 and archive 1707703.
+
+Pilot update 2026-11-14T12:40:31.890013+00:00: gg_H; 0 configurations with errors. Measured details: `runs/production_parallel_wave2/gg_H-summary.json`.
+- pythia nominal: 320211 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- pythia up: 322291 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- pythia down: 317860 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- herwig nominal: 292915 selected / 2000000 showered rows from 2020000 supplied hard events; 0 repeated source occurrences.

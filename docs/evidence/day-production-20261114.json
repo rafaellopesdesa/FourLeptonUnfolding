@@ -1,0 +1,10 @@
+{
+  "created_utc": "2026-11-14T12:25:53.281853+00:00",
+  "phase": "waiting_for_repair",
+  "completed_waves": [],
+  "message": "Queued after two repaired shards, full-wave validation and verified duplicate cleanup.",
+  "initial_launch_job_id": "1708008",
+  "initial_monitor_job_id": "1708012",
+  "prerequisite_archive_job_id": "1707703",
+  "updated_utc": "2026-11-14T12:30:36.924633+00:00"
+}

@@ -365,3 +365,47 @@ input retention, not bulk production intermediates.
 [Current diagnostic evidence](evidence/calorimeter-diagnosis-checkpoint.json)
 records which comparisons have completed; two repaired diagnostic shards
 are not yet counted as certified production outputs.
+
+## Automatic production through 14 November
+
+Update 2026-11-14 12:36 UTC. Seven original/fixed controls match exactly across all
+78 Analysis branches. The signal Pythia scale-down control differs only in
+six Born angles by 2.22e-16 to 8.88e-16 after analysis on different node types.
+The original strict gate stopped as designed. Job 1707521 reanalyzed both
+original and fixed Delphes files on the same node: all 78 branches and all
+10,000 rows match exactly. The original failed comparison is retained; its
+replacement certificate allows only these six double-precision fields within
+eight machine epsilons (1.776e-15). Reconstructed values, selections, weights
+and all other fields remain exact. No fitted correction or calibration was
+introduced. [Same-node evidence](evidence/calorimeter-roundoff-certificate.json).
+
+Gate 1707522 additionally verified all ten regenerated LHE/HepMC hashes
+against the original production. Both same-seed repairs, 1707700/1707701,
+completed. Summary 1707702 and checksum-protected archive 1707703 precede
+the next launch.
+
+At the user's request, launcher 1708008 schedules successive 16M-showered-row
+waves (200 × 10k × eight configurations), with 100 gg_H and 100 ZZ workers.
+It starts only after archive 1707703 passes. New waves stop at midnight UTC
+on 15 November, with a hard maximum of eight waves; already queued tasks
+finish. Every launch checks 50 GB /work and 10 GB /project headroom below
+the 300 GB / 2 TB targets. All temporary event files use worker-local disk.
+Only one wave is active, all outputs are validated/persisted, and duplicate
+work files are checksum-checked before removal and another launch. Unknown
+failures stop advancement; recognized failures permit one bounded same-seed
+retry. Seeds are fresh between waves and shared between Pythia detector scales.
+
+Eight controller checks passed in 1707729. They cover resource caps,
+dependency order, record-before-release, rollback, deadlines, seed ranges
+and failure stops. Each controller and summary explicitly uses one BLAS/OpenMP
+thread. Monitor 1708012 updates the local status and reveal.js page every
+30 minutes; GitHub remains a separately published snapshot. The frozen
+[configuration](evidence/day-config-20261114.json),
+[submission receipt](evidence/day-submission-20261114.json) and
+[validation output](evidence/day-checks-1707729.txt) record the setup.
+
+The initial two pending scheduling jobs were replaced before execution to
+make thread limits explicit. Slurm's MinJobAge is 300 seconds: the completed
+check job had aged out of active records, so its success was verified through
+accounting instead of reattaching an expired dependency. No production job
+was cancelled or replaced in that scheduler adjustment.

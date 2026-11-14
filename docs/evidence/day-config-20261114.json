@@ -1,0 +1,89 @@
+{
+  "tag": "production_day_20261114",
+  "created_utc": "2026-11-14T12:25:53.144147+00:00",
+  "control": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_day_20261114/control_v2",
+  "control_sha256": {
+    "archive_work_copies.py": "00a979307aec306160522286d12b9aec9186f2163fccebcaaf22d23002863958",
+    "local_worker.py": "f870300011e3ae84c171c44067fd7fa9d07ae610c00b7cdba353a2858360755b",
+    "production_day.py": "aca1f15f6356526578a114a45ad5c0ca88fa3693a5120d77b53a0020d29b9f8f",
+    "summarize_pilot.py": "7f2ec8650832476afdfebc5725cbecb66a00e3e71f64385eaccf6c6d7d0f6177"
+  },
+  "runtime": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/calorimeter_diagnosis_20261114/runtime",
+  "runtime_snapshot_sha256": "5c41c1bc1f364181953f566f32dbf227e481e2c51aeff6f5ff2a08f11559d161",
+  "launch_deadline_utc": "2026-11-15T00:00:00+00:00",
+  "monitor_until_utc": "2026-11-15T04:00:00+00:00",
+  "maximum_waves": 8,
+  "prerequisite_plan": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/plan.json",
+  "prerequisite_summaries": [
+    "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_signal_wave1/gg_H-summary.json",
+    "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/gg_H-summary.json",
+    "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/ZZ-summary.json"
+  ],
+  "templates": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/gg_H_pythia_production_parallel_wave2_20261113/campaign.env",
+      "config_sha256": "3aa7e83e2a32a6b60dbcf3d8d50fa76e45d4566762e119c5b19c4b39ec9b17da",
+      "run_card_sha256": "819d3c617419af4811c881cbcaac9035e7fcd029b70c49116bc099c8b812d9be"
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/gg_H_pythia_production_parallel_wave2_20261113_muon_scale_up/campaign.env",
+      "config_sha256": "81b06828e9ea40261e57cf0b1e81150e88ce5ec9464b1524ad9b2ea2b9d1fd58",
+      "run_card_sha256": "819d3c617419af4811c881cbcaac9035e7fcd029b70c49116bc099c8b812d9be"
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/gg_H_pythia_production_parallel_wave2_20261113_muon_scale_down/campaign.env",
+      "config_sha256": "df2dd39c7340c935bd479493b24fc377a322b1de871875e2d215520c88c9430e",
+      "run_card_sha256": "819d3c617419af4811c881cbcaac9035e7fcd029b70c49116bc099c8b812d9be"
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/gg_H_herwig_production_parallel_wave2_20261113/campaign.env",
+      "config_sha256": "7aa330a6b5ca3b7be0e0f523c2ead254c14639f68c5ed4e9eeb10a7a38c2d071",
+      "run_card_sha256": "819d3c617419af4811c881cbcaac9035e7fcd029b70c49116bc099c8b812d9be"
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/ZZ_pythia_production_parallel_wave2_20261113/campaign.env",
+      "config_sha256": "e5ed9b50671686965c32cf66dc48559a1838afa6b88b440a870bd58c84fc46a2",
+      "run_card_sha256": "8c7f0a96e2131b5444a9be3d371da5aec10597a2ffdb9bf18b489de7d51b874b"
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "up",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/ZZ_pythia_production_parallel_wave2_20261113_muon_scale_up/campaign.env",
+      "config_sha256": "e3903843daa5874687b59cd461654dec27d327d216fac4a1b7e7554b7ddf2043",
+      "run_card_sha256": "8c7f0a96e2131b5444a9be3d371da5aec10597a2ffdb9bf18b489de7d51b874b"
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "down",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/ZZ_pythia_production_parallel_wave2_20261113_muon_scale_down/campaign.env",
+      "config_sha256": "59a21f8c4da7a206ce6984756e08bdf5baa7ce6390c3e5b3d1d94618e61840f0",
+      "run_card_sha256": "8c7f0a96e2131b5444a9be3d371da5aec10597a2ffdb9bf18b489de7d51b874b"
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "scale": "nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/campaigns/ZZ_herwig_production_parallel_wave2_20261113/campaign.env",
+      "config_sha256": "675a159812854f05b1222bd7b4524afa99ca017b14ece89f183b48535eb9f9b3",
+      "run_card_sha256": "8c7f0a96e2131b5444a9be3d371da5aec10597a2ffdb9bf18b489de7d51b874b"
+    }
+  ],
+  "checks_job_id": "1707729"
+}

@@ -1,0 +1,40 @@
+{
+  "updated_utc": "2026-11-14T12:19:00.837593+00:00",
+  "case": "gg_H_pythia_down_000000",
+  "node": "uri-cpu079",
+  "job_id": "1707521",
+  "cross_node_differences": {
+    "born_cos_theta_star": {
+      "unequal_values": 1024,
+      "maximum_absolute_difference": 2.220446049250313e-16
+    },
+    "born_cos_theta1": {
+      "unequal_values": 4500,
+      "maximum_absolute_difference": 4.440892098500626e-16
+    },
+    "born_cos_theta2": {
+      "unequal_values": 4592,
+      "maximum_absolute_difference": 4.440892098500626e-16
+    },
+    "born_Phi": {
+      "unequal_values": 603,
+      "maximum_absolute_difference": 8.881784197001252e-16
+    },
+    "born_Phi1": {
+      "unequal_values": 517,
+      "maximum_absolute_difference": 8.881784197001252e-16
+    },
+    "born_Psi": {
+      "unequal_values": 696,
+      "maximum_absolute_difference": 8.881784197001252e-16
+    }
+  },
+  "absolute_bound": 1.7763568394002505e-15,
+  "same_node_comparison": {
+    "entries": 10000,
+    "branches": 78,
+    "differences": {},
+    "all_branch_values_identical": true
+  },
+  "passed": true
+}

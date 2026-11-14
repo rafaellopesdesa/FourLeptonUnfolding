@@ -143,3 +143,12 @@ completed 10,000 events with the upstream fix. Eight successful-control
 comparisons, 80,000 input rows total, remain in progress; every Analysis
 branch must be identical. These checks are neither HPO nor an unfolding
 closure. No regularization or fitted calibration has been introduced.
+
+### 14 November follow-up: certified detector controls and day scheduler
+
+All ten diagnostic cases are certified: two reproduced crashes recovered,
+seven successful controls identical across nodes, and the eighth identical
+across all 78 branches after same-node analysis. Cross-node Born-angle
+differences are at most 8.88e-16; the strict original comparison is retained.
+The eight day-controller checks pass (1707729). This is production/software
+validation; there are still no NN physics fits, HPO or unfolding results.

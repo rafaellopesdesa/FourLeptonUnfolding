@@ -16,9 +16,12 @@
     <h1>Unfolding the<br>Higgs decay.</h1>
     <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
     <div class="rule"></div>
-    <p><strong>Current phase:</strong> validating a Delphes calorimeter repair.</p>
-    <p class="small">Second wave: 1,598/1,600 shards saved; two crashes under investigation. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+    <p><strong>Current phase:</strong> continuing production in automatically validated waves.</p>
+    <p class="small">Two failed shards repaired; final validation gates the day-long run. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
   </section>
+<!-- DAY_SLIDE_BEGIN -->
+<section><p class="eyebrow">Production / 14 November</p><h2>Automatic waves through the day</h2><p><strong>waiting_for_repair</strong>: Queued after two repaired shards, full-wave validation and verified duplicate cleanup.</p><table><thead><tr><th>Process</th><th>Saved selected / configuration</th><th>Target</th></tr></thead><tbody><tr><td colspan="3">Finalizing repaired-wave counts</td></tr></tbody></table><p>At most 100 gg_H + 100 ZZ jobs. Each wave is validated, saved and checked before the next starts.</p><p class="small">New waves stop at midnight UTC; running jobs finish. Updated 2026-11-14T12:30:36.924633+00:00. Local status refreshes every 30 minutes; GitHub is a published snapshot. <a href="CURRENT_STATUS.md">Details and job records →</a></p></section>
+<!-- DAY_SLIDE_END -->
   <section>
     <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
     <div class="columns"><div>
@@ -99,8 +102,8 @@
       <tr><td>gg_H, first + second waves</td><td>440,177–483,395</td><td>≥5M</td></tr>
       <tr><td>ZZ, second wave</td><td>14,792–14,843</td><td>≥5M</td></tr>
     </tbody></table>
-    <p>Two signal seeds crash in Delphes' calorimeter. Its particle loop indexes a track vector; upstream has a targeted correction. The separate build and neutral-only regression passed; both failed seeds now complete. Eight successful controls test output equivalence.</p>
-    <p>No further bulk wave is running. A guarded recovery will repair the two shards and validate the wave only after all controls and input hashes pass.</p>
+    <p>Two signal seeds crash in Delphes' calorimeter. Its particle loop indexes a track vector; upstream has a targeted correction. The separate build and neutral-only regression passed; both failed seeds now complete. All eight controls are certified, including an exact same-node check for floating-point rounding.</p>
+    <p>The repaired wave is being validated. The next run is queued to continue through midnight UTC, with 100 workers per process and storage checks between waves.</p>
     <p class="small">99.875% successful jobs refers to this wave, not the full sample target. ZZ selection efficiency is about 0.74%. <a href="PILOT_RESULTS.md#large-wave-completion-and-calorimeter-investigation">Failure analysis and evidence →</a></p>
   </section>
   <section>
