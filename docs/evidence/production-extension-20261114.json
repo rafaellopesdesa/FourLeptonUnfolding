@@ -1,0 +1,25 @@
+{
+  "updated_utc": "2026-11-14T21:59:02.997440+00:00",
+  "extension_requested_utc": "2026-11-14T21:35:38+00:00",
+  "launch_deadline_utc": "2026-11-16T21:35:38+00:00",
+  "monitor_until_utc": "2026-11-17T01:35:38+00:00",
+  "interval_minutes": 60,
+  "independently_scheduled_checks": 53,
+  "maximum_waves": 64,
+  "selected_reco_target_per_configuration": 5000000,
+  "initial_caps": {
+    "ggH": 100,
+    "ZZ": 100
+  },
+  "zz_only_cap_after_scratch_checks": 200,
+  "maximum_total_workers": 200,
+  "storage_soft_targets_GB": {
+    "work": 300,
+    "project": 2000
+  },
+  "controller_checks_passed": 37,
+  "production_phase": "archive_validation_running",
+  "first_check_result": "Storage inventory exceeded its initial 90-second allowance. The bounded allowance was increased and a follow-up check submitted.",
+  "monitoring": "Failures, blocked dependencies, two-hour progress stalls, immutable runtime checks, storage capacity and read-after-write availability.",
+  "recovery": "At most two infrastructure retries for validated archives or storage failures before creating a new wave. Unknown physics failures and checksum mismatches remain stopped."
+}
