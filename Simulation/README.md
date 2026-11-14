@@ -249,6 +249,17 @@ added to the unfolding.
 
 ## Install
 
+The pinned release also needs `delphes-neutral-energy.patch`, a backport of
+[upstream fix 7f2b717](https://github.com/delphes/delphes/commit/7f2b717c96671e78b6724b27aceea2580c9ce73a).
+Its particle-hit loop indexed the track-fraction vector with a particle index,
+which can read outside the vector and crash when there are no tracks. The fix
+uses the particle's calorimeter fraction for the neutral-energy sum. The
+installer records the patch checksum in `versions.txt`.
+
+Build into a separate installation while production uses an existing one.
+Validate the changed detector simulation and freeze its environment before
+switching new campaigns; never replace binaries or scripts used by active jobs.
+
 On Ubuntu 24.04 with sudo access:
 
 ```bash
