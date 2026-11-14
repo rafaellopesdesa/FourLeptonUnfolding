@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-11-14T21:59:02.997440+00:00",
+  "updated_utc": "2026-11-14T22:09:08.375276+00:00",
   "extension_requested_utc": "2026-11-14T21:35:38+00:00",
   "launch_deadline_utc": "2026-11-16T21:35:38+00:00",
   "monitor_until_utc": "2026-11-17T01:35:38+00:00",
@@ -18,8 +18,15 @@
     "project": 2000
   },
   "controller_checks_passed": 37,
-  "production_phase": "archive_validation_running",
+  "production_phase": "archive_finalization_running",
   "first_check_result": "Storage inventory exceeded its initial 90-second allowance. The bounded allowance was increased and a follow-up check submitted.",
   "monitoring": "Failures, blocked dependencies, two-hour progress stalls, immutable runtime checks, storage capacity and read-after-write availability.",
-  "recovery": "At most two infrastructure retries for validated archives or storage failures before creating a new wave. Unknown physics failures and checksum mismatches remain stopped."
+  "recovery": "At most two infrastructure retries for validated archives or storage failures before creating a new wave. Unknown physics failures and checksum mismatches remain stopped.",
+  "latest_health_check_completed_utc": "2026-11-14T22:06:45.353407+00:00",
+  "latest_health_check_passed": true,
+  "storage_used_GB": {
+    "work": 76.785034135,
+    "project": 9.648196311
+  },
+  "archive_summaries_passed": true
 }
