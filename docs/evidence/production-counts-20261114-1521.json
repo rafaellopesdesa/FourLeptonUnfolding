@@ -1,0 +1,102 @@
+{
+  "snapshot_started_utc": "2026-11-14T15:21:16.858697+00:00",
+  "snapshot_finished_utc": "2026-11-14T15:21:55.353330+00:00",
+  "definition": "Analysis.reconstructed, extended mass region; excludes pilots and diagnostics",
+  "end_of_day_utc": "2026-11-15T00:00:00+00:00",
+  "measured_clean_wave_cycle_minutes": 104.16652483333334,
+  "planning_range_day_wave_equivalents": [
+    5,
+    6.399919228050021
+  ],
+  "forecast_note": "Planning range, not a confidence interval. Assumes the audited retries pass and sufficient capacity remains on eligible workers. Lower edge allows about 2.4 hours of recovery/queue delay relative to the measured clean-wave pace. Longer delays or a repeated generator failure can give lower totals. Running jobs may finish after midnight.",
+  "samples": [
+    {
+      "configuration": "gg_H pythia nominal",
+      "produced_reconstructed_events": 968147,
+      "fully_validated_and_persisted": 799972,
+      "completed_current_wave_shards": 105,
+      "clean_wave_selected_yield": 319590,
+      "planning_range_at_midnight": [
+        2078332,
+        2525732
+      ]
+    },
+    {
+      "configuration": "gg_H pythia up",
+      "produced_reconstructed_events": 905647,
+      "fully_validated_and_persisted": 805479,
+      "completed_current_wave_shards": 62,
+      "clean_wave_selected_yield": 322084,
+      "planning_range_at_midnight": [
+        2093815,
+        2544707
+      ]
+    },
+    {
+      "configuration": "gg_H pythia down",
+      "produced_reconstructed_events": 898367,
+      "fully_validated_and_persisted": 794754,
+      "completed_current_wave_shards": 65,
+      "clean_wave_selected_yield": 317948,
+      "planning_range_at_midnight": [
+        2066546,
+        2511648
+      ]
+    },
+    {
+      "configuration": "gg_H herwig nominal",
+      "produced_reconstructed_events": 852379,
+      "fully_validated_and_persisted": 735526,
+      "completed_current_wave_shards": 79,
+      "clean_wave_selected_yield": 293864,
+      "planning_range_at_midnight": [
+        1910982,
+        2322368
+      ]
+    },
+    {
+      "configuration": "ZZ pythia nominal",
+      "produced_reconstructed_events": 36743,
+      "fully_validated_and_persisted": 29960,
+      "completed_current_wave_shards": 92,
+      "clean_wave_selected_yield": 15130,
+      "planning_range_at_midnight": [
+        90480,
+        111661
+      ]
+    },
+    {
+      "configuration": "ZZ pythia up",
+      "produced_reconstructed_events": 37203,
+      "fully_validated_and_persisted": 29863,
+      "completed_current_wave_shards": 100,
+      "clean_wave_selected_yield": 15071,
+      "planning_range_at_midnight": [
+        90147,
+        111245
+      ]
+    },
+    {
+      "configuration": "ZZ pythia down",
+      "produced_reconstructed_events": 38060,
+      "fully_validated_and_persisted": 30005,
+      "completed_current_wave_shards": 109,
+      "clean_wave_selected_yield": 15162,
+      "planning_range_at_midnight": [
+        90653,
+        111879
+      ]
+    },
+    {
+      "configuration": "ZZ herwig nominal",
+      "produced_reconstructed_events": 38236,
+      "fully_validated_and_persisted": 29621,
+      "completed_current_wave_shards": 117,
+      "clean_wave_selected_yield": 14784,
+      "planning_range_at_midnight": [
+        88757,
+        109453
+      ]
+    }
+  ]
+}
