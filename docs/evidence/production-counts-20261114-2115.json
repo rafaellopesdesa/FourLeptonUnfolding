@@ -1,0 +1,73 @@
+{
+  "checked_utc": "2026-11-14T21:16:24.992497+00:00",
+  "definition": "Completed selected reconstructed events in the extended mass region; pilots and diagnostic reruns excluded. The final 71 recovered events await full-wave archive validation.",
+  "running_production_workers_at_check": 0,
+  "production_stopped_utc": "2026-11-14T16:30:10+00:00",
+  "previous_clean_cycle_minutes": 104.16652483333334,
+  "latest_wave_start_to_summary_minutes": 113.33580263333333,
+  "scratch_retries_succeeded": 29,
+  "remaining_failed_shards": 0,
+  "forecast_status": "Earlier midnight forecast withdrawn. Processing time was close to the estimate, but the interruption exceeded four hours.",
+  "samples": [
+    {
+      "configuration": "gg_H pythia nominal",
+      "selected_reconstructed": 1119751,
+      "increase_since_1521": 151604,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "gg_H pythia up",
+      "selected_reconstructed": 1127113,
+      "increase_since_1521": 221466,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "gg_H pythia down",
+      "selected_reconstructed": 1112481,
+      "increase_since_1521": 214114,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "gg_H herwig nominal",
+      "selected_reconstructed": 1031500,
+      "increase_since_1521": 179121,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "ZZ pythia nominal",
+      "selected_reconstructed": 44693,
+      "increase_since_1521": 7950,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "ZZ pythia up",
+      "selected_reconstructed": 44514,
+      "increase_since_1521": 7311,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "ZZ pythia down",
+      "selected_reconstructed": 44842,
+      "increase_since_1521": 6782,
+      "latest_wave_shards": 200
+    },
+    {
+      "configuration": "ZZ herwig nominal",
+      "selected_reconstructed": 44402,
+      "increase_since_1521": 6166,
+      "latest_wave_shards": 200
+    }
+  ],
+  "recovery_update_utc": "2026-11-14T21:16:24.992497+00:00",
+  "recovery_phase": "archive_validation_running",
+  "generator_regression_passed": true,
+  "hard_events_in_regression": 10100,
+  "exact_LHE_controls_passed": 3,
+  "recovery_controller_checks_passed": 16,
+  "generator_fix_commit": "32700bd340c1a7df73255cc27deea58eefe88164",
+  "repaired_shard_selected_reconstructed": 71,
+  "repaired_shard_complete_utc": "2026-11-14T20:47:10+00:00",
+  "full_worker_provenance_passed": true,
+  "full_wave_archive_pending": true,
+  "archive_recovery": "Archive validation retried on a node with verified persistent-storage access."
+}
