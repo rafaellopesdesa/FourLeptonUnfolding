@@ -76,7 +76,16 @@ branch against the original when it completed. A separate executable
 regression on `codex_validation` checks a neutral-only event with zero tracks:
 the original crashes and the fixed version conserves the input energy.
 
-`calorimeter_recover.py` may run only after all eleven checks succeed. It also
+One cross-node control differed only in six Born-angle doubles, by at most
+8.88e-16. `calorimeter_roundoff.py` reruns both detector outputs through
+Analysis on the same node and requires exact agreement across all 78 branches.
+Only this named case may use that certificate; recovery also rechecks that
+the original cross-node differences are restricted to those angles, within
+eight double-precision epsilons. Reconstructed values, weights, selections
+and all other branches must remain exact. The original failed comparison is
+retained alongside the additional evidence.
+
+`calorimeter_recover.py` may run only after these checks succeed. It also
 verifies that all ten diagnostic LHE/HepMC hashes equal their original
 production hashes, and checks the fixed binary/environment checksums and
 storage headroom. It archives both failed task records, submits exactly two

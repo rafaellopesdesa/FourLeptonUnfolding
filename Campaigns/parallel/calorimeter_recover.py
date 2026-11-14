@@ -27,8 +27,23 @@ def main():
         result = json.loads((directory / 'comparison.json').read_text())
         if case['expected_original'] == 'success':
             comparison = result['original_vs_fixed']
-            if not comparison['all_branch_values_identical'] or comparison['entries'] != 10000:
-                raise RuntimeError('A successful control changed under the correction')
+            if comparison['entries'] != 10000:
+                raise RuntimeError('A successful control has the wrong entry count')
+            if not comparison['all_branch_values_identical']:
+                certificate = json.loads((directory / 'roundoff-certificate.json').read_text())
+                if (case['name'] != 'gg_H_pythia_down_000000' or
+                        certificate['case'] != case['name'] or not certificate['passed'] or
+                        not certificate['same_node_comparison']['all_branch_values_identical'] or
+                        certificate['same_node_comparison']['entries'] != 10000):
+                    raise RuntimeError('Control difference lacks a matching same-node validation')
+                spec_roundoff = importlib.util.spec_from_file_location('calorimeter_roundoff',
+                                    Path(__file__).with_name('calorimeter_roundoff.py'))
+                roundoff = importlib.util.module_from_spec(spec_roundoff)
+                spec_roundoff.loader.exec_module(roundoff)
+                # Recheck the unchanged inputs; only six Born-angle doubles may
+                # differ, within eight machine epsilons. Reco/weights stay exact.
+                roundoff.assess(Path(result['original_status']['analysis_output']),
+                                Path(result['fixed_analysis']))
             controls += 1
         else:
             if result.get('reproduced_calorimeter_crash') is not True:

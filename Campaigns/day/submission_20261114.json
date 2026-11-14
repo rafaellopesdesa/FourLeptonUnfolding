@@ -1,0 +1,13 @@
+{
+  "launch_job_id": "1708008",
+  "monitor_job_id": "1708012",
+  "prerequisite_archive_job_id": "1707703",
+  "test_job_id": "1707729",
+  "config_sha256": "a061b3900312e10ffc547f88c7f59a91045802b24908c901aa4e2843423c77aa",
+  "superseded_pending_jobs": [
+    "1707849",
+    "1707850"
+  ],
+  "test_accounting_state": "COMPLETED|0:0",
+  "test_dependency_note": "Passed test job expired from Slurm after MinJobAge=300 seconds; success verified with sacct before submission."
+}

@@ -35,6 +35,9 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
     if expected_shards not in (1, 100, 200):
         raise ValueError('Expected one pilot shard or a bounded 100/200-shard production wave')
     base = STUDY / 'runs' / run_area
+    # Inventory once per process summary, then account for each new compact
+    # copy. Rewalking all previously saved shards for every file scales poorly.
+    project_used = int(subprocess.check_output(['du', '-sb', str(PROJECT)]).split()[0])
     records = []
     for shower, scale in [('pythia', 'nominal'), ('pythia', 'up'),
                           ('pythia', 'down'), ('herwig', 'nominal')]:
@@ -82,8 +85,7 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                         'born_tau_reco': int((selected & (arrays['born_n_taus'] > 0)).sum())}
                 destination = PROJECT / 'samples' / campaign_tag / scale / path.name
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                used = int(subprocess.check_output(['du', '-sb', str(PROJECT)]).split()[0])
-                if used + item['bytes'] > 2_000_000_000_000:
+                if project_used + item['bytes'] > 2_000_000_000_000:
                     raise RuntimeError('Project storage target would be exceeded')
                 if destination.exists():
                     if digest(destination) != item['sha256']:
@@ -97,6 +99,7 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                     if digest(temporary) != item['sha256']:
                         raise ValueError('Copied shard checksum mismatch')
                     temporary.rename(destination)
+                    project_used += item['bytes']
                 item['persisted_path'] = str(destination)
                 record['files'].append(item)
             except Exception as error:
@@ -133,7 +136,8 @@ def summarize(process, run_area='pilot', campaign_tag='pilot_20261113', expected
                              f'{record["totals"]["showered_events"]} showered rows from '
                              f'{record["totals"]["hard_source_events"]} supplied hard events; '
                              f'{record["totals"]["repeated_showered_sources"]} repeated source occurrences.\n')
-    print(json.dumps(result, indent=2))
+    print(json.dumps({'process': process, 'manifest': str(output), 'samples': [
+        {k: r[k] for k in ('shower', 'scale', 'totals', 'errors')} for r in records]}, indent=2))
     return int(any(r['errors'] for r in records))
 
 
