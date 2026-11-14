@@ -1,10 +1,69 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-14 00:02 UTC. The first signal wave is complete and persisted. All eight
-node-local pilots passed, and the next 1,592 tasks have been submitted with a
-limit of 100 simultaneous gg_H jobs plus 100 ZZ jobs. Slurm determines the
-actual running count. No physics NN training, HPO, unfolding or coefficient
-measurement has run yet.
+Updated: 2026-11-14 11:25 UTC. The larger wave finished with **1,598/1,600 shards
+validated and persisted (99.875%)**. Two gg_H shards crashed in Delphes
+`SimpleCalorimeter::Process`; the automatic controller stopped on this unknown
+failure, and duplicate cleanup did not run. No bulk production is running.
+The fixed build and neutral-only regression passed. Both failed seeds now
+complete 10,000 events in diagnostic reruns; eight successful-control
+comparisons still gate production recovery. Existing
+samples are retained; their use for training awaits this detector-code check.
+No physics NN training, HPO, unfolding or coefficient measurement has run yet.
+
+## Latest production checkpoint
+
+Counts below exclude pilots and combine signal waves one and two. These are
+selected reconstructed events in the extended analysis region, not showered
+input rows. The goal is at least five million selected events **per row**.
+
+| Process / configuration | Saved selected events | Fraction of 5M target |
+|---|---:|---:|
+| gg_H Pythia nominal | 478742 | 9.57% |
+| gg_H Pythia scale up | 483395 | 9.67% |
+| gg_H Pythia scale down | 476806 | 9.54% |
+| gg_H Herwig nominal | 440177 | 8.80% |
+| ZZ Pythia nominal | 14830 | 0.297% |
+| ZZ Pythia scale up | 14792 | 0.296% |
+| ZZ Pythia scale down | 14843 | 0.297% |
+| ZZ Herwig nominal | 14837 | 0.297% |
+
+Wave two contains 15.98M showered rows and 2.968 GB of compact output. All
+successful shards passed structural/provenance checks and were copied to
+/project. Total project usage was 3.700 GB at 11:07 UTC. Reaching the selected
+ZZ target takes much more generation: its measured selection efficiency is
+about 0.74%, compared with 14.6–16.1% for gg_H in this wave.
+
+The failed seeds are 50000044 (Pythia nominal, task 43) and 60000046
+(Herwig nominal, task 45). Neither failure was an OOM or scratch-space guard.
+Inspection identifies a particle index used on `fTrackFractions` in Delphes
+3.5.1; the upstream correction is commit
+[7f2b717](https://github.com/delphes/delphes/commit/7f2b717c96671e78b6724b27aceea2580c9ce73a).
+The neutral-only regression reproduces the original crash and passes with
+the fix (expected/measured energy 16.56550469/16.56550407 GeV). Both failed
+production seeds complete with the fixed build. Comparisons of every compact
+analysis branch in eight successful controls remain in progress.
+
+Diagnostic run: `runs/calorimeter_diagnosis_20261114`. Build 1706140; ten
+original-code reproductions 1706142/1706144–1706152; fixed comparisons
+1706181/1706183–1706191; neutral-only regression 1706192. The ten cases cover
+the two failures and one successful control from each configuration. They
+retain bounded intermediate inputs on /work for reuse, with 50 GB headroom
+checked before the build. The original production runtime is untouched. Gate 1706261 will submit exactly
+two production repairs only after all eleven checks pass and all ten input
+LHE/HepMC hashes match the originals. It will then queue full-wave validation
+and checksum-protected duplicate cleanup. No next bulk wave is scheduled.
+
+
+Slurm accounting confirms a peak of **200 simultaneous tasks**, exactly 100
+per process. The wave ran from 23:50:04 to 01:31:10 UTC (1 h 41 min), with a
+median task duration of 465 s. These timings include the pilots and queue
+ramp, and exclude the final validation job.
+
+The full scratch audit found 1,600 usage records, maximum sampled per-task
+usage 3.659 GB, minimum sampled free local disk 92.879 GB, zero guard trips,
+and zero leftover workspaces. The current sequential inventory during the
+retained-input diagnostics measured 64.111 GB /work and 3.700 GB /project;
+these remain below the 300 GB / 2 TB targets.
 
 ## Confirmed configuration and authorization
 
@@ -59,7 +118,7 @@ validated/persisted the outputs after correcting scale-suffix filename discovery
 Negative selected weight occurs in every configuration. Signed MC remains
 intact; positive data-like intensity construction needs validation before
 Poisson pseudo-experiments. Selected tau rows are 12/13/9/12. All selected
-Born kinematics are valid. Full background production begins with the next wave.
+Born kinematics are valid. The first background production wave is summarized above.
 
 ## Larger wave and live controls
 
@@ -76,12 +135,12 @@ hour on `cpu` with `--constraint=localscratch`.
 | 1678905 | Verify prerequisites and prepare immutable controls | Complete |
 | 1679053–1679060 | Eight 10k local-disk pilots | All passed; local cleanup verified |
 | 1679061 | Gate and submit remaining 1,592 tasks | Passed and submitted all eight arrays |
-| 1679616–1679619 | Four gg_H arrays, 199 remaining tasks each | Submitted; max 25 workers each |
-| 1679620–1679623 | Four ZZ arrays, 199 remaining tasks each | Submitted; max 25 workers each |
-| 1679624 | Bounded recovery controller | Waiting for all eight arrays |
-| 1679625 | Validate/persist the entire wave | Waiting for recovery controller |
+| 1679616–1679619 | Four gg_H bulk arrays | Terminal; two Delphes failures |
+| 1679620–1679623 | Four ZZ bulk arrays | All completed |
+| 1679624 | Bounded recovery controller | Stopped on unknown calorimeter crash |
+| 1679625 | Validate/persist the entire wave | Saved 1598 shards; failed overall with two missing |
 | 1679187 | Attach verified duplicate cleanup | Completed |
-| 1679659 | Verify saved hashes and remove duplicate work shards | Waiting for successful summary |
+| 1679659 | Verify saved hashes and remove duplicate work shards | Cancelled after summary failure; no deletion |
 
 The eight local pilots finished in 6 min 32 s to 8 min 32 s, with sampled
 peaks of 3.035–3.634 GB and no remaining task files. All guards stayed enabled.
@@ -119,15 +178,17 @@ not Slurm disk reservations; other users can affect free space.
 
 ## Code, validation and reporting
 
-- Published main: `29a5e301674821421a72a759ec7288cb9a38095b`.
-- Physics tests: `codex_validation`, `b57c0f1562ff87f2791e2983e0f389d19263d602`.
-- Published campaign: `codex_bootstrap_20261113`, `6dfd9aad31281032c0decf41bba4408de11c606d`.
-- Unique report: `codex_report`, 21 reveal.js slides under `/docs`, ready for
+- Published main: `e966bd655a5a5e38d79f8bc331083dd17a5dc88b`.
+- Physics tests: `codex_validation`, `100417897f52e1e369b1f66ae611d284de6de952`.
+- Published campaign: `codex_bootstrap_20261113`, `efaf0749e07099ed308f37ecdb6ff9a4c30ff2b3`.
+- Unique report: `codex_report`, 22 reveal.js slides under `/docs`, ready for
   GitHub Pages. Live hosting has not been configured.
 - Runtime snapshot: `runs/runtime_snapshots/e07de718c4d3967c8efd8f752f5ed1f282be9305`,
   tree equal to main 29a5e30. New wave controls are frozen in the run's `control/`.
   Do not replace executing scripts or installed dependencies while jobs use them.
-- 428 passing component checks plus seven passing campaign/cleanup checks.
+- 428 passing component checks, seven campaign/cleanup checks, and the new
+  executable neutral-only calorimeter regression. Eight full-sample equivalence
+  controls are still running; no additional physics training has occurred.
   Real-input normalization, native −0.1/0/+0.1 SMEFT ratios and NN readers passed
   earlier pilot checks; these are not HPO or unfolding closure results.
 - Main includes systematic endpoint shape/yield training through NSBI,
@@ -156,3 +217,15 @@ Detailed attempt history, measured pilots and training diagnostics live in
 2026-11-14T00:01:05.110873+00:00: All eight local pilots passed; 1,592 remaining 10k tasks submitted with a 200-job total cap (100 per physics process). Summary 1679625.
 
 Scheduler snapshot 2026-11-14T00:03:47.829518+00:00: gg_H {'PENDING': 713, 'RUNNING': 83}; ZZ {'PENDING': 796}.
+
+Pilot update 2026-11-14T01:43:10.468486+00:00: gg_H; 2 configurations with errors. Measured details: `runs/production_parallel_wave2/gg_H-summary.json`.
+- pythia nominal: 318571 selected / 1990000 showered rows from 1990000 supplied hard events; 0 repeated source occurrences.
+- pythia up: 322291 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- pythia down: 317860 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- herwig nominal: 291430 selected / 1990000 showered rows from 2009900 supplied hard events; 0 repeated source occurrences.
+
+Pilot update 2026-11-14T01:51:12.025783+00:00: ZZ; 0 configurations with errors. Measured details: `runs/production_parallel_wave2/ZZ-summary.json`.
+- pythia nominal: 14830 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- pythia up: 14792 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- pythia down: 14843 selected / 2000000 showered rows from 2000000 supplied hard events; 0 repeated source occurrences.
+- herwig nominal: 14837 selected / 2000000 showered rows from 2020000 supplied hard events; 0 repeated source occurrences.

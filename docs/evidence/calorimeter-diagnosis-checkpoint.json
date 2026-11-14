@@ -1,0 +1,98 @@
+{
+  "updated_utc": "2026-11-14 11:25 UTC",
+  "build_job_id": "1706140",
+  "neutral_regression": {
+    "original": {
+      "returncode": 129,
+      "log": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/calorimeter_diagnosis_20261114/neutral-regression/original.log"
+    },
+    "fixed": {
+      "returncode": 0,
+      "log": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/calorimeter_diagnosis_20261114/neutral-regression/fixed.log"
+    },
+    "passed": true,
+    "events": 1,
+    "tracks": 0,
+    "expected_energy": 16.565504694633454,
+    "measured_energy": 16.56550407409668
+  },
+  "recovery_gate_job_id": "1706261",
+  "cases": [
+    {
+      "name": "gg_H_pythia_nominal_000000",
+      "seed": 50000001,
+      "original_job_id": "1706142",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "gg_H_pythia_nominal_000043",
+      "seed": 50000044,
+      "original_job_id": "1706144",
+      "expected_original": "simulation_crash",
+      "comparison_completed": true,
+      "fixed_analysis": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/calorimeter_diagnosis_20261114/cases/gg_H_pythia_nominal_000043/fixed/analysis.root",
+      "fixed_analysis_sha256": "524f95da2465c00900c1706051061967298b6d9ef6e10a697ce193a772a28c9f",
+      "reproduced_calorimeter_crash": true
+    },
+    {
+      "name": "gg_H_pythia_up_000000",
+      "seed": 50000001,
+      "original_job_id": "1706145",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "gg_H_pythia_down_000000",
+      "seed": 50000001,
+      "original_job_id": "1706146",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "gg_H_herwig_nominal_000000",
+      "seed": 60000001,
+      "original_job_id": "1706147",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "gg_H_herwig_nominal_000045",
+      "seed": 60000046,
+      "original_job_id": "1706148",
+      "expected_original": "simulation_crash",
+      "comparison_completed": true,
+      "fixed_analysis": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/calorimeter_diagnosis_20261114/cases/gg_H_herwig_nominal_000045/fixed/analysis.root",
+      "fixed_analysis_sha256": "5c72b07903a19b64a6f2844a63f53cda35ec87eb21b52792518bc68448184494",
+      "reproduced_calorimeter_crash": true
+    },
+    {
+      "name": "ZZ_pythia_nominal_000000",
+      "seed": 70000001,
+      "original_job_id": "1706149",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "ZZ_pythia_up_000000",
+      "seed": 70000001,
+      "original_job_id": "1706150",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "ZZ_pythia_down_000000",
+      "seed": 70000001,
+      "original_job_id": "1706151",
+      "expected_original": "success",
+      "comparison_completed": false
+    },
+    {
+      "name": "ZZ_herwig_nominal_000000",
+      "seed": 80000001,
+      "original_job_id": "1706152",
+      "expected_original": "success",
+      "comparison_completed": false
+    }
+  ]
+}

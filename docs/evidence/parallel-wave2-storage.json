@@ -1,0 +1,13 @@
+{
+  "updated_utc": "2026-11-14T11:19:50.418653+00:00",
+  "usage_records": 1600,
+  "maximum_sampled_task_bytes": 3658750463,
+  "minimum_sampled_local_free_bytes": 92878868480,
+  "guard_trips": 0,
+  "uncleaned_task_workspaces": 0,
+  "nonzero_child_exit_records": 2,
+  "persistent_usage": {
+    "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy": 64111004882,
+    "/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy": 3700273504
+  }
+}

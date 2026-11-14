@@ -1,0 +1,43 @@
+{
+  "updated_utc": "2026-11-14T11:17:12.515455+00:00",
+  "all": {
+    "tasks": 1600,
+    "states": {
+      "COMPLETED": 1598,
+      "FAILED": 2
+    },
+    "first_start": "2026-11-13T23:50:04",
+    "last_end": "2026-11-14T01:31:10",
+    "wall_span_seconds": 6066.0,
+    "median_task_seconds": 465.0,
+    "peak_simultaneous_tasks": 200,
+    "task_cpu_hours_allocated": 218.57944444444445
+  },
+  "by_process": {
+    "gg_H": {
+      "tasks": 800,
+      "states": {
+        "COMPLETED": 798,
+        "FAILED": 2
+      },
+      "first_start": "2026-11-13T23:50:04",
+      "last_end": "2026-11-14T01:22:40",
+      "wall_span_seconds": 5556.0,
+      "median_task_seconds": 466.0,
+      "peak_simultaneous_tasks": 100,
+      "task_cpu_hours_allocated": 108.83555555555556
+    },
+    "ZZ": {
+      "tasks": 800,
+      "states": {
+        "COMPLETED": 800
+      },
+      "first_start": "2026-11-13T23:50:04",
+      "last_end": "2026-11-14T01:31:10",
+      "wall_span_seconds": 6066.0,
+      "median_task_seconds": 463.0,
+      "peak_simultaneous_tasks": 100,
+      "task_cpu_hours_allocated": 109.74388888888889
+    }
+  }
+}

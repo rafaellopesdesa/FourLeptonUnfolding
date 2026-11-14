@@ -134,3 +134,12 @@ coefficient ratio, record:
 The nominal HPO study will optimize reco_pull on development toys, then freeze
 its rule before the independent closure/statistical ensemble. The report will
 include unsuccessful choices as well as the selected ones.
+
+## 2026-11-14: detector-code validation, no NN training
+
+Delphes build 1706140 and executable neutral-only regression 1706192 passed.
+Both failed production seeds reproduced the original calorimeter crash and
+completed 10,000 events with the upstream fix. Eight successful-control
+comparisons, 80,000 input rows total, remain in progress; every Analysis
+branch must be identical. These checks are neither HPO nor an unfolding
+closure. No regularization or fitted calibration has been introduced.

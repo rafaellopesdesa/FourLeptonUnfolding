@@ -307,3 +307,61 @@ shards of the same configurations, so the total remains 200 per configuration.
 Recovery controller 1679624 waits for all arrays; final summary 1679625 waits
 for recovery. Archive scheduler 1679187 attaches duplicate cleanup only after
 successful final publication. [Immutable controls and submission manifest](evidence/parallel-wave2-submission.json).
+
+## Large-wave completion and calorimeter investigation
+
+Snapshot: 2026-11-14 11:12 UTC. Wave two saved 1,598 of 1,600 shards, totaling
+15.98M showered rows. All four ZZ configurations passed; gg_H nominal Pythia
+and Herwig each lack one 10k shard. Full counts and manifest checksums are in
+[the checkpoint](evidence/parallel-wave2-checkpoint.json). The selection
+efficiency is approximately 0.74% for ZZ and 14.6–16.1% for gg_H. These
+counts do not constitute an unfolding result.
+
+Pythia seed 50000044 and Herwig seed 60000046 both crashed at the same
+`SimpleCalorimeter::Process` instruction. Their reported peak RSS was below
+4 GiB, local free space remained above 194 GB, and the scratch guards did not
+fire. The original logs and failed task directories are retained. The recovery
+controller correctly refused this previously unrecognized error; summary
+1679625 still persisted the 1,598 valid compact files and reported the two
+holes. Cleanup 1679659 never ran.
+
+The pinned Delphes 3.5.1 particle-hit branch indexes `fTrackFractions[number]`
+with a particle index. This is outside the vector when there are more particles
+than tracks and can dereference a null pointer for zero tracks. The crash
+instruction is the indexed double load at `SimpleCalorimeter::Process+0xd23`
+in the HepMC3 executable. Upstream fixed the neutral-energy calculation in
+[7f2b717](https://github.com/delphes/delphes/commit/7f2b717c96671e78b6724b27aceea2580c9ce73a).
+We backported that change into a separate installation without touching the
+production runtime. A neutral-only executable regression and ten retained-input
+cases are queued: both failed seeds and a successful control from each of the
+eight configurations. Fixed outputs will be validated and compared branch by
+branch. Until those checks pass, saved production samples are held from
+training and no further bulk wave is submitted.
+
+Diagnostics, configs and job records live under
+`runs/calorimeter_diagnosis_20261114`; build 1706140 and comparison jobs
+1706181/1706183–1706192. No original seed is replaced or event silently dropped.
+
+Update 2026-11-14 11:25 UTC: the isolated build and neutral-only regression passed.
+The old executable returns 129 with `SimpleCalorimeter::Process` in its crash
+trace; the corrected executable returns zero and gives 16.56550407 GeV for
+16.56550469 GeV of neutral input energy. Both original failing production
+seeds also reproduced their crashes and completed all 10,000 events with the
+fix. The eight successful-control comparisons are in progress. Gate 1706261
+requires all checks and original LHE/HepMC hash equality before submitting
+two repairs, validation and checksum-protected cleanup. Main now includes
+the small upstream backport at e966bd6.
+
+[Slurm accounting](evidence/parallel-wave2-scheduler.json) measures a peak of
+200 workers, 100 per process; 1 h 41 min from the first pilot start to the
+last production task; median task time 465 s; and 218.58 allocated CPU-hours.
+The [full scratch audit](evidence/parallel-wave2-storage.json) covers all
+1,600 tasks: largest sampled footprint 3.659 GB, least sampled free space
+92.879 GB, zero guard trips and zero uncleaned task workspaces. A sequential
+inventory during the retained-input diagnostics measured 64.111 GB /work and
+3.700 GB /project. The temporary increase in /work is bounded diagnostic
+input retention, not bulk production intermediates.
+
+[Current diagnostic evidence](evidence/calorimeter-diagnosis-checkpoint.json)
+records which comparisons have completed; two repaired diagnostic shards
+are not yet counted as certified production outputs.

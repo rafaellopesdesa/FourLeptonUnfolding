@@ -9,15 +9,15 @@
   <link rel="stylesheet" href="report.css">
 </head>
 <body>
-<div class="report-label">FOUR LEPTON STUDY <span>UNITY · 13 NOV 2026</span></div>
+<div class="report-label">FOUR LEPTON STUDY <span>UNITY · 14 NOV 2026</span></div>
 <div class="reveal"><div class="slides">
   <section class="cover">
     <p class="eyebrow">Research notebook / 01</p>
     <h1>Unfolding the<br>Higgs decay.</h1>
     <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
     <div class="rule"></div>
-    <p><strong>Current phase:</strong> scaling production with local temporary storage.</p>
-    <p class="small">First signal wave: 400/400 shards validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+    <p><strong>Current phase:</strong> validating a Delphes calorimeter repair.</p>
+    <p class="small">Second wave: 1,598/1,600 shards saved; two crashes under investigation. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
   </section>
   <section>
     <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
@@ -85,13 +85,23 @@
   <section>
     <p class="eyebrow">Production / Capacity and storage</p><h2>100 workers per physics process</h2>
     <table><thead><tr><th>Resource</th><th>Measured / planned</th></tr></thead><tbody>
-      <tr><td>Persistent usage</td><td>26.3 GB /work; 0.73 GB /project</td></tr>
-      <tr><td>Temporary files per 10k task</td><td>3.54–3.55 GB; moved to node-local disk</td></tr>
-      <tr><td>Next bounded wave</td><td>2M showered rows × eight configurations</td></tr>
-      <tr><td>Concurrency cap</td><td>100 gg_H + 100 ZZ; one CPU / 4 GiB each</td></tr>
+      <tr><td>Persistent usage</td><td>64.1 GB /work with diagnostics; 3.70 GB /project</td></tr>
+      <tr><td>Temporary files per 10k task</td><td>≤3.66 GB sampled across all 1,600 tasks</td></tr>
+      <tr><td>Wave two saved</td><td>15.98M showered rows; 1,598/1,600 shards</td></tr>
+      <tr><td>Concurrency cap</td><td>Observed peak: 100 gg_H + 100 ZZ</td></tr>
     </tbody></table>
-    <p>All eight local-disk pilots passed, using 3.0–3.64 GB each with complete cleanup. The remaining 1,592 tasks are submitted. Per-task disk monitoring and project headroom checks stay active.</p>
+    <p>All eight local-disk pilots passed, using 3.0–3.64 GB each with complete cleanup. The larger wave saved 1,598/1,600 shards. Two calorimeter crashes stopped final completion. Per-task disk monitoring and project headroom checks stayed active.</p>
     <p class="small">Use immutable code; persist validated compact results; remove only checksum-verified duplicate work files. <a href="PILOT_RESULTS.md#scaling-with-node-local-temporary-storage">Storage probes and campaign validation →</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">Production / 14 November checkpoint</p><h2>1,598 of 1,600 shards saved</h2>
+    <table><thead><tr><th>Selected reco, excluding pilots</th><th>Saved</th><th>Goal per configuration</th></tr></thead><tbody>
+      <tr><td>gg_H, first + second waves</td><td>440,177–483,395</td><td>≥5M</td></tr>
+      <tr><td>ZZ, second wave</td><td>14,792–14,843</td><td>≥5M</td></tr>
+    </tbody></table>
+    <p>Two signal seeds crash in Delphes' calorimeter. Its particle loop indexes a track vector; upstream has a targeted correction. The separate build and neutral-only regression passed; both failed seeds now complete. Eight successful controls test output equivalence.</p>
+    <p>No further bulk wave is running. A guarded recovery will repair the two shards and validate the wave only after all controls and input hashes pass.</p>
+    <p class="small">99.875% successful jobs refers to this wave, not the full sample target. ZZ selection efficiency is about 0.74%. <a href="PILOT_RESULTS.md#large-wave-completion-and-calorimeter-investigation">Failure analysis and evidence →</a></p>
   </section>
   <section>
     <p class="eyebrow">Background / Larger pilot</p><h2>The ZZ chain also completes</h2>

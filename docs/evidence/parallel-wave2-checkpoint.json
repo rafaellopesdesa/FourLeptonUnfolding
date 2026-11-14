@@ -1,0 +1,194 @@
+{
+  "updated_utc": "2026-11-14 11:12 UTC",
+  "wave": "production_parallel_wave2_20261113",
+  "phase": "summary_failed",
+  "successful_shards": 1598,
+  "expected_shards": 1600,
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "totals": {
+        "reconstructed": 318571,
+        "reconstructed_signal_window": 307663,
+        "fiducial": 438555,
+        "negative_weight_entries": 782,
+        "bytes": 356844289,
+        "showered_events": 1990000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 199,
+        "hard_source_events": 1990000
+      },
+      "errors": [
+        "Expected 200 shards; found 199"
+      ],
+      "validated_shards": 199,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/gg_H-summary.json",
+      "manifest_sha256": "c7421b0efc40df5627bd356cb0e9b0abbfd18dca8f74df7e854461167745e3e5"
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "totals": {
+        "reconstructed": 322291,
+        "reconstructed_signal_window": 309883,
+        "fiducial": 440781,
+        "negative_weight_entries": 785,
+        "bytes": 358708470,
+        "showered_events": 2000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 200,
+        "hard_source_events": 2000000
+      },
+      "errors": [],
+      "validated_shards": 200,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/gg_H-summary.json",
+      "manifest_sha256": "c7421b0efc40df5627bd356cb0e9b0abbfd18dca8f74df7e854461167745e3e5"
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "totals": {
+        "reconstructed": 317860,
+        "reconstructed_signal_window": 307196,
+        "fiducial": 440781,
+        "negative_weight_entries": 785,
+        "bytes": 358559756,
+        "showered_events": 2000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 200,
+        "hard_source_events": 2000000
+      },
+      "errors": [],
+      "validated_shards": 200,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/gg_H-summary.json",
+      "manifest_sha256": "c7421b0efc40df5627bd356cb0e9b0abbfd18dca8f74df7e854461167745e3e5"
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "totals": {
+        "reconstructed": 291430,
+        "reconstructed_signal_window": 281707,
+        "fiducial": 401276,
+        "negative_weight_entries": 831,
+        "bytes": 349576462,
+        "showered_events": 1990000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 199,
+        "hard_source_events": 2009900
+      },
+      "errors": [
+        "Expected 200 shards; found 199"
+      ],
+      "validated_shards": 199,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/gg_H-summary.json",
+      "manifest_sha256": "c7421b0efc40df5627bd356cb0e9b0abbfd18dca8f74df7e854461167745e3e5"
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "nominal",
+      "totals": {
+        "reconstructed": 14830,
+        "reconstructed_signal_window": 4222,
+        "fiducial": 20928,
+        "negative_weight_entries": 15971,
+        "bytes": 387296990,
+        "showered_events": 2000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 200,
+        "hard_source_events": 2000000
+      },
+      "errors": [],
+      "validated_shards": 200,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/ZZ-summary.json",
+      "manifest_sha256": "89880384690d8e40a59f2ba13a6d362d88b15c19d3e25d466ec16ad6816fd106"
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "up",
+      "totals": {
+        "reconstructed": 14792,
+        "reconstructed_signal_window": 4192,
+        "fiducial": 20928,
+        "negative_weight_entries": 15971,
+        "bytes": 387326303,
+        "showered_events": 2000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 200,
+        "hard_source_events": 2000000
+      },
+      "errors": [],
+      "validated_shards": 200,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/ZZ-summary.json",
+      "manifest_sha256": "89880384690d8e40a59f2ba13a6d362d88b15c19d3e25d466ec16ad6816fd106"
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "down",
+      "totals": {
+        "reconstructed": 14843,
+        "reconstructed_signal_window": 4309,
+        "fiducial": 20928,
+        "negative_weight_entries": 15971,
+        "bytes": 387283914,
+        "showered_events": 2000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 200,
+        "hard_source_events": 2000000
+      },
+      "errors": [],
+      "validated_shards": 200,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/ZZ-summary.json",
+      "manifest_sha256": "89880384690d8e40a59f2ba13a6d362d88b15c19d3e25d466ec16ad6816fd106"
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "scale": "nominal",
+      "totals": {
+        "reconstructed": 14837,
+        "reconstructed_signal_window": 4279,
+        "fiducial": 20762,
+        "negative_weight_entries": 16032,
+        "bytes": 382280324,
+        "showered_events": 2000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 200,
+        "hard_source_events": 2020000
+      },
+      "errors": [],
+      "validated_shards": 200,
+      "manifest": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/ZZ-summary.json",
+      "manifest_sha256": "89880384690d8e40a59f2ba13a6d362d88b15c19d3e25d466ec16ad6816fd106"
+    }
+  ],
+  "failures": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "task": 43,
+      "seed": 50000044,
+      "slurm_job_id": "1680277"
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "task": 45,
+      "seed": 60000046,
+      "slurm_job_id": "1680559"
+    }
+  ],
+  "failure_signature": "SimpleCalorimeter::Process segmentation violation",
+  "upstream_fix": "https://github.com/delphes/delphes/commit/7f2b717c96671e78b6724b27aceea2580c9ce73a",
+  "production_use": "held pending calorimeter fix validation"
+}
