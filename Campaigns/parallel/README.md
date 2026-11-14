@@ -58,3 +58,29 @@ They cover gates, caps, dependency order, partial-submission rollback, failure
 classification, and checksum-protected duplicate cleanup. `validate.sbatch`
 runs them through Slurm. Physics-input validation is the separate eight-pilot
 gate; these software checks do not establish unfolding closure.
+
+## Calorimeter failure diagnosis (14 November)
+
+The bulk arrays completed 1,598/1,600 tasks. Two signal seeds crashed in
+Delphes 3.5.1 `SimpleCalorimeter::Process`: its particle-hit loop indexed a
+track-fraction vector. The upstream correction is commit
+`7f2b717c96671e78b6724b27aceea2580c9ce73a`.
+
+`calorimeter_build.sbatch` builds that backport in a separate installation.
+`calorimeter_diagnosis.py` submits the two original failure seeds and eight
+successful controls, retaining bounded inputs under /work. It changes only
+diagnostic storage settings and leaves the production runtime untouched.
+`calorimeter_compare.py` reuses each identical HepMC input with the fixed
+detector, validates the resulting compact tree, and compares every analysis
+branch against the original when it completed. A separate executable
+regression on `codex_validation` checks a neutral-only event with zero tracks:
+the original crashes and the fixed version conserves the input energy.
+
+`calorimeter_recover.py` may run only after all eleven checks succeed. It also
+verifies that all ten diagnostic LHE/HepMC hashes equal their original
+production hashes, and checks the fixed binary/environment checksums and
+storage headroom. It archives both failed task records, submits exactly two
+same-seed repairs with explicit fixed-runtime configs, then a full summary
+and checksum-protected duplicate cleanup. It never substitutes seeds,
+silently drops events, or launches the next bulk wave. Record job IDs and
+dependencies in the diagnostic run before releasing work.
