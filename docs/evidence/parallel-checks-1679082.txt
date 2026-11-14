@@ -1,0 +1,171 @@
+test_bad_persisted_copy_prevents_all_removals (test_archive.ArchiveTest.test_bad_persisted_copy_prevents_all_removals) ... ok
+test_verified_cleanup_preserves_persistent_data_and_is_repeatable (test_archive.ArchiveTest.test_verified_cleanup_preserves_persistent_data_and_is_repeatable) ... ok
+test_bulk_caps_and_dependencies_are_saved_before_release (test_production.ProductionGateTest.test_bulk_caps_and_dependencies_are_saved_before_release) ... ok
+test_failed_pilot_prevents_any_bulk_submission (test_production.ProductionGateTest.test_failed_pilot_prevents_any_bulk_submission) ... ok
+test_mutated_pilot_is_not_accepted (test_production.ProductionGateTest.test_mutated_pilot_is_not_accepted) ... ok
+test_partial_submission_cancels_only_its_held_jobs (test_production.ProductionGateTest.test_partial_submission_cancels_only_its_held_jobs) ... ok
+test_unknown_failure_never_triggers_an_automatic_retry (test_production.ProductionGateTest.test_unknown_failure_never_triggers_an_automatic_retry) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 3.938s
+
+OK
+{
+  "updated_utc": "2026-11-13T23:50:44.596822+00:00",
+  "removed_work_files": 2,
+  "removed_work_bytes": 44,
+  "verified_persisted_files": 2,
+  "persistent_directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmppw2clpa_/project/samples/wave"
+}
+{
+  "updated_utc": "2026-11-13T23:50:44.612646+00:00",
+  "removed_work_files": 0,
+  "removed_work_bytes": 0,
+  "verified_persisted_files": 2,
+  "persistent_directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmppw2clpa_/project/samples/wave"
+}
+{
+  "phase": "bulk_submitted",
+  "control": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/control",
+  "samples": [
+    {
+      "name": "gg_H_pythia_nominal",
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_pythia_nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_pythia_nominal/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "101"
+    },
+    {
+      "name": "gg_H_pythia_up",
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_pythia_up",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_pythia_up/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "102"
+    },
+    {
+      "name": "gg_H_pythia_down",
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_pythia_down",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_pythia_down/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "103"
+    },
+    {
+      "name": "gg_H_herwig_nominal",
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_herwig_nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/gg_H_herwig_nominal/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "104"
+    },
+    {
+      "name": "ZZ_pythia_nominal",
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "nominal",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_pythia_nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_pythia_nominal/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "105"
+    },
+    {
+      "name": "ZZ_pythia_up",
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "up",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_pythia_up",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_pythia_up/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "106"
+    },
+    {
+      "name": "ZZ_pythia_down",
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "down",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_pythia_down",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_pythia_down/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "107"
+    },
+    {
+      "name": "ZZ_herwig_nominal",
+      "process": "ZZ",
+      "shower": "herwig",
+      "scale": "nominal",
+      "base_seed": 50000001,
+      "directory": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_herwig_nominal",
+      "config": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/bootstrap/tmp/tmpeefpr0mb/ZZ_herwig_nominal/campaign.env",
+      "config_sha256": "7809f87fee4ffa1d873bfbce5ba6ead17b081b425fb206c638aca5954fc60729",
+      "pilot_local_storage": {
+        "guard": null,
+        "child_exit_code": 0,
+        "remaining_workspace_paths": [],
+        "sampled_peak_bytes": 3600000000
+      },
+      "bulk_job_id": "108"
+    }
+  ],
+  "storage_before_bulk": {},
+  "finish_job_id": "109",
+  "summary_job_id": "110"
+}

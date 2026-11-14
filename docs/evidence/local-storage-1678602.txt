@@ -1,0 +1,11 @@
+{"SLURM_JOB_ID": "1678602", "SLURMD_NODENAME": "cpu045", "SLURM_TMPDIR": null, "TMPDIR": "/tmp", "USER": "rclsa_umass_edu"}
+PATH /localscratch WRITABLE True
+drwxrwxrwt 3 root root 4096 Sep 15 15:04 /localscratch
+Filesystem         1B-blocks  Used     Available Use% Mounted on
+/dev/md0       1179995271168 28672 1119979290624   1% /localscratch
+/localscratch /dev/md0 ext4   rw,relatime,stripe=256
+PATH /tmp WRITABLE True
+drwx------ 2 rclsa_umass_edu root 4096 Nov 13 23:41 /tmp
+Filesystem        1B-blocks        Used    Available Use% Mounted on
+/dev/sda2      234622992384 22519058432 200111583232  11% /tmp
+/tmp   /dev/sda2[/var/tmp/cpu045/1678602/.1678602/_tmp] ext4   rw,relatime

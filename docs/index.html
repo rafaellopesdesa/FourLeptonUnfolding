@@ -16,8 +16,8 @@
     <h1>Unfolding the<br>Higgs decay.</h1>
     <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
     <div class="rule"></div>
-    <p><strong>Current phase:</strong> signal recovery and validation.</p>
-    <p class="small">1k/10k signal and ZZ pilots validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+    <p><strong>Current phase:</strong> scaling production with local temporary storage.</p>
+    <p class="small">First signal wave: 400/400 shards validated. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
   </section>
   <section>
     <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
@@ -72,7 +72,7 @@
       <tr><td>gg_H</td><td>Herwig nominal</td><td>≥5M</td></tr>
       <tr><td>ZZ</td><td>Herwig nominal</td><td>≥5M</td></tr>
     </tbody></table>
-    <p>First signal wave: one million showered events per configuration, At 21:56 UTC, 384/400 shards succeeded. The original arrays have finished; 12 recovery tasks are running and four are queued. Final validation waits for all retries. The four 10k ZZ pilots are validated and persisted.</p>
+    <p>First signal wave is complete: one million showered events per configuration selects 160,171 / 161,104 / 158,946 / 148,747 reconstructed events. All 400 shards are validated and persisted. The four 10k ZZ pilots also passed.</p>
     <p class="small">Persist compact samples and models on /project. Stage active I/O on /work; remove validated intermediates. Soft storage targets: 300 GB /work and 2 TB /project.</p>
   </section>
   <section>
@@ -80,7 +80,18 @@
     <p>Two rare Herwig discards left 9,998 accepted events from a 10,000-event finite source. The same seed succeeds with 10,100 supplied hard events and 10,000 unique showered outputs.</p>
     <p>New Herwig workers use a 1% reserve. They retain original source identities, keep exceptions fatal, and never reopen the source. All three initial full-chain retries have passed.</p>
     <p>I also caused eight NFS failures by updating an executing shared script. Partial files were rejected. Runtime files are now frozen; new jobs and final recovery use an immutable snapshot.</p>
-    <p class="small">Controller 1645888 has submitted all 16 remaining retries; summary 1636701 waits for them. See <a href="PILOT_RESULTS.md#finite-herwig-input-and-runtime-deployment-failure">failure history and evidence</a>. No physics closure is inferred from these checks.</p>
+    <p class="small">All recovery tasks passed. Summary 1636701 validated/persisted the complete wave at 22:18 UTC. See <a href="PILOT_RESULTS.md#finite-herwig-input-and-runtime-deployment-failure">failure history and evidence</a>. No physics closure is inferred from these checks.</p>
+  </section>
+  <section>
+    <p class="eyebrow">Production / Capacity and storage</p><h2>100 workers per physics process</h2>
+    <table><thead><tr><th>Resource</th><th>Measured / planned</th></tr></thead><tbody>
+      <tr><td>Persistent usage</td><td>26.3 GB /work; 0.73 GB /project</td></tr>
+      <tr><td>Temporary files per 10k task</td><td>3.54–3.55 GB; moved to node-local disk</td></tr>
+      <tr><td>Next bounded wave</td><td>2M showered rows × eight configurations</td></tr>
+      <tr><td>Concurrency cap</td><td>100 gg_H + 100 ZZ; one CPU / 4 GiB each</td></tr>
+    </tbody></table>
+    <p>All eight local-disk pilots passed, using 3.0–3.64 GB each with complete cleanup. The remaining 1,592 tasks are submitted. Per-task disk monitoring and project headroom checks stay active.</p>
+    <p class="small">Use immutable code; persist validated compact results; remove only checksum-verified duplicate work files. <a href="PILOT_RESULTS.md#scaling-with-node-local-temporary-storage">Storage probes and campaign validation →</a></p>
   </section>
   <section>
     <p class="eyebrow">Background / Larger pilot</p><h2>The ZZ chain also completes</h2>
@@ -180,7 +191,7 @@
     <p class="small">Unity partitions, account, limits, modules and storage guidance were checked on the live cluster. Existing allocations constrain all interactive work.</p>
   </section>
   <section class="cover">
-    <p class="eyebrow">Next checkpoint</p><h2>Recover and count the signal wave.<br>Size the remaining production.</h2>
+    <p class="eyebrow">Next checkpoint</p><h2>Validate local-disk production.<br>Count the larger wave.</h2>
     <p class="lead">Persist validated shards → count actual selected events → inspect signs and Born coverage → size the remaining waves.</p>
     <div class="rule"></div>
     <p><a href="CURRENT_STATUS.md">Current status</a> · <a href="PILOT_RESULTS.md">Pilot results</a> · <a href="TRAINING_LEDGER.md">Training ledger</a> · <a href="READING_NOTES.md">Reading notes</a></p>

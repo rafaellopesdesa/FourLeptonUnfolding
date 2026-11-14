@@ -223,3 +223,87 @@ Summary 1636701 is confirmed to wait for all four recovery arrays. The final
 selected-event totals and wave-wide persistence have not yet been produced.
 [Checkpoint and recovery task list](evidence/production-status-20261113-checkpoint3.json).
 The original wave is complete only after all required shards pass validation.
+
+## First signal wave complete
+
+Summary 1636701 passed at 22:18 UTC on 13 November 2026. All 400 compact shards
+were validated and persisted on /project, with no missing or rejected output.
+The final recovery also resolved the isolated Pythia provenance rejection;
+its original root cause remains undetermined and no guard was disabled.
+
+| Configuration | Showered rows | Selected reco | Reco 115–130 GeV | Fiducial | Selected tau |
+|---|---:|---:|---:|---:|---:|
+| Pythia nominal | 1,000,000 | 160,171 | 154,700 | 220,453 | 355 |
+| Pythia scale up | 1,000,000 | 161,104 | 154,883 | 220,453 | 367 |
+| Pythia scale down | 1,000,000 | 158,946 | 153,646 | 220,453 | 340 |
+| Herwig nominal | 1,000,000 | 148,747 | 143,773 | 204,914 | 343 |
+
+All selected Born kinematics are valid. The Pythia samples have nonzero
+negative selected weight; Herwig has none selected in this wave. Inclusive
+negative counts are 429/429/429/391. The Herwig output includes 33 repeated
+hard-source occurrences; these remain recorded and must share training splits
+with their source events. Its supplied hard-event count is 1,001,100 because
+the eleven recovery jobs used the reserve. Pythia supplied 1,000,000 each.
+
+The four compact outputs total approximately 714 MB before diagnostic copies.
+These counts reach approximately 3% of the five-million-selected target per
+signal configuration. [Final aggregate evidence](evidence/signal-wave1-final-1636701.json)
+includes signed sums and the checksum/location of the complete per-file manifest.
+Raw Pythia/Herwig sums have different conventions and must not be compared as
+physical yields before normalization.
+
+## Scaling with node-local temporary storage
+
+The user authorized up to 100 simultaneous jobs per physics process. The
+bounded next wave has 200 shards × 10,000 showered events in each of eight
+configurations: 16 million rows total. Four configurations × 25 workers give
+100 gg_H and 100 ZZ workers. Each task requests one CPU, 4 GiB and one hour;
+actual concurrency remains subject to the scheduler. There is no automatic
+continuation beyond this bounded wave.
+
+Live normal-QOS limits allow 1,000 running and 2,000 submitted jobs per user;
+the new campaign fits within those limits. Inspected peak memory in earlier
+3 GiB workers approached their request, motivating 4 GiB for this wave.
+No CPU threads beyond the allocated core are requested by numerical libraries.
+
+Inventory 1678427 measured 26.283 GB in /work and 0.732 GB in /project. Retained
+10k jobs used 3.544–3.548 GB of intermediate files each. Running 200 of those
+under /work would exceed the project limit. Unity documents the
+[`localscratch` node feature](https://docs.unity.rc.umass.edu/documentation/cluster_specs/features/).
+Probe 1678602 found `/localscratch` mounted from local ext4 storage on cpu045,
+with 1.12 TB free. This differs from shared HPC Workspace scratch.
+
+The local wrapper verifies the mount, checks at least 60 GB free initially,
+samples task size every ten seconds, and stops on more than 8 GB per task or
+less than 20 GB filesystem headroom. The eight real-input local pilots must
+finish with validated outputs, no leftover task workspace, and sampled peaks
+below 5 GB before the large arrays are released. These checks are not Slurm
+disk reservations; other users can change local free space.
+
+Preparation checks prerequisite /project hashes and reserves 50 GB below the
+300 GB /work target and 10 GB below the 2 TB /project target. Successful final
+summary is followed by checksum-protected removal of redundant compact /work
+copies; persistent samples and diagnostics remain. All runtime and controller
+files used by active workers are frozen snapshots.
+
+Evidence: [project usage](evidence/storage-1678427.txt),
+[retained task sizes and job-private /tmp](evidence/node-storage-1678572.txt),
+[node-local mount](evidence/local-storage-1678602.txt), and
+[seven campaign/cleanup checks](evidence/parallel-checks-1679082.txt).
+
+### Local pilot and submission outcome
+
+All eight local-storage pilots (1679053–1679060) passed with zero leftover
+workspaces and no guard firing. Sampled peaks were 3.531 GB for each signal
+Pythia setting, 3.035 GB for signal Herwig, 3.633–3.634 GB for ZZ Pythia, and
+3.130 GB for ZZ Herwig. Walltimes ranged from 6 min 32 s to 8 min 32 s.
+Nodes and event seeds differ from earlier pilots; this is not a controlled
+filesystem performance comparison. [Per-task measurements](evidence/parallel-local-pilots.json).
+
+Gate 1679061 also passed its renewed storage checks and submitted arrays
+1679616–1679619 for gg_H and 1679620–1679623 for ZZ. Each has 199 remaining
+10k tasks and a 25-worker throttle. The eight completed pilots are the first
+shards of the same configurations, so the total remains 200 per configuration.
+Recovery controller 1679624 waits for all arrays; final summary 1679625 waits
+for recovery. Archive scheduler 1679187 attaches duplicate cleanup only after
+successful final publication. [Immutable controls and submission manifest](evidence/parallel-wave2-submission.json).

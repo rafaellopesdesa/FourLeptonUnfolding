@@ -1,0 +1,19 @@
+Filesystem        1B-blocks        Used    Available Use% Mounted on
+/dev/sda2      470888099840 23890747392 423002337280   6% /tmp
+/tmp   /dev/sda2[/var/tmp/uri-cpu074/1678572/.1678572/_tmp] ext4   rw,relatime
+Filesystem           1B-blocks            Used       Available Use% Mounted on
+vast:/scratch  401282720333824 276846102970368 124436617363456  69% /scratch
+/scratch vast:/scratch nfs    rw,nosuid,relatime,vers=3,rsize=1048576,wsize=1048576,namlen=255,hard,proto=tcp,nconnect=16,timeo=600,retrans=2,sec=sys,mountaddr=10.100.1.15,mountvers=3,mountport=20048,mountproto=udp,local_lock=none,addr=10.100.1.15
+Filesystem           1B-blocks            Used      Available Use% Mounted on
+vast:/scratch  300000000081920 274233200476160 25766799605760  92% /scratch
+/scratch vast:/scratch nfs    rw,nosuid,relatime,vers=3,rsize=1048576,wsize=1048576,namlen=255,hard,proto=tcp,nconnect=16,timeo=600,retrans=2,sec=sys,mountaddr=10.100.1.15,mountvers=3,mountport=20048,mountproto=udp,local_lock=none,addr=10.100.1.15
+Filesystem         1B-blocks         Used    Available Use% Mounted on
+vast2:/work    1073741824000 535895736320 537846087680  50% /work
+/work  vast2:/work nfs    rw,nosuid,relatime,vers=3,rsize=1048576,wsize=1048576,namlen=255,hard,proto=tcp,nconnect=16,timeo=600,retrans=2,sec=sys,mountaddr=10.100.4.20,mountvers=3,mountport=20048,mountproto=udp,local_lock=none,addr=10.100.4.20
+3547592806	/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_signal_wave1/campaigns/gg_H_pythia_production_wave1_20261113/jobs/job_000021_seed30000022/intermediates
+3543839629	/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_signal_wave1/campaigns/gg_H_pythia_production_wave1_20261113/jobs/job_000037_seed30000038/intermediates
+{"SLURM_JOB_ID": "1678572", "SLURMD_NODENAME": "uri-cpu074", "SLURM_TMPDIR": null, "TMPDIR": "/tmp"}
+PATH /tmp
+PATH /scratch
+PATH /scratch/workspace
+PATH /work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy

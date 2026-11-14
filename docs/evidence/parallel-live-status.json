@@ -1,0 +1,24 @@
+{
+  "updated_utc": "2026-11-14T00:03:47.829518+00:00",
+  "scheduler_counts": [
+    {
+      "process": "gg_H",
+      "counts": {
+        "PENDING": 713,
+        "RUNNING": 83
+      }
+    },
+    {
+      "process": "ZZ",
+      "counts": {
+        "PENDING": 796
+      }
+    }
+  ],
+  "archive": {
+    "job_id": "1679659",
+    "summary_job_id": "1679625",
+    "code": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_parallel_wave2/control/archive_work_copies.py",
+    "code_sha256": "00a979307aec306160522286d12b9aec9186f2163fccebcaaf22d23002863958"
+  }
+}

@@ -109,6 +109,13 @@ Evidence: [targeted regression log](evidence/physics-checks-1644270.log) and
 
 ## Production fits: pending
 
+The larger production campaign also passes seven independent orchestration
+checks in 1679082: failed/mutated pilot rejection, caps and dependency ordering,
+partial-submission rollback, unknown-failure rejection, and checksum-protected
+removal of redundant work files. These are separate from the 428 component
+checks and perform no neural training. Real node-local generation pilots are
+the subsequent deployment check. [Campaign test log](evidence/parallel-checks-1679082.txt).
+
 For every future correction, subtraction, endpoint, OmniFold stage and
 coefficient ratio, record:
 

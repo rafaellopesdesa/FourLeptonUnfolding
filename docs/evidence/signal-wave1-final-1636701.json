@@ -1,0 +1,112 @@
+{
+  "updated_utc": "2026-11-13T22:18:51.398331+00:00",
+  "process": "gg_H",
+  "physics_closure_performed": false,
+  "expected_entries_per_shard": 10000,
+  "expected_shards_per_configuration": 100,
+  "count_semantics": "Showered/compact rows are distinct from supplied POWHEG hard events; hard sources are deduplicated by SHA256 within each configuration.",
+  "source_summary": "/work/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/runs/production_signal_wave1/gg_H-summary-1636701.json",
+  "source_summary_sha256": "f9b75c657ab9e4cead962a8ad859ada5cf2a22c8b0fee79fcf768eb86fe425ee",
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "errors": [],
+      "totals": {
+        "reconstructed": 160171,
+        "reconstructed_signal_window": 154700,
+        "fiducial": 220453,
+        "negative_weight_entries": 429,
+        "bytes": 179344583,
+        "showered_events": 1000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 100,
+        "hard_source_events": 1000000
+      },
+      "file_count": 100,
+      "reco_sums": {
+        "reco_sumw": 1507.9498892119154,
+        "reco_sum_abs_w": 1507.987548652105,
+        "reco_sumw2": 14.197491723781363,
+        "born_valid_reco": 160171,
+        "born_tau_reco": 355
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "errors": [],
+      "totals": {
+        "reconstructed": 161104,
+        "reconstructed_signal_window": 154883,
+        "fiducial": 220453,
+        "negative_weight_entries": 429,
+        "bytes": 179377151,
+        "showered_events": 1000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 100,
+        "hard_source_events": 1000000
+      },
+      "file_count": 100,
+      "reco_sums": {
+        "reco_sumw": 1516.7339536361396,
+        "reco_sum_abs_w": 1516.7716130763292,
+        "reco_sumw2": 14.28019246098278,
+        "born_valid_reco": 161104,
+        "born_tau_reco": 367
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "errors": [],
+      "totals": {
+        "reconstructed": 158946,
+        "reconstructed_signal_window": 153646,
+        "fiducial": 220453,
+        "negative_weight_entries": 429,
+        "bytes": 179307622,
+        "showered_events": 1000000,
+        "repeated_showered_sources": 0,
+        "distinct_hard_sources": 100,
+        "hard_source_events": 1000000
+      },
+      "file_count": 100,
+      "reco_sums": {
+        "reco_sumw": 1496.4166856538504,
+        "reco_sum_abs_w": 1496.45434509404,
+        "reco_sumw2": 14.088908226384007,
+        "born_valid_reco": 158946,
+        "born_tau_reco": 340
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "errors": [],
+      "totals": {
+        "reconstructed": 148747,
+        "reconstructed_signal_window": 143773,
+        "fiducial": 204914,
+        "negative_weight_entries": 391,
+        "bytes": 175901532,
+        "showered_events": 1000000,
+        "repeated_showered_sources": 33,
+        "distinct_hard_sources": 100,
+        "hard_source_events": 1001100
+      },
+      "file_count": 100,
+      "reco_sums": {
+        "reco_sumw": 41.21779585687909,
+        "reco_sum_abs_w": 41.21779585687909,
+        "reco_sumw2": 0.011421451829612425,
+        "born_valid_reco": 148747,
+        "born_tau_reco": 343
+      }
+    }
+  ]
+}

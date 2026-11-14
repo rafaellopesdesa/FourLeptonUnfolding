@@ -1,0 +1,227 @@
+{
+  "updated_utc": "2026-11-14T00:00:04.660296+00:00",
+  "all_local_pilots_passed": true,
+  "control_sha256": {
+    "local_worker.py": "f870300011e3ae84c171c44067fd7fa9d07ae610c00b7cdba353a2858360755b",
+    "production.py": "cdf4b762cca9b3b56bc00490ecf2c2c95b20143b626265b9afb0633b7595ca66",
+    "summarize_pilot.py": "1b8fb165ebd40217833401b392ca89eef77fb98d894477f5dcfe119dd0f29799"
+  },
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "nominal",
+      "pilot_job_id": "1679053",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:09.372645+00:00",
+        "finished_utc": "2026-11-13T23:58:36.423322+00:00",
+        "job_id": "1679053",
+        "task_id": 0,
+        "node": "cpu048",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sdb1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3531455134,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 895913967616,
+        "minimum_free_bytes": 892382420992,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "up",
+      "pilot_job_id": "1679054",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:09.319886+00:00",
+        "finished_utc": "2026-11-13T23:57:53.779608+00:00",
+        "job_id": "1679054",
+        "task_id": 0,
+        "node": "cpu059",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3531127516,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 216004980736,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "scale": "down",
+      "pilot_job_id": "1679055",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:09.310471+00:00",
+        "finished_utc": "2026-11-13T23:57:54.130400+00:00",
+        "job_id": "1679055",
+        "task_id": 0,
+        "node": "cpu059",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3531202777,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 216004980736,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "scale": "nominal",
+      "pilot_job_id": "1679056",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:10.868252+00:00",
+        "finished_utc": "2026-11-13T23:57:12.748927+00:00",
+        "job_id": "1679056",
+        "task_id": 0,
+        "node": "cpu060",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3035016764,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 216399040512,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "nominal",
+      "pilot_job_id": "1679057",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:10.868894+00:00",
+        "finished_utc": "2026-11-13T23:57:19.529229+00:00",
+        "job_id": "1679057",
+        "task_id": 0,
+        "node": "cpu060",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3633223108,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 216399040512,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "up",
+      "pilot_job_id": "1679058",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:09.405542+00:00",
+        "finished_utc": "2026-11-13T23:57:24.864452+00:00",
+        "job_id": "1679058",
+        "task_id": 0,
+        "node": "cpu064",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3633714379,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 219433676800,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "scale": "down",
+      "pilot_job_id": "1679059",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:09.356171+00:00",
+        "finished_utc": "2026-11-13T23:56:51.719921+00:00",
+        "job_id": "1679059",
+        "task_id": 0,
+        "node": "cpu065",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3633683178,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 216304959488,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "scale": "nominal",
+      "pilot_job_id": "1679060",
+      "local_storage": {
+        "started_utc": "2026-11-13T23:50:09.355721+00:00",
+        "finished_utc": "2026-11-13T23:56:36.028893+00:00",
+        "job_id": "1679060",
+        "task_id": 0,
+        "node": "cpu065",
+        "filesystem": {
+          "target": "/localscratch",
+          "source": "/dev/sda1",
+          "fstype": "ext4"
+        },
+        "scratch_root": "/localscratch/rclsa_umass_edu/FourLeptonStudy/production_parallel_wave2",
+        "sampled_peak_bytes": 3130254253,
+        "sampling_interval_seconds": 10,
+        "initial_free_bytes": 223067492352,
+        "minimum_free_bytes": 216304959488,
+        "remaining_workspace_paths": [],
+        "child_exit_code": 0,
+        "guard": null,
+        "signal": null
+      }
+    }
+  ]
+}

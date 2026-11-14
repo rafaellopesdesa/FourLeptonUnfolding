@@ -1,296 +1,158 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-13 21:56 UTC. The original signal arrays have finished. Wave one has
-384/400 successful shards (96%); the remaining 16 have submitted recovery jobs
-(12 running, four queued at this snapshot). Final validation/persistence waits
-for those jobs. All four 10k ZZ pilots remain validated and persisted. No
-unfolding, HPO, or coefficient measurement has yet been performed.
+Updated: 2026-11-14 00:02 UTC. The first signal wave is complete and persisted. All eight
+node-local pilots passed, and the next 1,592 tasks have been submitted with a
+limit of 100 simultaneous gg_H jobs plus 100 ZZ jobs. Slurm determines the
+actual running count. No physics NN training, HPO, unfolding or coefficient
+measurement has run yet.
 
-## Confirmed study
+## Confirmed configuration and authorization
 
-- **c_HB = +0.1 at Lambda = 1 TeV**, confirmed by the user; controls 0 and −0.1.
-  Repository LO SM + dimension-six amplitude-squared convention; no extra
-  Higgs width/branching-ratio shift.
-- Seven inputs: cos theta1, cos theta2, cos theta*, Psi, Phi, mZ1, mZ2.
-  Raw-radian angles. m4l is selection-only; no y4l/pT4l NN inputs.
-- 13.6 TeV; repository luminosity convention 312 fb^-1.
-- No regularization or fitted calibration. Large-sample baseline: ensemble
-  of four networks, four hidden layers of 1024 neurons; tune reco_pull separately.
+- c_HB = +0.1 at Lambda = 1 TeV; controls 0 and −0.1. Repository LO amplitude
+  convention, including the squared dimension-six term and fixed Higgs width.
+- Seven NN coordinates: cos(theta1), cos(theta2), cos(theta*), Psi, Phi, mZ1,
+  mZ2. Angles stay in radians. No m4l, y4l or pT4l NN inputs.
+- 13.6 TeV and the repository luminosity convention of 312 fb^-1.
+- No regularization or fitted score calibration. Default ensemble: four
+  networks, four hidden layers with 1024 neurons. Tune reco_pull separately.
+- The user authorized up to **100 concurrent jobs per physics process** and
+  suggested worker scratch. The new wave has 25 slots per configuration:
+  100 gg_H plus 100 ZZ. This is a limit; Slurm determines actual concurrency.
+- Node-local intermediates are temporary. Code, controls and diagnostics stay
+  in this /work project; final samples/models go to the corresponding /project.
 
-## Completed implementation and reading
+## First signal wave: complete
 
-1. Reviewed AGENTS.md and all repository Markdown documentation at initial
-   main `48a960af91bee00d948dcf5108daa784d4131d4c`; inspected the corresponding
-   implementation. Fourteen paper full texts are cached with SHA256 checksums
-   under `references/`. Core methods and relevant detector/model sections
-   were studied; long references were read selectively, not every appendix.
-   Detailed register: `report/docs/READING_NOTES.md`.
-2. Installed locked Analysis and NSBI/PyTorch environments; built patched
-   Delphes and POWHEG/Pythia/Herwig through Slurm. Pinned compatible POWHEG
-   core `9c3cd9e`; recorded ROOT prerequisites for clean workers.
-3. Added NSBI systematic shape/yield endpoint training, undeformed-MC
-   provenance checks and shared hard-event train/test partitions.
-4. Enforced zero weight decay for new fits, added independent OmniFold stage
-   settings with resume validation, and fixed NFS training-cache cleanup.
-5. Fixed full-chain failures: the standard POWHEG RNG footer after the LHE
-   closing tag, and imports when the output validator runs from a worker
-   directory. Original LHE bytes and hashes remain intact.
-6. **428 software checks pass across the final component runs:** 5 endpoint,
-   86 background-removal, 82 OmniFold, 132 Analysis, 11 Tools, 36 Simulation,
-   23 Generation, 8 BatchSubmit, 13 Plotting, 32 SMEFT. Jobs: 1628168;
-   1632409 (six component passes; native teardown failed); 1633186 (native
-   suite rerun passes); 1633505 (132 Analysis checks pass). These are software
-   checks, not physics HPO or unfolding closure. Latest targeted run 1644270
-   passes 23 Generation + 8 BatchSubmit checks, including finite-LHE recovery.
+Summary 1636701 passed at 2026-11-13 22:18 UTC. All 400 shards were validated,
+checksum-checked and persisted under /project `samples/production_wave1_20261113/`.
+Each configuration has one million showered rows.
 
-## Measured signal pilot
+| Configuration | Selected reconstructed | Reco 115–130 GeV | Fiducial |
+|---|---:|---:|---:|
+| Pythia nominal | 160171 | 154700 | 220453 |
+| Pythia scale up | 161104 | 154883 | 220453 |
+| Pythia scale down | 158946 | 153646 | 220453 |
+| Herwig nominal | 148747 | 143773 | 204914 |
 
-Each configuration generated 1,000 events through the complete chain.
-Compact outputs passed LHE/Born validation and checksum-checked publication
-under `/project/pi_rclsa_umass_edu/rclsa_umass_edu/FourLeptonStudy/samples/pilot_20261113/`.
+All selected Born kinematics are valid. Pythia has nonzero negative selected
+weight; Herwig has none selected in this wave. Herwig has 33 repeated hard
+source occurrences, retained in metadata and subject to shared-source training
+splits. It supplied 1,001,100 hard events because eleven recovery shards used
+the extra-event reserve. The original recovery failures are documented in
+`report/docs/PILOT_RESULTS.md`; all required replacements passed.
 
-| Configuration | Selected reco | Reco, 115–130 GeV | Fiducial | Walltime | Peak RSS (MiB) |
-|---|---:|---:|---:|---:|---:|
-| gg_H Pythia nominal | 172 | 167 | 234 | 93 s | 790 |
-| gg_H Pythia muon scale up | 172 | 167 | 234 | 94 s | 789 |
-| gg_H Pythia muon scale down | 170 | 167 | 234 | 93 s | 789 |
-| gg_H Herwig nominal | 140 | 134 | 201 | 96 s | 650 |
+These samples reach about 3% of the five-million-selected target per signal
+configuration. Evidence: `runs/production_signal_wave1/gg_H-summary-1636701.json`.
 
-Jobs 1634269/1634272/1634273/1634274 and summary 1634275 completed successfully.
-Files are approximately 0.25 MB each, including unselected events. This is
-not a precise shower comparison. All selected rows have valid certified Born
-kinematics. Pythia has one negative event inclusively and none selected;
-Herwig has none in this pilot. Production-scale positivity is not established.
+## Background pilot: complete
 
-Normalization/deformation job 1634795 completed successfully:
+ZZ integration and all four 1k/10k pilots passed. Final 10k summary 1653805
+validated/persisted the outputs after correcting scale-suffix filename discovery.
 
-- Existing merger gives sum(weight)=sigma*312000 and sum(weight_shape)=N.
-  Raw shower weight conventions differ; compare only normalized physical yields.
-- Pythia nominal/up/down retained LHE source-event identities are identical.
-- Native −0.1/0/+0.1 ratios are finite/nonnegative; c_HB=0 is exactly unity.
-- Tau rows are explicitly counted and retained unchanged for this diagnostic:
-  1/172 selected Pythia, 1/140 selected Herwig; 529/1000 and 557/1000 inclusively.
-  Unsupported rows are never labeled successful ME evaluations.
-- At +0.1, selected Herwig ratios span 0.708–2.428; its weighted selected
-  yield changes from 411.24 to 410.56 at 312 fb^-1 in this small template.
-  These are template diagnostics, not measured data or fitted coefficients.
-
-Evidence: `runs/pilot/gg_H-summary-1634275.json` and
-`runs/pilot/diagnostics/1634795/signal-checks.json`. Normalized/decorated
-compact templates are persisted in the pilot's `diagnostics/1634795/`.
-
-## Completed 10k pilot and production sizing
-
-All four 10,000-event signal jobs completed; summary 1635020 validated and
-persisted them under /project `samples/pilot10k_20261113/`.
-
-| Configuration | Selected reco | Reco 115–130 GeV | Fiducial | Walltime |
+| Configuration | Showered rows | Selected reco | Reco 115–130 GeV | Fiducial |
 |---|---:|---:|---:|---:|
-| Pythia nominal | 1528 | 1487 | 2138 | 11 min 44 s |
-| Pythia up | 1544 | 1494 | 2138 | 10 min 49 s |
-| Pythia down | 1526 | 1480 | 2138 | 11 min |
-| Herwig nominal | 1477 | 1425 | 1971 | 9 min 40 s |
+| Pythia nominal | 10000 | 77 | 24 | 107 |
+| Pythia scale up | 10000 | 77 | 25 | 107 |
+| Pythia scale down | 10000 | 71 | 23 | 107 |
+| Herwig nominal | 10000 | 81 | 28 | 102 |
 
-Peak recorded RSS is approximately 2 GiB; compact output is 1.76–1.79 MB
-per shard. All selected Born rows are valid. Selected tau counts: 2/3/1/2.
-Pythia has two negative rows inclusively and Herwig five, but none selected.
-Production-scale positive-intensity validation is still needed.
+Negative selected weight occurs in every configuration. Signed MC remains
+intact; positive data-like intensity construction needs validation before
+Poisson pseudo-experiments. Selected tau rows are 12/13/9/12. All selected
+Born kinematics are valid. Full background production begins with the next wave.
 
-Real training input checks also passed (1635491): systematic readers accept
-all four normalized 1k configurations in signal/extended regions with and
-without fiducial selection; OmniFold reads 234 fiducial Pythia MC and 201
-fiducial Herwig truth rows. No network was fitted in these checks.
+## Larger wave and live controls
 
-Measured acceptance suggests roughly 33–34 million showered events per
-signal configuration for the five-million-selected target, and approximately
-550–650 CPU hours / 6 GB compact output per configuration by naive scaling.
-Actual validated counts determine completion.
+Run area: `runs/production_parallel_wave2`; tag `production_parallel_wave2_20261113`.
+Two million showered events per configuration, eight configurations: 1,600
+shards and 16 million rows total. Each task requests one CPU, 4 GiB and one
+hour on `cpu` with `--constraint=localscratch`.
 
-## Active jobs and next checkpoint
-
-| Job | Purpose | Last observed state |
+| Job | Purpose | Recorded state |
 |---|---|---|
-| 1631379 | ZZ integration, 1 CPU / 4 GB / 48 h | Completed in 1 h 35 min |
-| 1631380 | ZZ Pythia nominal, 1,000 events | Completed |
-| 1631381 / 1643989 | Submit ZZ variants / validate all four 1k pilots | Completed; all compact outputs persisted |
-| 1635016–1635019 | Four signal configurations, 10,000 events each | Completed |
-| 1635020 | Validate/persist larger signal pilot | Completed |
-| 1636246 | Guarded first signal production-wave launcher | Completed; checks passed |
-| 1636684 | Pythia nominal, 100 × 10k events | Original array finished; remaining shards in recovery |
-| 1636696 / 1636697 | Pythia up/down, 100 × 10k each | Original arrays finished |
-| 1636700 | Herwig nominal, 100 × 10k events | Original array finished |
-| 1644720 | Retry Herwig tasks 4, 10, 17 with reserve | All three completed successfully |
-| 1645888 | One final recovery round for known failures | Completed; submitted 16 retries |
-| 1672510 / 1672513 / 1672518 / 1672519 | Nominal / up / down / Herwig recovery | 12 tasks running, four queued |
-| 1636701 | Validate/persist production wave | Waiting for all four recovery arrays |
-| 1646582 | Launch four bounded 10k ZZ checks | Completed |
-| 1646727–1646730 | Four 10k ZZ configurations | Completed; immutable runtime, fresh seeds |
-| 1646731 / 1653805 | Validate/persist larger ZZ pilot | Filename discovery corrected; rerun passed for all four |
-| 1646583 | Verify revised count summary on 10k signal pilot | Completed |
+| 1678427 | Project storage inventory | Complete |
+| 1678572 / 1678602 | Temporary/local storage probes | Complete |
+| 1678870 / 1679082 | Five gate checks / seven checks including cleanup | Passed |
+| 1678905 | Verify prerequisites and prepare immutable controls | Complete |
+| 1679053–1679060 | Eight 10k local-disk pilots | All passed; local cleanup verified |
+| 1679061 | Gate and submit remaining 1,592 tasks | Passed and submitted all eight arrays |
+| 1679616–1679619 | Four gg_H arrays, 199 remaining tasks each | Submitted; max 25 workers each |
+| 1679620–1679623 | Four ZZ arrays, 199 remaining tasks each | Submitted; max 25 workers each |
+| 1679624 | Bounded recovery controller | Waiting for all eight arrays |
+| 1679625 | Validate/persist the entire wave | Waiting for recovery controller |
+| 1679187 | Attach verified duplicate cleanup | Completed |
+| 1679659 | Verify saved hashes and remove duplicate work shards | Waiting for successful summary |
 
-The first production wave requests exactly 100 × 10,000 showered events per
-signal configuration, fresh seeds and the validated grid. It checks all
-four persisted pilot hashes and storage headroom before submission. At most
-four workers per array (16 total), each 1 CPU / 3 GB / 1 h; require 100 GB
-/work and 10 GB /project headroom below the soft targets. Its dependent
-summary validates/persists compact shards and appends actual selected totals.
-No next wave is automatic. One million showered events per configuration
-is only the first installment toward five million selected events. New Herwig
-workers supply 1% extra hard events to cover rare shower discards. Original
-queued tasks retain their old batch script, so remaining EOF failures are
-handled by the completion recovery controller. Current successful shard counts, including recovered tasks,
-are 98/96/98/92 across the four configurations, totaling 384/400.
-Slurm completion is followed by independent summary validation and persistence.
+The eight local pilots finished in 6 min 32 s to 8 min 32 s, with sampled
+peaks of 3.035–3.634 GB and no remaining task files. All guards stayed enabled.
+These timings use different nodes/seeds from the earlier pilots and do not
+isolate a filesystem-only speedup.
 
-## Production failures and recovery
+The gate checks output checksums, successful cleanup and sampled temporary
+size below 5 GB. It repeats project storage checks before releasing bulk arrays.
+Eight arrays have a 25-task limit each: at most 200 production jobs in total.
+Normal QOS currently allows 1,000 running / 2,000 submitted jobs per user;
+this bounded wave fits within those limits. No further wave is automatic.
 
-Herwig can discard a supplied hard event. Reproducing seed 40000005 in
-1642288 produced 9,998 accepted events from 10,000 attempts: remnant extraction
-and a meson-decay retry limit caused two discards. The finite LHE then exhausted.
-Buffer check 1643289 supplied 10,100 hard events and obtained 10,000 unique
-showered source identities with zero repeats; the first 10,000 hard-event
-blocks exactly matched the original failed input. The source is never reopened.
-Main now separates requested hard/showered counts and retains native logs.
-Full-chain retries 1644720_4, _10 and _17 have completed successfully.
+The completion controller permits one bounded same-seed recovery for recognized
+finite-LHE or HepMC-integrity failures, up to 32 tasks; unknown failures stop
+for investigation. Final summary validates/persists both processes. A dependent
+archive job verifies every saved checksum before deleting redundant compact
+/work copies. It retains persistent outputs, diagnostics and all controls.
 
-I also replaced an executing shell script on NFS during deployment. This caused
-eight separate stale-file-handle failures. Incomplete outputs were rejected;
-original diagnostics are preserved for retry. Active runtime files are now
-frozen. New jobs and the final recovery use an immutable snapshot of code
-commit e07de718 (tree equal to published main 29a5e30) plus hashed environment
-scripts. Do not edit the runtime or its installed dependencies while jobs use
-it. Unknown failures stop the recovery controller for investigation.
+## Storage measurements and safeguards
 
-Counts now distinguish supplied hard events, showered rows and repeated source
-occurrences. The earlier 10k Herwig pilot has 9,999 unique source identities and
-one repeated occurrence; this is recorded, not discarded. Shared-source split
-rules remain essential. Updated summary check 1646583 passes.
+Inventory 1678427 measured **26.283 GB /work** and **0.732 GB /project** at
+23:38–23:41 UTC. Soft limits remain 300 GB /work and 2 TB /project; hard limits
+remain 400 GB and 3 TB. Each launch/gate reserves 50 GB and 10 GB respectively
+below the soft limits. A retained 10k task uses about 3.55 GB of intermediate
+files, so 200 simultaneous workers must not place them all on /work.
 
-## Completed background pilot
+Unity documents the `localscratch` node feature:
+https://docs.unity.rc.umass.edu/documentation/cluster_specs/features/
+Probe 1678602 found a writable local ext4 mount on cpu045 with about 1.12 TB
+free. Inspected /tmp mounts are job-private local storage; shared HPC Workspace
+scratch is distinct. The worker explicitly verifies /localscratch and samples
+its task footprint every ten seconds. It requires 60 GB free at startup and
+stops on more than 8 GB task usage or less than 20 GB free. These checks are
+not Slurm disk reservations; other users can affect free space.
 
-ZZ integration completed in 1 h 35 min. Summary 1643989 validated and persisted
-all four 1k configurations. Pythia nominal/up/down each select 12 reconstructed
-rows (5 in the Higgs window), with 19 fiducial rows; Herwig selects 5 (2 in the
-window), with 12 fiducial rows. All selected Born kinematics are valid. There
-are 7/7/7/8 negative rows inclusively, none selected. Selected tau counts are
-4/4/4/0. This is too small to estimate the shower difference or final production
-size precisely. Launcher 1646582 checks persisted checksums/storage, then runs
-four 10k ZZ shards (1646727–1646730) using the immutable runtime, one CPU /
-3 GB / one hour each. All four completed in approximately 10–11 minutes. Summary 1646731 missed the
-scale-variation filenames; after correcting discovery, 1653805 validated and
-persisted all four files. Selected reco counts are 77/77/71/81 (Higgs window:
-24/25/23/28). All selected Born kinematics are valid. Each configuration now
-has negative selected weight, so positive data-like intensity construction
-requires explicit validation before pseudo-experiments.
-
-## Earlier recovery checkpoint (19:44 UTC)
-
-At 19:44 UTC, 13 signal shards remain failed: eight original NFS failures,
-four further finite-LHE Herwig failures, and one Pythia provenance failure.
-Nominal Pythia task 37 was rejected because the HepMC file identity changed
-during validation; the root cause is unresolved. The pending completion
-controller now allows one same-seed retry with all integrity checks enabled
-and intermediates retained. A repeated failure remains an error.
-
-The existing controller waits for the four original arrays, runs the bounded
-recovery, and then releases final validation/persistence. At current throughput,
-roughly 2–3 hours remain for this first wave including recovery and summary;
-this is an estimate, not a scheduler guarantee. The five-million-selected-event
-requirements need substantial additional production beyond this wave.
-
-## Recovery now running (21:56 UTC)
-
-The original arrays are terminal. Controller 1645888 completed at 21:51 UTC
-and submitted 16 same-seed retries using the immutable runtime: two nominal,
-four scale-up, two scale-down, and eight Herwig. Their recorded causes are
-eight NFS failures, seven Herwig finite-input failures, and one unresolved
-Pythia provenance failure. No new failure category was encountered.
-
-Twelve retries are running and four Herwig tasks are queued. Summary 1636701
-now depends on all four recovery arrays, as verified in Slurm. It will validate
-all 400 compact shards, count selected reconstructed events, and copy verified
-files to /project. No complete-wave selected total is available yet.
-
-About 20–40 minutes of remaining runtime is plausible at the measured rate,
-plus queue delays and any further failure investigation. This is only the
-first signal wave; the five-million-selected targets require further waves.
-ZZ bulk production and neural unfolding have not started.
-
-## Branches and directories
-
-Reference: https://github.com/rafaellopesdesa/FourLeptonUnfolding
+## Code, validation and reporting
 
 - Published main: `29a5e301674821421a72a759ec7288cb9a38095b`.
-- Published tests: `codex_validation`, `b57c0f1562ff87f2791e2983e0f389d19263d602`.
-- Published campaign inputs: `codex_bootstrap_20261113`, `fc106375876ad512cea799e040e51abf84e6155f`.
-- Unique report: `codex_report`, 20 reveal.js slides under `/docs`, with
-  measured pilots, training ledger and failure history. GitHub Pages-ready; live hosting is not configured.
-- `codebase/`: implementation; `validation/`: tests; `repository/`: runtime
-  and campaign inputs; `report/`: report worktree; builds in `install/`.
-- Active I/O and logs in `runs/`; final compact samples in /project.
+- Physics tests: `codex_validation`, `b57c0f1562ff87f2791e2983e0f389d19263d602`.
+- Published campaign: `codex_bootstrap_20261113`, `6dfd9aad31281032c0decf41bba4408de11c606d`.
+- Unique report: `codex_report`, 21 reveal.js slides under `/docs`, ready for
+  GitHub Pages. Live hosting has not been configured.
+- Runtime snapshot: `runs/runtime_snapshots/e07de718c4d3967c8efd8f752f5ed1f282be9305`,
+  tree equal to main 29a5e30. New wave controls are frozen in the run's `control/`.
+  Do not replace executing scripts or installed dependencies while jobs use them.
+- 428 passing component checks plus seven passing campaign/cleanup checks.
+  Real-input normalization, native −0.1/0/+0.1 SMEFT ratios and NN readers passed
+  earlier pilot checks; these are not HPO or unfolding closure results.
+- Main includes systematic endpoint shape/yield training through NSBI,
+  provenance checks/shared hard-event partitions, zero weight decay for new
+  fits, stage-specific OmniFold settings/resume validation, and finite-LHE fixes.
+- All repository Markdown documentation was reviewed and fourteen cited paper
+  full texts cached with checksums. Core methods/relevant sections were studied;
+  long reference works were read selectively. Register: `report/docs/READING_NOTES.md`.
 
-## Checks required before interpretation
+## Remaining research
 
-- Preserve signed MC sums and sum(w^2). Signed Poisson sampling has variance
-  mu_plus+mu_minus, not physical net expectation; validate a positive selected
-  intensity before data-like ensembles. Zero selected negative events in a
-  small pilot does not establish positivity at production scale.
-- Deform the intensity before sampling. Multiplying already sampled toys by
-  SMEFT weights changes their statistical variance.
-- Fix and document unsupported tau treatment before final closure.
-- Validate sideband contamination/transport. Freeze the nominal background
-  pair across toys; refit OmniFold for each statistical replica.
-- Marginal systematic endpoints require conditional-response transport and
-  nuisance interpolation validation before profiling.
-- Weighted background-subtracted likelihoods need statistical validation.
-  Uniform auxiliary draws define a sensitivity ensemble, not Gaussian coverage.
+Reach at least five million selected reconstructed events per sample. Construct
+and validate the c_HB-deformed positive data-like intensity, keeping signed
+MC accounting and an explicit tau policy. Deform before drawing at least 100
+pseudo-experiments. Freeze the nominal background-removal pair across toys,
+refit ordinary OmniFold for each statistical replica, tune reco_pull and
+iteration count on development data, then demonstrate independent closure and
+unbinned coefficient inference. Only then implement and validate nuisance
+profiling and the 100-point auxiliary ensemble. Marginal systematic endpoints
+still need conditional-response transport tests; weighted likelihoods and the
+uniform auxiliary box require explicit inference/coverage interpretation.
 
-## Remaining research and storage
+Detailed attempt history, measured pilots and training diagnostics live in
+`report/docs/PILOT_RESULTS.md` and `report/docs/TRAINING_LEDGER.md`.
 
-Produce ≥5M selected reconstructed events per required sample and ≥100 valid
-pseudo-experiments; optimize ordinary OmniFold and demonstrate independent
-O_HB closure/c_HB inference; then implement and validate Profile OmniFold and
-the auxiliary ensemble. No physics convergence or coverage claim is made.
+2026-11-14T00:01:05.110873+00:00: All eight local pilots passed; 1,592 remaining 10k tasks submitted with a 200-job total cap (100 per physics process). Summary 1679625.
 
-Soft targets: /work 300 GB, /project 2 TB; hard limits 400 GB and 3 TB.
-Last full inventory (1635989, 16:48–16:50 UTC): /work 14.16 GB, /project
-2.53 MB, before the 10k pilot added another 7.12 MB of compact outputs.
-Active production intermediates will grow within the reserved headroom.
-All substantial computation/I/O uses Slurm. Interactive allocation 1638161
-runs until 2026-11-14 01:04 UTC; independent batch jobs retain their allocations.
-
-## Automatic pilot updates
-
-Earlier signal attempts failed before publication on LHE footer parsing,
-then standalone validator imports. Both were fixed and regression-tested.
-Successful replacement: 1634269/1634272/1634273/1634274; summary 1634275.
-
-Pilot update 2026-11-13T16:51:12.891805+00:00: gg_H; 0 configurations with errors. Measured details: `runs/pilot10k/gg_H-summary.json`.
-- pythia nominal: 1528 selected / 10000 generated in validated persisted shards.
-- pythia up: 1544 selected / 10000 generated in validated persisted shards.
-- pythia down: 1526 selected / 10000 generated in validated persisted shards.
-- herwig nominal: 1477 selected / 10000 generated in validated persisted shards.
-
-Pilot update 2026-11-13T17:51:24.963393+00:00: ZZ; 0 configurations with errors. Measured details: `runs/pilot/ZZ-summary.json`.
-- pythia nominal: 12 selected / 1000 generated in validated persisted shards.
-- pythia up: 12 selected / 1000 generated in validated persisted shards.
-- pythia down: 12 selected / 1000 generated in validated persisted shards.
-- herwig nominal: 5 selected / 1000 generated in validated persisted shards.
-
-Pilot update 2026-11-13T18:20:28.754587+00:00: gg_H; 0 configurations with errors. Measured details: `runs/pilot10k/gg_H-summary.json`.
-- pythia nominal: 1528 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- pythia up: 1544 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- pythia down: 1526 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- herwig nominal: 1477 selected / 10000 showered rows from 10000 supplied hard events; 1 repeated source occurrences.
-
-Pilot update 2026-11-13T18:34:36.495196+00:00: ZZ; 2 configurations with errors. Measured details: `runs/pilot10k/ZZ-summary.json`.
-- pythia nominal: 77 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- pythia up: 0 selected / 0 showered rows from 0 supplied hard events; 0 repeated source occurrences.
-- pythia down: 0 selected / 0 showered rows from 0 supplied hard events; 0 repeated source occurrences.
-- herwig nominal: 81 selected / 10000 showered rows from 10100 supplied hard events; 0 repeated source occurrences.
-
-Pilot update 2026-11-13T19:38:45.519584+00:00: ZZ; 0 configurations with errors. Measured details: `runs/pilot10k/ZZ-summary.json`.
-- pythia nominal: 77 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- pythia up: 77 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- pythia down: 71 selected / 10000 showered rows from 10000 supplied hard events; 0 repeated source occurrences.
-- herwig nominal: 81 selected / 10000 showered rows from 10100 supplied hard events; 0 repeated source occurrences.
+Scheduler snapshot 2026-11-14T00:03:47.829518+00:00: gg_H {'PENDING': 713, 'RUNNING': 83}; ZZ {'PENDING': 796}.
