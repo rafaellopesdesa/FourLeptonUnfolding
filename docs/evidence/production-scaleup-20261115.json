@@ -1,0 +1,42 @@
+{
+  "updated_utc": "2026-11-15T13:25:59+00:00",
+  "caps": {
+    "previous_per_process": 100,
+    "current_per_process": 200,
+    "total": 400,
+    "zz_only_maximum_after_signal_completion_and_scratch_checks": 400
+  },
+  "scheduling": {
+    "audited_utc": "2026-11-15T13:14:26.689237+00:00",
+    "pending_tasks": 398,
+    "pending_reasons": [
+      "JobArrayTaskLimit"
+    ],
+    "first_batch_eligible_to_start_seconds": [
+      16,
+      17
+    ],
+    "after_scaleup_snapshot_utc": "2026-11-15T13:21:47.436174+00:00",
+    "after_scaleup_running": {
+      "gg_H": 193,
+      "ZZ": 143
+    }
+  },
+  "scratch": {
+    "completed_workers": 2672,
+    "maximum_sampled_peak_bytes": 3668878411,
+    "minimum_free_bytes": 402042241024,
+    "guard_exit_cleanup_failures": 0,
+    "persistent_availability_probe_passed": true
+  },
+  "monitoring": {
+    "remaining_hourly_checks": 37,
+    "time_limit_minutes": 20,
+    "inventory_limit_seconds": 900,
+    "overall_probe_limit_seconds": 960,
+    "reason": "The 480-second project inventory timed out; scheduler and worker checks continue independently of storage access.",
+    "capacity_guards_unchanged": true
+  },
+  "controller_checks_passed": 44,
+  "interpretation": "Worker parallelism is doubled. Overall throughput still depends on validation and archive I/O; a twofold end-to-end speedup has not been demonstrated."
+}
