@@ -1,0 +1,117 @@
+{
+  "updated_utc": "2026-11-15T12:32:26+00:00",
+  "count_definition": "Selected reconstructed events in the extended mass region, validated and persisted through wave 4; pilot and diagnostic samples excluded. Counts are raw event counts, not weighted yields. Pythia nominal/up/down are correlated configurations.",
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "nominal",
+      "selected_reco_events": 1760456,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "up",
+      "selected_reco_events": 1771561,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "down",
+      "selected_reco_events": 1748916,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "muon_scale": "nominal",
+      "selected_reco_events": 1619467,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "nominal",
+      "selected_reco_events": 74280,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "up",
+      "selected_reco_events": 74207,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "down",
+      "selected_reco_events": 74435,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "muon_scale": "nominal",
+      "selected_reco_events": 73793,
+      "target": 5000000
+    }
+  ],
+  "completed_waves": 4,
+  "overnight": {
+    "physics_workers_completed": 3200,
+    "physics_workers_failed": 0,
+    "summary_timeouts": 2,
+    "interrupted_archive_files_recovered": 1,
+    "recovered_file_selected_events": 90,
+    "final_wave_files_checksum_verified": 1600,
+    "events_regenerated_for_archive_repair": 0
+  },
+  "production": {
+    "active_wave": 4,
+    "phase": "between_waves",
+    "status": "Wave 4 is fully archived. The next-wave launcher is checking storage before submitting physics workers.",
+    "running_workers": 0,
+    "pending_workers": 0,
+    "concurrency_caps": {
+      "gg_H": 100,
+      "ZZ": 100
+    },
+    "new_wave_deadline_utc": "2026-11-16T21:35:38+00:00",
+    "hourly_monitor_until_utc": "2026-11-17T01:35:38+00:00"
+  },
+  "validation": {
+    "controller_checks_passed": 42,
+    "validator_checks_passed": 23,
+    "real_file_validation_and_summary_matches": 8,
+    "selected_feature_control_files": 8,
+    "selected_feature_checks": "All seven reco and fiducial features finite and in their expected ranges in the eight control files; this is a spot check, not a full-sample distribution closure test."
+  },
+  "storage": {
+    "measured_utc": "2026-11-15T11:44:47.247246+00:00",
+    "directories": {
+      "active_work": {
+        "bytes": 77565389785,
+        "free_bytes": 486564429824,
+        "soft_limit": 300000000000,
+        "reserve": 50000000000,
+        "okay": true
+      },
+      "persistent_archive": {
+        "bytes": 15486816375,
+        "free_bytes": 4027868774400,
+        "soft_limit": 2000000000000,
+        "reserve": 10000000000,
+        "okay": true
+      }
+    }
+  },
+  "notes": [
+    "Hourly checks continued, but 240-second storage inventory timeouts delayed automatic recovery.",
+    "The summary now buffers compact files and keeps checksum-protected progress checkpoints.",
+    "Storage inventories are being migrated to concurrent 480-second checks within the existing ten-minute monitoring budget.",
+    "No unfolding, hyperparameter optimization, or coefficient fit result is claimed."
+  ]
+}
