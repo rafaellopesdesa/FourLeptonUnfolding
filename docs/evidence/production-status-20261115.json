@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-11-15T12:32:26+00:00",
+  "updated_utc": "2026-11-15T12:38:23+00:00",
   "count_definition": "Selected reconstructed events in the extended mass region, validated and persisted through wave 4; pilot and diagnostic samples excluded. Counts are raw event counts, not weighted yields. Pythia nominal/up/down are correlated configurations.",
   "samples": [
     {
@@ -70,11 +70,11 @@
     "events_regenerated_for_archive_repair": 0
   },
   "production": {
-    "active_wave": 4,
-    "phase": "between_waves",
-    "status": "Wave 4 is fully archived. The next-wave launcher is checking storage before submitting physics workers.",
-    "running_workers": 0,
-    "pending_workers": 0,
+    "active_wave": 5,
+    "phase": "producing",
+    "status": "Wave 5 has been submitted: 200 physics workers running and 1,400 pending at this snapshot.",
+    "running_workers": 200,
+    "pending_workers": 1400,
     "concurrency_caps": {
       "gg_H": 100,
       "ZZ": 100
@@ -90,28 +90,24 @@
     "selected_feature_checks": "All seven reco and fiducial features finite and in their expected ranges in the eight control files; this is a spot check, not a full-sample distribution closure test."
   },
   "storage": {
-    "measured_utc": "2026-11-15T11:44:47.247246+00:00",
+    "measured_utc": "2026-11-15T12:35:28.277560+00:00",
     "directories": {
       "active_work": {
-        "bytes": 77565389785,
-        "free_bytes": 486564429824,
+        "bytes": 74617152516,
         "soft_limit": 300000000000,
-        "reserve": 50000000000,
-        "okay": true
+        "reserve": 50000000000
       },
       "persistent_archive": {
-        "bytes": 15486816375,
-        "free_bytes": 4027868774400,
+        "bytes": 15591774461,
         "soft_limit": 2000000000000,
-        "reserve": 10000000000,
-        "okay": true
+        "reserve": 10000000000
       }
     }
   },
   "notes": [
     "Hourly checks continued, but 240-second storage inventory timeouts delayed automatic recovery.",
     "The summary now buffers compact files and keeps checksum-protected progress checkpoints.",
-    "Storage inventories are being migrated to concurrent 480-second checks within the existing ten-minute monitoring budget.",
+    "The activated monitor now runs independent storage inventories concurrently with 480-second limits within the existing ten-minute monitoring budget.",
     "No unfolding, hyperparameter optimization, or coefficient fit result is claimed."
   ]
 }
