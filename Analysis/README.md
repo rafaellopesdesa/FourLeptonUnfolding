@@ -178,6 +178,13 @@ events, four-lepton candidates, and Higgs records separately. A zero hard
 four-lepton count for the current `gg_H` sample is expected, even when every
 event has a valid LHE association.
 
+The Python API also accepts a readable, seekable binary stream, such as
+`io.BytesIO(path.read_bytes())`. This lets batch callers read a compact shard
+once before running the same schema, LHE, Born, and normalization checks,
+avoiding repeated reads over a shared filesystem. Callers that buffer files
+must bound their input size to fit the allocated memory; the command-line
+interface continues to accept a filesystem path.
+
 ### Born projection and the signal decay record
 
 The separate `born_*` level projects four hard charged leptons onto a system

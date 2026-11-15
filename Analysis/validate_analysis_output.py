@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import sys
+from typing import BinaryIO
 
 import numpy as np
 import uproot
@@ -271,7 +272,7 @@ def _validate_born_chunk(arrays, *, path: Path, branch_types, require_born: bool
 
 
 def validate_analysis_output(
-    path: Path, *, expected_entries: int | None = None, step_size: str = "100 MB",
+    path: Path | BinaryIO, *, expected_entries: int | None = None, step_size: str = "100 MB",
     require_lhe: bool = False,
     require_born: bool = False,
 ) -> ValidationSummary:
@@ -281,11 +282,17 @@ def validate_analysis_output(
     corresponding requirement is enabled.  Partially present schemas are
     always errors.  ``require_born`` checks that a source was evaluated; it
     does not reject unsupported native Higgs decays.
+
+    A seekable binary stream can be supplied to validate a buffered compact
+    file without repeatedly reading individual ROOT branches over a network.
     """
 
-    path = path.expanduser().resolve()
-    if not path.is_file() or path.stat().st_size == 0:
-        raise FileNotFoundError(f"analysis output is missing or empty: {path}")
+    if isinstance(path, Path):
+        path = path.expanduser().resolve()
+        if not path.is_file() or path.stat().st_size == 0:
+            raise FileNotFoundError(f"analysis output is missing or empty: {path}")
+    elif not (path.readable() and path.seekable()):
+        raise ValueError("Analysis input must be a readable, seekable binary stream")
 
     with uproot.open(path) as root_file:
         if TREE_NAME not in root_file:
