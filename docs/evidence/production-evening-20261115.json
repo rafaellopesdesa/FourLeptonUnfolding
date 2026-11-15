@@ -1,0 +1,170 @@
+{
+  "updated_utc": "2026-11-15T22:28:46+00:00",
+  "count_definition": "Validated and archived selected reconstructed events through wave 9 in the extended mass region; pilots and diagnostics excluded. Nominal/up/down Pythia samples are correlated. In-progress wave 10 is excluded.",
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "nominal",
+      "selected_reco_events": 3363612,
+      "increase_since_1238_utc": 1603156,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "up",
+      "selected_reco_events": 3385288,
+      "increase_since_1238_utc": 1613727,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "down",
+      "selected_reco_events": 3341767,
+      "increase_since_1238_utc": 1592851,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "muon_scale": "nominal",
+      "selected_reco_events": 3087717,
+      "increase_since_1238_utc": 1468250,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "nominal",
+      "selected_reco_events": 148547,
+      "increase_since_1238_utc": 74267,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "up",
+      "selected_reco_events": 148615,
+      "increase_since_1238_utc": 74408,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "down",
+      "selected_reco_events": 148766,
+      "increase_since_1238_utc": 74331,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "muon_scale": "nominal",
+      "selected_reco_events": 146966,
+      "increase_since_1238_utc": 73173,
+      "target": 5000000
+    }
+  ],
+  "production": {
+    "completed_additional_waves": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "completed_additional_workers": 8000,
+    "worker_failures": 0,
+    "summary_errors": 0,
+    "active_wave": 10,
+    "queue_snapshot_utc": "2026-11-15T22:25:15.689643+00:00",
+    "queue": [
+      {
+        "process": "gg_H",
+        "state": "PENDING",
+        "reason": "JobArrayTaskLimit",
+        "count": 600
+      },
+      {
+        "process": "ZZ",
+        "state": "PENDING",
+        "reason": "JobArrayTaskLimit",
+        "count": 600
+      },
+      {
+        "process": "ZZ",
+        "state": "RUNNING",
+        "reason": "",
+        "count": 200
+      },
+      {
+        "process": "gg_H",
+        "state": "RUNNING",
+        "reason": "",
+        "count": 200
+      }
+    ],
+    "caps": {
+      "gg_H": 200,
+      "ZZ": 200
+    },
+    "launch_deadline_utc": "2026-11-16T21:35:38+00:00"
+  },
+  "timing": {
+    "full_scale_waves": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "previous_100_per_process_worker_phase_minutes": 68.41666666666667,
+    "mean_worker_phase_minutes": 34.391666666666666,
+    "start_to_start_minutes": [
+      127.30025411666666,
+      112.2253197,
+      86.77918705,
+      106.83200891666667
+    ],
+    "mean_start_to_start_minutes": 108.28419244583333,
+    "post_worker_minutes": [
+      85.83654666666666,
+      62.05718591666667,
+      43.52342758333334,
+      64.277164
+    ],
+    "selected_reco_per_hour": {
+      "gg_H pythia nominal": 177645.45835831453,
+      "gg_H pythia up": 178859.76302301223,
+      "gg_H pythia down": 176508.3117700755,
+      "gg_H herwig nominal": 162558.35318534833,
+      "ZZ pythia nominal": 8211.170808193188,
+      "ZZ pythia up": 8236.520768681403,
+      "ZZ pythia down": 8226.269964986715,
+      "ZZ herwig nominal": 8113.234075596648
+    }
+  },
+  "monitoring": {
+    "checks": 9,
+    "healthy_checks": 7,
+    "storage_inventory_alerts": 2,
+    "alert_types": [
+      "One project-inventory timeout at 900 seconds",
+      "One nonzero exit from the project-inventory command; underlying cause not established"
+    ],
+    "latest_check_finished_utc": "2026-11-15T21:49:57.292925+00:00",
+    "latest_check_healthy": true
+  },
+  "storage": {
+    "measured_utc": "2026-11-15T22:19:44.896043+00:00",
+    "active_work_bytes": 76587767767,
+    "archive_bytes": 30452285398
+  },
+  "forecast": {
+    "ggH_remaining_waves": 7,
+    "ggH_conditional_completion_utc": "2026-11-16T10:57:44.256870+00:00",
+    "assumptions": "Seven further waves including the current wave, with recent average selected yield and mean start-to-start cadence; excludes new interruptions or changes in shared-storage performance.",
+    "ZZ_note": "About 3% of target. At the measured mixed-process rate, five million per configuration will not be reached in the current production window. Reassignment to up to 400 ZZ workers remains conditional on completed ggH targets and scratch checks; its throughput has not yet been measured."
+  }
+}
