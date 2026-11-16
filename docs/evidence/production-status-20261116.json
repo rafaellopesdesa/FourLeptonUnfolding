@@ -1,126 +1,144 @@
 {
-  "updated_utc": "2026-11-16T11:55:52+00:00",
+  "updated_utc": "2026-11-16T16:54:36.424072+00:00",
   "samples": [
     {
       "process": "gg_H",
       "shower": "pythia",
       "muon_scale": "nominal",
-      "completed_analysis_selected_reco": 4324164,
-      "fully_archived_selected_reco": 4003535,
+      "completed_analysis_selected_reco": 4965354,
+      "fully_archived_selected_reco": 4645236,
       "target": 5000000
     },
     {
       "process": "gg_H",
       "shower": "pythia",
       "muon_scale": "up",
-      "completed_analysis_selected_reco": 4351683,
-      "fully_archived_selected_reco": 4029138,
+      "completed_analysis_selected_reco": 4996180,
+      "fully_archived_selected_reco": 4674263,
       "target": 5000000
     },
     {
       "process": "gg_H",
       "shower": "pythia",
       "muon_scale": "down",
-      "completed_analysis_selected_reco": 4296289,
-      "fully_archived_selected_reco": 3977344,
+      "completed_analysis_selected_reco": 4932836,
+      "fully_archived_selected_reco": 4614789,
       "target": 5000000
     },
     {
       "process": "gg_H",
       "shower": "herwig",
       "muon_scale": "nominal",
-      "completed_analysis_selected_reco": 3974931,
-      "fully_archived_selected_reco": 3681180,
+      "completed_analysis_selected_reco": 4563977,
+      "fully_archived_selected_reco": 4269699,
       "target": 5000000
     },
     {
       "process": "ZZ",
       "shower": "pythia",
       "muon_scale": "nominal",
-      "completed_analysis_selected_reco": 192925,
-      "fully_archived_selected_reco": 178143,
+      "completed_analysis_selected_reco": 222643,
+      "fully_archived_selected_reco": 207592,
       "target": 5000000
     },
     {
       "process": "ZZ",
       "shower": "pythia",
       "muon_scale": "up",
-      "completed_analysis_selected_reco": 193036,
-      "fully_archived_selected_reco": 178286,
+      "completed_analysis_selected_reco": 222615,
+      "fully_archived_selected_reco": 207688,
       "target": 5000000
     },
     {
       "process": "ZZ",
       "shower": "pythia",
       "muon_scale": "down",
-      "completed_analysis_selected_reco": 193156,
-      "fully_archived_selected_reco": 178443,
+      "completed_analysis_selected_reco": 222935,
+      "fully_archived_selected_reco": 207814,
       "target": 5000000
     },
     {
       "process": "ZZ",
       "shower": "herwig",
       "muon_scale": "nominal",
-      "completed_analysis_selected_reco": 191143,
-      "fully_archived_selected_reco": 176557,
+      "completed_analysis_selected_reco": 220673,
+      "fully_archived_selected_reco": 205979,
       "target": 5000000
     }
   ],
-  "count_definition": "Selected reconstructed events in the extended mass region; pilots and diagnostics excluded. Completed-analysis totals include wave 12. Fully archived totals include waves through 11. Pythia scale variations are correlated.",
+  "count_definition": "Selected reconstructed events in the extended mass region; pilots and diagnostics excluded. Completed-analysis totals include wave 14; fully archived totals include wave 13. Pythia scale variations are correlated.",
   "state": {
-    "active_wave": 12,
-    "phase": "archive_recovery",
+    "active_wave": 14,
+    "phase": "validation_and_archive",
     "physics_workers_running": 0,
-    "recovery_jobs": [
-      {
-        "role": "fourlepton_day_advance",
-        "state": "PENDING"
-      },
-      {
-        "role": "fourlepton_day_summary",
-        "state": "RUNNING"
-      }
-    ],
-    "next_generation_requires_complete_archive_verification": true
+    "summary_jobs_running": 2,
+    "next_wave_requires_archive_verification": true
   },
-  "wave12": {
-    "physics_workers_completed": 1600,
-    "worker_validation_passed": true,
-    "ggH_summary_files_passed": 800,
-    "ZZ_durable_checkpoint_files": 768,
-    "additional_ZZ_analysis_files_strictly_validated": 32,
-    "archive_recheck_progress": 48,
-    "archive_recheck_errors": 0,
-    "archive_recheck_updated_utc": "2026-11-16T11:55:31.884424+00:00",
+  "validation": {
+    "physics_workers_passed": 1600,
+    "checkpoint_source_hashes_rechecked": 544,
+    "additional_shards_strictly_validated": 1056,
     "archive_complete": false
   },
-  "storage": {
-    "access_restored_on_all_five_probe_nodes": true,
-    "known_output_checksums_checked": 20,
-    "read_after_write_probes_passed": 5,
-    "probe_elapsed_seconds": [
-      47.000160827010404,
-      46.02956904203165,
-      45.98560982104391,
-      46.27045543602435,
-      45.841784363030456
-    ],
-    "permanent_storage_fix_verified": false
+  "summary_progress": {
+    "gg_H": {
+      "updated_utc": "2026-11-16T16:54:35.375691+00:00",
+      "process": "gg_H",
+      "phase": "validating_and_persisting",
+      "completed_shards": 592,
+      "expected_shards": 800,
+      "errors": 0
+    },
+    "ZZ": {
+      "updated_utc": "2026-11-16T16:54:35.626241+00:00",
+      "process": "ZZ",
+      "phase": "validating_and_persisting",
+      "completed_shards": 560,
+      "expected_shards": 800,
+      "errors": 0
+    }
   },
-  "recovery": {
-    "checkpoint_unchanged": true,
-    "events_regenerated": 0,
-    "summary_time_limit_hours": 3,
-    "controller_checks_passed": 44,
+  "storage": {
+    "permanent_fix_verified": false,
+    "latest_two_hourly_checks_passed": true,
+    "latest_check_finished_utc": "2026-11-16T16:47:28.783911+00:00",
+    "last_reported_failure_check_utc": "2026-11-16T14:36:00+00:00",
+    "work_usage_gb": 81.507708685,
+    "project_usage_gb": 42.970681855
+  },
+  "continuation": {
     "caps": {
       "gg_H": 200,
       "ZZ": 200
     },
-    "launch_deadline_utc": "2026-11-16T21:35:38+00:00"
+    "new_wave_deadline_utc": "2026-11-16T21:35:38+00:00",
+    "hourly_checks_until_utc": "2026-11-17T01:35:38+00:00"
   },
-  "forecast": {
-    "previous_ggH_1100_utc_estimate_withdrawn": true,
-    "replacement_completion_estimate": null,
-    "reason": "Repeated archive-access failures and long I/O stalls invalidate the previous stable-cadence assumption."
-  }
+  "history": [
+    {
+      "time_utc": "2026-11-16T12:02:19+00:00",
+      "event": "Wave 12 final archive completed after checkpoint recovery."
+    },
+    {
+      "time_utc": "2026-11-16T12:07:47+00:00",
+      "event": "Wave 13 launched."
+    },
+    {
+      "time_utc": "2026-11-16T12:52:58+00:00",
+      "event": "Both wave-13 summaries failed because the project directory was inaccessible."
+    },
+    {
+      "time_utc": "2026-11-16T13:41:25+00:00",
+      "event": "Hourly monitor submitted archive retries."
+    },
+    {
+      "time_utc": "2026-11-16T15:41:22+00:00",
+      "event": "Wave 13 fully archived, all 1600 persisted files verified."
+    },
+    {
+      "time_utc": "2026-11-16T16:24:10+00:00",
+      "event": "Wave 14: all 1600 workers passed; summaries followed."
+    }
+  ],
+  "completion_estimate": null
 }
