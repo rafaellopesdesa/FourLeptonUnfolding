@@ -1,0 +1,40 @@
+{
+  "checked_utc": "2026-11-16T23:02:17.810578+00:00",
+  "fully_archived_counts": {
+    "gg_H pythia nominal": 5607187,
+    "gg_H pythia up": 5642232,
+    "gg_H pythia down": 5569862,
+    "gg_H herwig nominal": 5150310,
+    "ZZ pythia nominal": 252269,
+    "ZZ pythia up": 252348,
+    "ZZ pythia down": 252689,
+    "ZZ herwig nominal": 250036
+  },
+  "active_wave": 16,
+  "phase": "between_waves",
+  "signal_complete": true,
+  "recent_window_hours": 10.861779976944444,
+  "recent_ZZ_selected_per_hour": {
+    "ZZ pythia nominal": 5463.56123268612,
+    "ZZ pythia up": 5460.615122557952,
+    "ZZ pythia down": 5480.961695630607,
+    "ZZ herwig nominal": 5422.039493067263
+  },
+  "remaining_ZZ_hours_at_recent_rate": {
+    "ZZ pythia nominal": 136.85780540476958,
+    "ZZ pythia up": 136.9171756697206,
+    "ZZ pythia down": 136.34669269733308,
+    "ZZ herwig nominal": 138.31769409996372
+  },
+  "remaining_ZZ_waves_at_recent_yield": {
+    "ZZ pythia nominal": 51,
+    "ZZ pythia up": 51,
+    "ZZ pythia down": 51,
+    "ZZ herwig nominal": 51
+  },
+  "estimated_ZZ_completion_at_recent_rate_utc": "2026-11-22T17:21:21.509338+00:00",
+  "forecast_scope": "Generation, validation and archival to 1M ZZ selected reco events per configuration.",
+  "forecast_assumptions": "Extrapolate the last four archived mixed-process waves. ZZ-only end-to-end throughput is not measured yet. The estimate includes recent delays but cannot guarantee future storage availability.",
+  "ggH_target": 5000000,
+  "ZZ_target": 1000000
+}
