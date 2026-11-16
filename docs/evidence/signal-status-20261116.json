@@ -1,0 +1,21 @@
+{
+  "checked_utc": "2026-11-16T19:56:23.488744+00:00",
+  "fully_archived_wave": 15,
+  "active_wave": 16,
+  "ggH_fully_archived": {
+    "gg_H pythia nominal": 5286420,
+    "gg_H pythia up": 5319632,
+    "gg_H pythia down": 5252059,
+    "gg_H herwig nominal": 4856030
+  },
+  "Herwig_completed_current_wave_shards": 9,
+  "Herwig_additional_validated_reco": 13356,
+  "Herwig_completed_analysis_total": 4869386,
+  "Herwig_queue": {
+    "PENDING|(Priority)": 191
+  },
+  "target": 5000000,
+  "count_definition": "Table counts are fully validated and archived through wave 15; the nine additional Herwig wave-16 files passed strict analysis validation but are not yet archived.",
+  "Herwig_remaining_completed_analysis": 130614,
+  "ggH_complete": false
+}
