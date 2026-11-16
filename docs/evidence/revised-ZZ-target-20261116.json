@@ -1,0 +1,50 @@
+{
+  "updated_utc": "2026-11-16T20:17:14.076607+00:00",
+  "requirements": {
+    "ggH_selected_reco_per_configuration": 5000000,
+    "ZZ_initial_selected_reco_per_configuration": 1000000,
+    "ZZ_previous_selected_reco_per_configuration": 5000000,
+    "ZZ_configurations": [
+      "Pythia nominal",
+      "Pythia muon-scale up",
+      "Pythia muon-scale down",
+      "Herwig"
+    ],
+    "count_definition": "Selected reconstructed events in the existing extended mass region, excluding pilots and diagnostics; scale variations are correlated.",
+    "minimum_pseudoexperiments": 100
+  },
+  "ZZ_fully_archived_counts": {
+    "ZZ pythia nominal": 237435,
+    "ZZ pythia up": 237474,
+    "ZZ pythia down": 237848,
+    "ZZ herwig nominal": 235252
+  },
+  "fully_archived_wave": 15,
+  "active_wave": 16,
+  "continuation": {
+    "user_confirmed_beyond_previous_cutoff": true,
+    "stop_when_all_configurations_reach_target": true,
+    "after_ggH": "ZZ-only waves",
+    "worker_cap_before_ggH_completion": {
+      "ggH": 200,
+      "ZZ": 200
+    },
+    "ZZ_only_worker_cap_after_scratch_checks": 400
+  },
+  "monitoring": {
+    "independent_hourly_checks": true,
+    "future_checks_verified": 48,
+    "rolling_horizon_hours": 48,
+    "scheduled_through_utc": "2026-11-18T19:35:38+00:00",
+    "stop_future_checks_after_target_completion": true
+  },
+  "verification": {
+    "controller_checks_passed": 53,
+    "live_target_mapping_verified": true,
+    "ZZ_only_transition_verified": true,
+    "target_stop_verified": true,
+    "pending_controllers_replaced": true,
+    "physics_workers_unchanged": true
+  },
+  "limitations": "One million ZZ events is an initial production milestone, not a demonstrated statistical-sufficiency or unfolding-closure result. Review sideband and signal-region effective statistics and background-reweighting closure before requesting more."
+}
