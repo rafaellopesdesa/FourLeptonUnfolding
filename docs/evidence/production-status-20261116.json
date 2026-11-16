@@ -1,0 +1,126 @@
+{
+  "updated_utc": "2026-11-16T11:55:52+00:00",
+  "samples": [
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "nominal",
+      "completed_analysis_selected_reco": 4324164,
+      "fully_archived_selected_reco": 4003535,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "up",
+      "completed_analysis_selected_reco": 4351683,
+      "fully_archived_selected_reco": 4029138,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "pythia",
+      "muon_scale": "down",
+      "completed_analysis_selected_reco": 4296289,
+      "fully_archived_selected_reco": 3977344,
+      "target": 5000000
+    },
+    {
+      "process": "gg_H",
+      "shower": "herwig",
+      "muon_scale": "nominal",
+      "completed_analysis_selected_reco": 3974931,
+      "fully_archived_selected_reco": 3681180,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "nominal",
+      "completed_analysis_selected_reco": 192925,
+      "fully_archived_selected_reco": 178143,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "up",
+      "completed_analysis_selected_reco": 193036,
+      "fully_archived_selected_reco": 178286,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "pythia",
+      "muon_scale": "down",
+      "completed_analysis_selected_reco": 193156,
+      "fully_archived_selected_reco": 178443,
+      "target": 5000000
+    },
+    {
+      "process": "ZZ",
+      "shower": "herwig",
+      "muon_scale": "nominal",
+      "completed_analysis_selected_reco": 191143,
+      "fully_archived_selected_reco": 176557,
+      "target": 5000000
+    }
+  ],
+  "count_definition": "Selected reconstructed events in the extended mass region; pilots and diagnostics excluded. Completed-analysis totals include wave 12. Fully archived totals include waves through 11. Pythia scale variations are correlated.",
+  "state": {
+    "active_wave": 12,
+    "phase": "archive_recovery",
+    "physics_workers_running": 0,
+    "recovery_jobs": [
+      {
+        "role": "fourlepton_day_advance",
+        "state": "PENDING"
+      },
+      {
+        "role": "fourlepton_day_summary",
+        "state": "RUNNING"
+      }
+    ],
+    "next_generation_requires_complete_archive_verification": true
+  },
+  "wave12": {
+    "physics_workers_completed": 1600,
+    "worker_validation_passed": true,
+    "ggH_summary_files_passed": 800,
+    "ZZ_durable_checkpoint_files": 768,
+    "additional_ZZ_analysis_files_strictly_validated": 32,
+    "archive_recheck_progress": 48,
+    "archive_recheck_errors": 0,
+    "archive_recheck_updated_utc": "2026-11-16T11:55:31.884424+00:00",
+    "archive_complete": false
+  },
+  "storage": {
+    "access_restored_on_all_five_probe_nodes": true,
+    "known_output_checksums_checked": 20,
+    "read_after_write_probes_passed": 5,
+    "probe_elapsed_seconds": [
+      47.000160827010404,
+      46.02956904203165,
+      45.98560982104391,
+      46.27045543602435,
+      45.841784363030456
+    ],
+    "permanent_storage_fix_verified": false
+  },
+  "recovery": {
+    "checkpoint_unchanged": true,
+    "events_regenerated": 0,
+    "summary_time_limit_hours": 3,
+    "controller_checks_passed": 44,
+    "caps": {
+      "gg_H": 200,
+      "ZZ": 200
+    },
+    "launch_deadline_utc": "2026-11-16T21:35:38+00:00"
+  },
+  "forecast": {
+    "previous_ggH_1100_utc_estimate_withdrawn": true,
+    "replacement_completion_estimate": null,
+    "reason": "Repeated archive-access failures and long I/O stalls invalidate the previous stable-cadence assumption."
+  }
+}
