@@ -1,0 +1,68 @@
+{
+  "updated_utc": "2026-11-17T17:29:51.586548+00:00",
+  "archived_through_wave": 21,
+  "archived_counts": {
+    "gg_H pythia nominal": 5607187,
+    "gg_H pythia up": 5642232,
+    "gg_H pythia down": 5569862,
+    "gg_H herwig nominal": 5150310,
+    "ZZ pythia nominal": 326617,
+    "ZZ pythia up": 326731,
+    "ZZ pythia down": 327473,
+    "ZZ herwig nominal": 323622
+  },
+  "selected_reco_targets": {
+    "gg_H": 5000000,
+    "ZZ": 1000000
+  },
+  "count_semantics": "Selected reco, extended mass selection; pilots excluded; Pythia scale variations correlated.",
+  "active_wave": 22,
+  "workers": {
+    "PENDING": 400,
+    "RUNNING": 400
+  },
+  "pending_reasons": {
+    "JobArrayTaskLimit": 400
+  },
+  "concurrency_cap": 400,
+  "independent_future_hourly_checks": 48,
+  "storage_bytes": {
+    "work": 80353153932,
+    "project": 58977224343
+  },
+  "controller_tests_passed": 58,
+  "interruption": {
+    "last_archive_utc": "2026-11-17T05:07:26.036756+00:00",
+    "resumed_wave_created_utc": "2026-11-17T17:28:19.258911+00:00",
+    "cause": "Slow serial work-directory metadata inventory; timed-out launcher left an unhandled between-waves recovery state.",
+    "remedy": "Bounded fresh concurrent inventories and guarded recovery of timed-out launchers; capacity and physics-validation checks retained."
+  },
+  "measured_ZZ_only_span_hours": 6.223376888611111,
+  "measured_rate_and_forecast": {
+    "ZZ pythia nominal": {
+      "gain": 74348,
+      "rate_per_hour": 11946.568772985314,
+      "remaining": 673383,
+      "hours_remaining": 56.36622638650153
+    },
+    "ZZ pythia up": {
+      "gain": 74383,
+      "rate_per_hour": 11952.19272933995,
+      "remaining": 673269,
+      "hours_remaining": 56.3301659575214
+    },
+    "ZZ pythia down": {
+      "gain": 74784,
+      "rate_per_hour": 12016.627200717352,
+      "remaining": 672527,
+      "hours_remaining": 55.96636966151804
+    },
+    "ZZ herwig nominal": {
+      "gain": 73586,
+      "rate_per_hour": 11824.127208921522,
+      "remaining": 676378,
+      "hours_remaining": 57.20320731069777
+    }
+  },
+  "forecast_assumption": "About 56\u201357 further productive hours; roughly 20 November if the recent ZZ-only cadence resumes without interruptions. Storage stability and scheduling remain uncertain."
+}
