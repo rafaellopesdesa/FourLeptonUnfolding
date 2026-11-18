@@ -1,34 +1,34 @@
 {
-  "updated_utc": "2026-11-18T17:01:56.388606+00:00",
-  "status": "All interrupted-wave workers passed",
-  "status_detail": "The replacement shard passed. The complete wave is being summarized and archived before new production waves begin.",
+  "updated_utc": "2026-11-18T17:10:19.870282+00:00",
+  "status": "ZZ production has resumed",
+  "status_detail": "The repaired wave passed validation and archival. New ZZ-only waves are running toward 1M selected reconstructed events per configuration.",
   "target_selected_reco_per_ZZ_configuration": 1000000,
-  "completed_wave": 26,
+  "completed_wave": 27,
   "ggH_complete": true,
   "counts": [
     {
       "configuration": "Pythia nominal",
       "ggH_archived_reco": 5607187,
       "ZZ_validated_reco": 415552,
-      "ZZ_archived_reco": 400664
+      "ZZ_archived_reco": 415552
     },
     {
       "configuration": "Pythia muon-scale up",
       "ggH_archived_reco": 5642232,
       "ZZ_validated_reco": 415766,
-      "ZZ_archived_reco": 400893
+      "ZZ_archived_reco": 415766
     },
     {
       "configuration": "Pythia muon-scale down",
       "ggH_archived_reco": 5569862,
       "ZZ_validated_reco": 416060,
-      "ZZ_archived_reco": 401183
+      "ZZ_archived_reco": 416060
     },
     {
       "configuration": "Herwig",
       "ggH_archived_reco": 5150310,
       "ZZ_validated_reco": 412005,
-      "ZZ_archived_reco": 397253
+      "ZZ_archived_reco": 412005
     }
   ],
   "count_scope": "Extended-mass reconstructed selection, excludes pilots. Retained wave-27 successes are included before archival; subsequent waves count only after archival.",
