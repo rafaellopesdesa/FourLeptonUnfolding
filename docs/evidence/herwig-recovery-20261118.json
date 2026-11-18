@@ -1,0 +1,50 @@
+{
+  "updated_utc": "2026-11-18T16:54:49.921386+00:00",
+  "status": "Herwig repair validated; recovery running",
+  "status_detail": "The original-seed replacement worker is running, followed by complete-wave validation and archival. New waves remain conditional on those checks passing.",
+  "target_selected_reco_per_ZZ_configuration": 1000000,
+  "completed_wave": 26,
+  "ggH_complete": true,
+  "counts": [
+    {
+      "configuration": "Pythia nominal",
+      "ggH_archived_reco": 5607187,
+      "ZZ_validated_reco": 415552,
+      "ZZ_archived_reco": 400664
+    },
+    {
+      "configuration": "Pythia muon-scale up",
+      "ggH_archived_reco": 5642232,
+      "ZZ_validated_reco": 415766,
+      "ZZ_archived_reco": 400893
+    },
+    {
+      "configuration": "Pythia muon-scale down",
+      "ggH_archived_reco": 5569862,
+      "ZZ_validated_reco": 416060,
+      "ZZ_archived_reco": 401183
+    },
+    {
+      "configuration": "Herwig",
+      "ggH_archived_reco": 5150310,
+      "ZZ_validated_reco": 411925,
+      "ZZ_archived_reco": 397253
+    }
+  ],
+  "count_scope": "Extended-mass reconstructed selection, excludes pilots. Validated totals include retained successful files through wave 27; later in-flight waves are excluded until archived.",
+  "validation": {
+    "failing_seed_shower_events": 10000,
+    "control_events": 20000,
+    "control_recorded_quantities_match_exactly": true,
+    "full_chain_entries": 10000,
+    "full_chain_repeated_source_events": 0,
+    "retained_files_checked": 799
+  },
+  "storage_gb": {
+    "work": 83.192731703,
+    "project": 68.242115178
+  },
+  "hourly_checks_enabled": true,
+  "fix_commit": "bde95e4ade3be360757fd6b633abbc065e6f5366",
+  "research_handoff": "After every ZZ configuration reaches 1M and validation passes, resume merging, physical pseudo-data preparation, background removal and ordinary OmniFold closure/hyperparameter studies, then the profile and measurement program."
+}
