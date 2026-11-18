@@ -1,7 +1,7 @@
 {
-  "updated_utc": "2026-11-18T16:54:49.921386+00:00",
-  "status": "Herwig repair validated; recovery running",
-  "status_detail": "The original-seed replacement worker is running, followed by complete-wave validation and archival. New waves remain conditional on those checks passing.",
+  "updated_utc": "2026-11-18T17:01:56.388606+00:00",
+  "status": "All interrupted-wave workers passed",
+  "status_detail": "The replacement shard passed. The complete wave is being summarized and archived before new production waves begin.",
   "target_selected_reco_per_ZZ_configuration": 1000000,
   "completed_wave": 26,
   "ggH_complete": true,
@@ -27,11 +27,11 @@
     {
       "configuration": "Herwig",
       "ggH_archived_reco": 5150310,
-      "ZZ_validated_reco": 411925,
+      "ZZ_validated_reco": 412005,
       "ZZ_archived_reco": 397253
     }
   ],
-  "count_scope": "Extended-mass reconstructed selection, excludes pilots. Validated totals include retained successful files through wave 27; later in-flight waves are excluded until archived.",
+  "count_scope": "Extended-mass reconstructed selection, excludes pilots. Retained wave-27 successes are included before archival; subsequent waves count only after archival.",
   "validation": {
     "failing_seed_shower_events": 10000,
     "control_events": 20000,
