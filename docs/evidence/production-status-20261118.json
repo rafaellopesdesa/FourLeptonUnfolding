@@ -1,0 +1,52 @@
+{
+  "updated_utc": "2026-11-18T12:41:45.369181+00:00",
+  "archived_through_wave": 26,
+  "archived_reconstructed": {
+    "gg_H pythia nominal": 5607187,
+    "gg_H pythia up": 5642232,
+    "gg_H pythia down": 5569862,
+    "gg_H herwig nominal": 5150310,
+    "ZZ pythia nominal": 400664,
+    "ZZ pythia up": 400893,
+    "ZZ pythia down": 401183,
+    "ZZ herwig nominal": 397253
+  },
+  "validated_reconstructed_including_partial_wave": {
+    "gg_H pythia nominal": 5607187,
+    "gg_H pythia up": 5642232,
+    "gg_H pythia down": 5569862,
+    "gg_H herwig nominal": 5150310,
+    "ZZ pythia nominal": 415552,
+    "ZZ pythia up": 415766,
+    "ZZ pythia down": 416060,
+    "ZZ herwig nominal": 411925
+  },
+  "partial_wave": 27,
+  "partial_validated_files": 799,
+  "partial_reconstructed": {
+    "ZZ pythia nominal": 14888,
+    "ZZ pythia up": 14873,
+    "ZZ pythia down": 14877,
+    "ZZ herwig nominal": 14672
+  },
+  "targets_per_configuration": {
+    "gg_H": 5000000,
+    "ZZ": 1000000
+  },
+  "status": "Bulk production stopped. The identical-input/seed retry reproduced the same Herwig density-matrix assertion on a different node. An isolated diagnostic job has been submitted to capture the crash backtrace.",
+  "retry_states": [
+    "FAILED"
+  ],
+  "physics_changed": false,
+  "latest_health_check_utc": "2026-11-18T12:39:31.193694+00:00",
+  "storage_errors": [],
+  "storage_bytes": {
+    "work": 83098674463,
+    "project": 68242115178
+  },
+  "future_hourly_checks": 48,
+  "count_semantics": "Selected reconstructed events in the extended mass region; pilots excluded; Pythia scale variations correlated. Available totals include 799 individually validated files in unfinished wave 27. Whole-wave archive ledger stops at wave 26.",
+  "forecast": "The previous conditional 20 November estimate is uncertain after the new interruption; no replacement completion date until recovery succeeds.",
+  "identical_seed_failure_reproduced": true,
+  "diagnostic_submitted": true
+}
