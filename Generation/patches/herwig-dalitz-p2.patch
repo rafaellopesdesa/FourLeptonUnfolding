@@ -1,0 +1,25 @@
+--- a/Decay/Dalitz/VectorTo3PseudoScalarDalitz.cc
++++ b/Decay/Dalitz/VectorTo3PseudoScalarDalitz.cc
+@@ -185,15 +185,18 @@
+   // Blatt-Weisskopf factors
+   // for the D decay
+   Energy pD  = sqrt(max(ZERO,(0.25*sqr(sqr(mD_)-sqr(mR)-sqr(mOut_[sp])) - sqr(mR*mOut_[sp]))/sqr(mD_)));
+-  Energy pDAB= sqrt( 0.25*sqr(sqr(mD_)-sqr(m2_[d1][d2])-sqr(mOut_[sp])) - sqr(m2_[d1][d2]*mOut_[sp]))/mD_;
+-  double r2A(parentRadius()   *pD),r2B(parentRadius()   *pDAB);
++  // Only the squared breakup momentum enters the barrier factors. Avoid
++  // taking a square root that is immediately squared again: boosted decays
++  // can give a slightly negative Kallen polynomial at a phase-space boundary.
++  Energy2 pDAB2 = (0.25*sqr(sqr(mD_)-sqr(m2_[d1][d2])-sqr(mOut_[sp])) - sqr(m2_[d1][d2]*mOut_[sp]))/sqr(mD_);
++  double r2A(parentRadius()*pD), r2B2(sqr(parentRadius())*pDAB2);
+   // Blatt-Weisskopf factors and spin piece
+   switch (resonances()[i]->type) {
+   case ResonanceType::Spin1: case ResonanceType::Spin1GS : 
+-    output *= sqrt( (1. + sqr(r2A)) / (1. + sqr(r2B)) );
++    output *= sqrt( (1. + sqr(r2A)) / (1. + r2B2) );
+     break;
+   case ResonanceType::Spin2:
+-    output *= sqrt( (9. + sqr(r2A)*(3.+sqr(r2A))) / (9. + sqr(r2B)*(3.+sqr(r2B))));
++    output *= sqrt( (9. + sqr(r2A)*(3.+sqr(r2A))) / (9. + r2B2*(3.+r2B2)));
+     // spin piece
+     output *= (sqr(mD_) - sqr(mOut_[sp]) + sqr(m2_[d1][d2]))/(sqr(mD_)*sqr(m2_[d1][d2]))/GeV2*
+ 	       ((-sqr(m2_[sp][d1]) + sqr(m2_[sp][d2]))*sqr(m2_[d1][d2]) +

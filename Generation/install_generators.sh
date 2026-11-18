@@ -29,6 +29,7 @@ POWHEG_URL="${POWHEG_URL:-https://gitlab.com/POWHEG-BOX/V2/POWHEG-BOX-V2.git}"
 POWHEG_REF="${POWHEG_REF:-9c3cd9ec74f7c804ea521ef21835ca5db5d3bf9e}"
 POWHEG_ZZ_PATCH="$SCRIPT_DIR/patches/powheg-zz-m4lmin.patch"
 POWHEG_ZZ_ANGLE_PATCH="$SCRIPT_DIR/patches/powheg-zz-angle-bound.patch"
+HERWIG_DALITZ_PATCH="$SCRIPT_DIR/patches/herwig-dalitz-p2.patch"
 
 usage() {
   cat <<'EOF'
@@ -412,7 +413,13 @@ install_thepeg() {
 }
 
 install_herwig() {
-  local stamp="$PREFIX/.installed-herwig-$HERWIG_VERSION"
+  [[ -r "$HERWIG_DALITZ_PATCH" ]] || {
+    echo "Missing Herwig Dalitz patch: $HERWIG_DALITZ_PATCH" >&2
+    exit 1
+  }
+  local patch_sha
+  patch_sha="$(sha256sum "$HERWIG_DALITZ_PATCH" | awk '{print $1}')"
+  local stamp="$PREFIX/.installed-herwig-$HERWIG_VERSION-dalitz-${patch_sha:0:12}"
   [[ -e "$stamp" ]] && return
   local archive
   archive="$(download \
@@ -420,6 +427,7 @@ install_herwig() {
     "Herwig-${HERWIG_VERSION}.tar.bz2")"
   local src="$BUILD_DIR/Herwig-$HERWIG_VERSION"
   unpack_clean "$archive" "$src"
+  patch -d "$src" -p1 --forward <"$HERWIG_DALITZ_PATCH"
   log "Building Herwig $HERWIG_VERSION"
   (
     cd "$src"
@@ -593,6 +601,8 @@ write_versions() {
     printf 'PYTHIA %s\n' "$PYTHIA_VERSION"
     printf 'ThePEG %s\n' "$THEPEG_VERSION"
     printf 'Herwig %s\n' "$HERWIG_VERSION"
+    printf 'Herwig Dalitz momentum-squared patch %s\n' \
+      "$(sha256sum "$HERWIG_DALITZ_PATCH" | awk '{print $1}')"
     printf 'Herwig default PDF sets CT14lo CT14nlo\n'
     printf 'PDF set %s\n' "$PDFSET"
     printf 'POWHEG-BOX-V2 %s\n' "$(git -C "$powheg_root" rev-parse HEAD)"

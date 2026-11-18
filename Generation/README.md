@@ -22,6 +22,24 @@ in-range calculations. The installer records the patch checksum in
 `versions.txt`. Validation reproduced the failed seed through its full LHE
 sample and matched three successful production LHE controls byte for byte.
 
+The Herwig build applies [a Dalitz form-factor correction](patches/herwig-dalitz-p2.patch).
+For highly boosted vector mesons near a three-body phase-space boundary,
+rounding can make the squared breakup momentum slightly negative. The original
+code takes its square root and immediately squares it in the Blatt–Weisskopf
+factors; the intermediate NaN can abort spin-density normalization. The patch
+evaluates these factors directly in momentum squared, preserving the algebraic
+expression without modifying phase-space generation, spin correlations, seeds
+or hard-event inputs. It does not disable assertions or discard events.
+
+The installer includes the patch checksum in the Herwig build stamp and in
+`versions.txt`, so an earlier unpatched build is not silently reused. Validation
+completed the previously failing 10,000-event shower and two 10,000-event
+control pairs. Both controls matched the unchanged generator exactly in event
+identities, headers, decay topology, final-state electron/muon momenta and summed
+final-state four-momenta. The same failing seed also
+completed generation, detector simulation and analysis with 10,000 output rows,
+strict LHE/Born provenance checks and no repeated source events.
+
 POWHEG does not use a separate `configure` step. Its build is explicitly bound
 to the locally installed `lhapdf-config` and `fastjet-config`. The LHAPDF
 include flags and library directory are passed to the POWHEG compiler and
@@ -57,7 +75,7 @@ the local installation prefix, so root privileges are not needed for it:
 ```
 
 This no-`sudo` route still expects `c++`, `gfortran`, `make`, `cmake`, `curl`,
-`git`, and `tar` to be available on the host system. Boost headers and the
+`git`, `patch`, and `tar` to be available on the host system. Boost headers and the
 compiled Boost.Test library are built inside the local installation prefix.
 The required `CT14lo`, `CT14nlo`, and `NNPDF31_nlo_as_0118` PDF data sets are
 downloaded directly into that prefix before Herwig is built. This does not
