@@ -1,0 +1,283 @@
+{
+  "updated_utc": "2026-11-19T14:39:24+00:00",
+  "stage": "Merged samples and SMEFT templates complete; pre-unfolding distributions available.",
+  "samples": [
+    {
+      "configuration": "Pythia nominal",
+      "ggF_entries": 35000000,
+      "ggF_reco": 5607187,
+      "ZZ_entries": 67990000,
+      "ZZ_reco": 504772
+    },
+    {
+      "configuration": "Pythia muon scale +1%",
+      "ggF_entries": 35000000,
+      "ggF_reco": 5642232,
+      "ZZ_entries": 67990000,
+      "ZZ_reco": 504985
+    },
+    {
+      "configuration": "Pythia muon scale \u22121%",
+      "ggF_entries": 35000000,
+      "ggF_reco": 5569862,
+      "ZZ_entries": 67990000,
+      "ZZ_reco": 505436
+    },
+    {
+      "configuration": "Herwig nominal",
+      "ggF_entries": 35000000,
+      "ggF_reco": 5150310,
+      "ZZ_entries": 68000000,
+      "ZZ_reco": 500780
+    }
+  ],
+  "luminosity_fb": 312.0,
+  "coefficient_values": [
+    -0.1,
+    0.0,
+    0.1
+  ],
+  "lambda_tev": 1.0,
+  "expected_herwig_signal_yields": {
+    "extended": {
+      "coefficient_order": [
+        -0.1,
+        0.0,
+        0.1
+      ],
+      "sumw": [
+        436.68629666341815,
+        432.2209460096802,
+        430.5132374108839
+      ],
+      "sumw2": [
+        0.037267046067658016,
+        0.03627329589343006,
+        0.03621361630621654
+      ],
+      "effective_entries": [
+        5116985.160224553,
+        5150206.000534387,
+        5118009.922532475
+      ],
+      "unsupported_fraction": 0.002284716842287163
+    },
+    "higgs": {
+      "coefficient_order": [
+        -0.1,
+        0.0,
+        0.1
+      ],
+      "sumw": [
+        421.9441420020961,
+        417.6184844231566,
+        415.96064809743893
+      ],
+      "sumw2": [
+        0.03601216097936226,
+        0.0350477971217616,
+        0.034989416032753684
+      ],
+      "effective_entries": [
+        4943798.265033688,
+        4976210.00047401,
+        4945017.104706003
+      ],
+      "unsupported_fraction": 0.0005974311065276131
+    },
+    "fiducial": {
+      "coefficient_order": [
+        -0.1,
+        0.0,
+        0.1
+      ],
+      "sumw": [
+        601.9001900356628,
+        595.6993638907645,
+        593.3158192570245
+      ],
+      "sumw2": [
+        0.05134957164085765,
+        0.049992875921588846,
+        0.04988513492788363
+      ],
+      "effective_entries": [
+        7055245.588002263,
+        7098166.000620506,
+        7056684.559228649
+      ],
+      "unsupported_fraction": 0.002424100862431607
+    }
+  },
+  "plots": {
+    "created_utc": "2026-11-19T14:39:23.985576+00:00",
+    "input_sha256": [
+      "8920fdd44bb618a112c023c637c1bb26efb1fd409597dfd1d2c2fa250baf5c18",
+      "22265a05b54aa5f20a7fff0758c76d734363c9d59c341dd6781bb3ea8f04d0d9",
+      "36a260b16b84aecc37a210759967d1aa3c4c142aea73f7149592ebea5b2c4a10",
+      "24ba4ca4ca001fcddfecae26768f29fe5a45154127ff6966f778cdc88cd920f6",
+      "bfadc21d9040fe81e8dba9de9f1b70a9fd7884a682c63aee20f0c1c61427c1f0"
+    ],
+    "checks": {
+      "full_sample_counts_and_weights": true,
+      "coefficient_zero_histograms_match": true,
+      "coefficient_zero_ratio_and_correlated_uncertainty": true
+    },
+    "limitations": [
+      "Finite-template statistical errors only; no physical pseudo-data or unfolded results.",
+      "SMEFT shapes normalized within the indicated selected region; absolute yields shown separately.",
+      "Selected SMEFT comparisons use the same events and include covariance in the ratio errors.",
+      "Inclusive preselection SMEFT normalization is not used: low-mass tails dominate its variance."
+    ],
+    "files": [
+      {
+        "path": "figures/current/reco-overview.svg",
+        "bytes": 157837,
+        "sha256": "b53262da51b04a77cd9e1111b2c0700c8732bda0c3b85a2cf4fed29b153af633"
+      },
+      {
+        "path": "figures/current/reco-angles.svg",
+        "bytes": 330266,
+        "sha256": "638a5693a15aeae4b34e3c42d946814a7881a164d2363b03ffab8cb8f832b1fe"
+      },
+      {
+        "path": "figures/current/smeft-angles.svg",
+        "bytes": 279094,
+        "sha256": "27a5e59051574b45df254e89efb613c088ce4dcd224b0ab661688dea82034bbc"
+      },
+      {
+        "path": "figures/current/reco-masses.svg",
+        "bytes": 204908,
+        "sha256": "b2efacfb2db1e562689cbdfa89bc052f8e543267ae0648f83d9cd05840c858ac"
+      },
+      {
+        "path": "figures/current/smeft-masses.svg",
+        "bytes": 192022,
+        "sha256": "789b8408492fa6f72f0b5e248e06d338c8a43a4597d28b99b9d71aa9cb359698"
+      },
+      {
+        "path": "figures/current/generators-cos_theta_star.svg",
+        "bytes": 164902,
+        "sha256": "3fb09efc32f12a1a92aac04e5cf45a9de677dfcf9c6843709d55c35cd21bc117"
+      },
+      {
+        "path": "figures/current/generators-cos_theta1.svg",
+        "bytes": 164557,
+        "sha256": "ab7ce5363c3bef39ec34b97e1eacb93c36188dfd8d173c468e250e6a7decce21"
+      },
+      {
+        "path": "figures/current/generators-cos_theta2.svg",
+        "bytes": 167287,
+        "sha256": "eec9160741da60de3f2b3d86894310e74f5e8e5ac72b1a44f315f06544daf21a"
+      },
+      {
+        "path": "figures/current/generators-Phi.svg",
+        "bytes": 142788,
+        "sha256": "c9129e65331f4052d4125b51e81a65a21570ea3cc594f51c178246b355a56af1"
+      },
+      {
+        "path": "figures/current/generators-Psi.svg",
+        "bytes": 148895,
+        "sha256": "0cccba9cae0e3850dfbbf048cf7bece364343b16d097fc3f78403853479cdfb1"
+      },
+      {
+        "path": "figures/current/generators-m_Z1.svg",
+        "bytes": 155104,
+        "sha256": "9f18306ce806a35b904bc08fbb8b3cba50dad05d1fafb779176e5e2a6bd2d62a"
+      },
+      {
+        "path": "figures/current/generators-m_Z2.svg",
+        "bytes": 139410,
+        "sha256": "14da78fdc7c0f4cdfc3f3e7ba285930f63eec59256dc50c389c92a503015bc15"
+      },
+      {
+        "path": "figures/current/generators-m_ZZ.svg",
+        "bytes": 160292,
+        "sha256": "0b57bc83e26afbfc2739ff31719f167db5299376359f340af00a4c0f9ecbc3b9"
+      },
+      {
+        "path": "figures/current/generators-pT_ZZ.svg",
+        "bytes": 145800,
+        "sha256": "aae6d796ad92ee78711d16eebe76bce873218d86a29422d1fdeadf03ec477c6a"
+      },
+      {
+        "path": "figures/current/smeft-shape-cos_theta_star.svg",
+        "bytes": 160636,
+        "sha256": "d808ceae5fecbc988722734f2511f7d5969401de354c19f9da45d464ce3f8e08"
+      },
+      {
+        "path": "figures/current/smeft-yield-cos_theta_star.svg",
+        "bytes": 165251,
+        "sha256": "2605bc4021a844b69d703b1e078d00b1cd24914db1f19adf476d8da955856380"
+      },
+      {
+        "path": "figures/current/smeft-shape-cos_theta1.svg",
+        "bytes": 163178,
+        "sha256": "698a0a4e9c967417591be0d4e175a13d073a957e292ba84734816d88aef8b289"
+      },
+      {
+        "path": "figures/current/smeft-yield-cos_theta1.svg",
+        "bytes": 155538,
+        "sha256": "d9bee54f3efbf6887e0edd38b89cd245e8980a1fb01e9fc5293d727e763d1703"
+      },
+      {
+        "path": "figures/current/smeft-shape-cos_theta2.svg",
+        "bytes": 163188,
+        "sha256": "a7ea506cb55146c9bcb13232cb63d3f36406ccb9b0dcd7476db6dd974d0983cc"
+      },
+      {
+        "path": "figures/current/smeft-yield-cos_theta2.svg",
+        "bytes": 156181,
+        "sha256": "33f585853ea40faa135ea5a506f17f110e861126e1b3fd0aa44f88e4c3774ec5"
+      },
+      {
+        "path": "figures/current/smeft-shape-Phi.svg",
+        "bytes": 141980,
+        "sha256": "d0bf1f99df6fffb3c495e71198573fd4cb33c07e368bdb34b7a4ed9d51b28997"
+      },
+      {
+        "path": "figures/current/smeft-yield-Phi.svg",
+        "bytes": 133394,
+        "sha256": "6a492f01090efc465f88b42401cf70637759ee746fef770e3edafd975b22c4fa"
+      },
+      {
+        "path": "figures/current/smeft-shape-Psi.svg",
+        "bytes": 146182,
+        "sha256": "6d35b9a6175370f37b4b23b82326534a10c004daf761c3f0f2ea19fd227fd120"
+      },
+      {
+        "path": "figures/current/smeft-yield-Psi.svg",
+        "bytes": 140629,
+        "sha256": "1e3fb74b4adf9813e1f2c134e8f58cb020cfb85c7b8259a6172daa5184c19258"
+      },
+      {
+        "path": "figures/current/smeft-shape-m_Z1.svg",
+        "bytes": 142442,
+        "sha256": "4c38f2dd469cdc52609772c6229a27b0fe918807db2f73f647d854f186f67abe"
+      },
+      {
+        "path": "figures/current/smeft-yield-m_Z1.svg",
+        "bytes": 131689,
+        "sha256": "abcab68b614ddf7ce20ab154891adb8b24aabd1616652aec061559a5d2c0ecb1"
+      },
+      {
+        "path": "figures/current/smeft-shape-m_Z2.svg",
+        "bytes": 116914,
+        "sha256": "a91000ba3ebbf00c275c078e29fa615cbafc969043e902a936834b477b319b73"
+      },
+      {
+        "path": "figures/current/smeft-yield-m_Z2.svg",
+        "bytes": 111534,
+        "sha256": "79943da6d332bad4084058559bd68ef5914009e6b0b1129e5c53d9769ec4647c"
+      },
+      {
+        "path": "figures/current/physics-distributions.pdf",
+        "bytes": 305276,
+        "sha256": "3b19c6ac2a8bd8c70fbd0bd3a9c8f53f65eb7fd1b2903f94016a2267bf8a801b"
+      }
+    ]
+  },
+  "next": "Validate physical pseudo-experiments, then background removal and ordinary OmniFold closure.",
+  "production_ended": true,
+  "unfolding_performed": false
+}

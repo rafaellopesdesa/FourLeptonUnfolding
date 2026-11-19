@@ -1,0 +1,59 @@
+body.current-report { --paper:#f7f6f2; --accent:#a5412e; }
+.current-report .report-label { font-size:11px; letter-spacing:.12em; }
+.current-report .report-label a { color:var(--muted); text-decoration:none; margin-left:19px; }
+.current-report .report-label a:hover { color:var(--accent); }
+.current-report .reveal { font-size:24px; }
+.current-report .reveal .slides section { padding:14px 8px; }
+.current-report .reveal h1 { font-size:2.95em; margin:0 0 26px; }
+.current-report .reveal h2 { font-size:1.85em; margin:0 0 17px; max-width:none; }
+.current-report .reveal .eyebrow { margin:0 0 15px; font-size:13px; }
+.current-report .reveal .lead { max-width:990px; font-size:1.08em; }
+.current-report .reveal .small { font-size:.64em; }
+.current-report .reveal .metrics { display:grid; grid-template-columns:1fr 1fr; gap:40px; margin:42px 0 34px; }
+.current-report .reveal .metric { border-top:3px solid var(--accent); padding-top:21px; }
+.current-report .reveal .metric strong { display:block; font-weight:500; font-size:2.5em; letter-spacing:-.045em; }
+.current-report .reveal .metric span { color:var(--muted); display:block; margin-top:8px; font-size:.8em; }
+.current-report .reveal .milestones { display:grid; grid-template-columns:1fr 1fr 1fr; gap:25px; border-top:1px solid var(--line); padding-top:23px; margin-top:30px; }
+.current-report .reveal .milestones b { display:block; font-size:.72em; color:var(--muted); margin-bottom:9px; font-weight:400; }
+.current-report .reveal .milestones span { font-size:.9em; }
+.current-report .reveal .milestones .ready { color:#276653; }
+.current-report .reveal table { font-size:.77em; margin:33px 0 24px; }
+.current-report .reveal table th { font-size:.77em; letter-spacing:.025em; }
+.current-report .reveal table td { font-variant-numeric:tabular-nums; padding:18px 12px 18px 0; white-space:nowrap; }
+.current-report .reveal .plot { display:block; width:100%; max-height:590px; object-fit:contain; margin:10px auto 0; background:#fff; }
+.current-report .reveal .plot.compact { max-height:490px; }
+.current-report .reveal figure { margin:0; }
+.current-report .reveal figcaption { margin:12px 0 0; color:var(--muted); font-size:.62em; line-height:1.42; }
+.current-report .reveal .plot a { border:none; }
+.current-report .reveal .reading { display:grid; grid-template-columns:1fr 1fr; gap:50px; margin:30px 0; }
+.current-report .reveal .reading p { font-size:.84em; }
+.current-report .reveal .reading h3 { font-size:1.1em; }
+.current-report .reveal .yield-line { color:var(--muted); font-size:.72em; margin:14px 0 20px; }
+.current-report .reveal .source { font-size:.57em; margin-top:18px; }
+.current-report .reveal .scroll-note { font-size:.6em; color:var(--muted); }
+.current-report .reveal .progress { height:3px; }
+.gallery { max-width:1280px; margin:0 auto; padding:38px 32px 55px; }
+.gallery header { padding-bottom:20px; border-bottom:1px solid var(--line); }
+.gallery .eyebrow { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; }
+.gallery h1 { font-size:40px; letter-spacing:-.04em; margin:16px 0; font-weight:600; }
+.gallery h2 { font-size:23px; margin:25px 0 12px; }
+.gallery p { line-height:1.55; }
+.gallery a { color:var(--accent); text-underline-offset:3px; }
+.gallery .muted { color:var(--muted); font-size:14px; }
+.gallery .selectors { display:flex; flex-wrap:wrap; gap:24px; padding:24px 0 12px; }
+.gallery label { font-size:13px; color:var(--muted); }
+.gallery select { display:block; margin-top:8px; min-width:245px; padding:10px 12px; border:1px solid var(--line); background:white; color:var(--ink); font-size:16px; border-radius:4px; }
+.gallery figure { margin:18px 0; }
+.gallery figure img { display:block; width:100%; background:white; }
+.gallery figcaption { margin-top:14px; color:var(--muted); font-size:14px; line-height:1.5; }
+.gallery .downloads { display:flex; flex-wrap:wrap; gap:24px; margin:18px 0; font-size:14px; }
+.gallery .method { margin-top:38px; border-top:1px solid var(--line); padding-top:16px; max-width:1000px; }
+.gallery .method p { font-size:14px; color:var(--muted); }
+@media(max-width:700px) {
+  .gallery { padding:22px 16px; }
+  .gallery h1 { font-size:31px; }
+  .gallery .selectors { gap:16px; }
+  .gallery select { min-width:210px; max-width:100%; }
+  .current-report .report-label a { margin-left:10px; }
+}
+@media print { .gallery .selectors,.gallery .downloads { display:none; } }

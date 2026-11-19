@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Living research report for Higgs four-lepton unfolding on Unity. Methods, validation, and production status.">
+  <title>Four-lepton unfolding · Archived research log</title>
+  <link rel="stylesheet" href="vendor/reveal.css">
+  <link rel="stylesheet" href="report.css">
+<style>.reveal #production-20261115 h2{font-size:1.65em}.reveal #production-20261115 table td{padding:8px 16px 8px 0}.reveal #production-20261115 table{margin:16px 0}</style><style>.reveal #scaleup-20261115 h2{font-size:1.65em}</style><style>.reveal #evening-counts h2{font-size:1.65em}.reveal #evening-counts table td{padding:8px 16px 8px 0}.reveal #evening-counts table{margin:16px 0}</style><style>.reveal #nov16-counts h2{font-size:1.65em}.reveal #nov16-counts table td{padding:8px 16px 8px 0}.reveal #nov16-counts table{margin:16px 0}</style></head>
+<body>
+<div class="report-label">FOUR LEPTON STUDY <span>UNITY · 19 NOV 2026</span></div>
+<div class="reveal"><div class="slides"><section id="archive-introduction"><p class="eyebrow">Historical record · through 19 November 2026</p><h2>Production and method notes</h2><p>This archive preserves the development history and earlier status snapshots.</p><p><a href="index.html">Open the current samples and physics results →</a></p></section><section id="research-start-20261119"><p class="eyebrow">Research transition · 2026-11-19T11:07:12+00:00</p><h2>Production ended; research preparation started</h2><p>The existing samples are accepted for the initial closure study. Generation and diagnostics are finished; future production checks are cancelled.</p><table style="font-size:.58em"><thead><tr><th>Configuration</th><th>Accepted ggH reco</th><th>Accepted ZZ reco</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>5,607,187</td><td>504,772</td></tr><tr><td>Pythia muon-scale up</td><td>5,642,232</td><td>504,985</td></tr><tr><td>Pythia muon-scale down</td><td>5,569,862</td><td>505,436</td></tr><tr><td>Herwig nominal</td><td>5,150,310</td><td>500,780</td></tr></tbody></table><p class="small">All eight configurations passed a preparation preflight. Full consolidation is running; the Herwig SMEFT template follows its validated signal merge. Counts include validated final-wave successes and exclude pilots. <a href="research-start-20261119.html">Preparation checks and research sequence →</a></p></section><section id="production-20261119"><p class="eyebrow">Production status · 19 November 2026, 10:42 UTC</p><h2>ZZ: halfway to target; production paused</h2><table style="font-size:.60em"><thead><tr><th>ZZ configuration</th><th>Validated reco</th><th>1M target</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>504,772</td><td>50.48%</td></tr><tr><td>Pythia muon-scale up</td><td>504,985</td><td>50.50%</td></tr><tr><td>Pythia muon-scale down</td><td>505,436</td><td>50.54%</td></tr><tr><td>Herwig nominal</td><td>500,780</td><td>50.08%</td></tr></tbody></table><p class="small">Totals include 797 validated files from unfinished wave 33. Three Pythia jobs failed at the same seed with heap corruption. Herwig completed the wave. Storage checks passed; hourly monitoring continues. All ggH targets remain met.</p><p class="small">Selected reco uses the 105–160 GeV mass range; pilots excluded. Pythia scale variants are correlated. <a href="production-20261119.html">Failure status and count accounting →</a></p></section><section id="herwig-recovery-20261118"><p class="eyebrow">Production recovery · 2026-11-18 17:10:19 UTC</p><h2>ZZ production has resumed</h2><p>The repaired wave passed validation and archival. New ZZ-only waves are running toward 1M selected reconstructed events per configuration.</p><table style="font-size:.56em"><thead><tr><th>Configuration</th><th>ggH reco</th><th>ZZ validated reco</th><th>ZZ archived reco</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>5,607,187</td><td>415,552</td><td>415,552</td></tr><tr><td>Pythia muon-scale up</td><td>5,642,232</td><td>415,766</td><td>415,766</td></tr><tr><td>Pythia muon-scale down</td><td>5,569,862</td><td>416,060</td><td>416,060</td></tr><tr><td>Herwig</td><td>5,150,310</td><td>412,005</td><td>412,005</td></tr></tbody></table><p class="small">All ggH targets are met. Counts use the extended-mass reconstructed selection and exclude pilots. Retained wave-27 successes are included; later waves count only after archival. Hourly checks remain enabled. <a href="herwig-recovery-20261118.html">Numerical repair and validation →</a></p></section><section id="ZZ-statistics-20261118"><p class="eyebrow">Statistical assessment · 2026-11-18 16:12:43 UTC</p><h2>About 1,040 ZZ entries per Run 3 pseudo-experiment</h2><p>Using the repository convention <strong>L = 312 fb⁻¹</strong>, POWHEG gives <strong>σ = 0.452574 ± 0.000527 pb</strong> before detector selection. The measured signed-weight acceptance is <strong>0.7369%</strong>.</p><table style="font-size:.56em"><thead><tr><th>Reconstructed region</th><th>Available MC entries</th><th>Expected ZZ entries / toy</th><th>Poisson σ</th></tr></thead><tbody><tr><td>105–160 GeV: all selected</td><td>411,925</td><td>1,040.5</td><td>32.3</td></tr><tr><td>115–130 GeV: Higgs window</td><td>118,764</td><td>299.1</td><td>17.3</td></tr><tr><td>130–160 GeV: correction sideband</td><td>249,066</td><td>630.5</td><td>25.1</td></tr><tr><td>105–115 GeV: lower region</td><td>44,095</td><td>110.8</td><td>10.5</td></tr></tbody></table><p class="small">Audit of 5,599 validated files: 55.99M showered entries. Selected cross section: 3.3349 fb. ZZ only; add ggH separately. The 312 fb⁻¹ value is the project convention. <a href="ZZ-statistics-20261118.html">Variance, effective statistics and production decision →</a></p></section><section id="production-20261118"><p class="eyebrow">Production status · 2026-11-18 12:41:45 UTC</p><h2>ggH complete; ZZ has 412k–416k validated events</h2><table style="font-size:.59em"><thead><tr><th>Configuration</th><th>ggH reco</th><th>ZZ validated reco</th><th>ZZ complete-wave archive</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>5,607,187</td><td>415,552</td><td>400,664</td></tr><tr><td>Pythia muon-scale up</td><td>5,642,232</td><td>415,766</td><td>400,893</td></tr><tr><td>Pythia muon-scale down</td><td>5,569,862</td><td>416,060</td><td>401,183</td></tr><tr><td>Herwig</td><td>5,150,310</td><td>411,925</td><td>397,253</td></tr></tbody></table><p>The validated ZZ total includes <strong>799 successful files from unfinished wave 27</strong>. The complete-wave archive ledger stops at wave 26.</p><p>The identical-seed retry reproduced the Herwig failure on another node. Bulk production is stopped; an isolated diagnostic job has been submitted.</p><p class="small">Selected reco, extended mass region; pilots excluded; Pythia scale variations correlated. <a href="production-20261118.html">Failure, recovery status and count definitions →</a></p></section><section id="production-20261117"><p class="eyebrow">Production status · 2026-11-17 17:29:51 UTC</p><h2>ZZ production resumed after a storage-check stall</h2><table style="font-size:.67em"><thead><tr><th>Configuration</th><th>ggH reco</th><th>ZZ reco</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>5,607,187</td><td>326,617</td></tr><tr><td>Pythia muon-scale up</td><td>5,642,232</td><td>326,731</td></tr><tr><td>Pythia muon-scale down</td><td>5,569,862</td><td>327,473</td></tr><tr><td>Herwig</td><td>5,150,310</td><td>323,622</td></tr></tbody></table><p>All ggH configurations exceed <strong>5M</strong>. ZZ is at <strong>32.4–32.7%</strong> of its initial one-million target. These counts are fully validated and archived through wave 21.</p><p>Wave 22 is running: <strong>400 workers running</strong>, 400 queued at this snapshot; cap <strong>400 ZZ workers</strong>.</p><p class="small">Selected reco in the extended mass region; pilots excluded; Pythia scale variations correlated. <a href="production-20261117.html">Recovery and revised outlook →</a></p></section><!-- SIGNAL_COMPLETE_BEGIN --><section id="signal-complete"><p class="eyebrow">Archived production · 2026-11-16 23:02:17 UTC</p><h2>ggH production is complete</h2><table style="font-size:.67em"><thead><tr><th>Configuration</th><th>ggH reco</th><th>ZZ reco</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>5,607,187</td><td>252,269</td></tr><tr><td>Pythia muon-scale up</td><td>5,642,232</td><td>252,348</td></tr><tr><td>Pythia muon-scale down</td><td>5,569,862</td><td>252,689</td></tr><tr><td>Herwig</td><td>5,150,310</td><td>250,036</td></tr></tbody></table><p>Every ggH configuration exceeds <strong>5M</strong>. ZZ is approximately <strong>25% of its initial 1M target</strong>. All counts shown passed final archive verification through wave 16.</p><p class="small">The controller is starting the transition to ZZ-only production. No additional ggH waves are required. Selected reco in the extended mass region; pilots excluded; Pythia scale variations correlated.</p></section><section><p class="eyebrow">Provisional production estimate · 2026-11-16 23:02:17 UTC</p><h2>Plan for approximately 22 November</h2><p>The last four completed waves added roughly <strong>59,000 ZZ reco events per configuration in 10.86 hours</strong>: approximately <strong>5,400–5,500 events/hour</strong>, including queue and archive delays.</p><p>At that measured rate, the remaining approximately <strong>750,000 events per configuration</strong> require <strong>136–138 hours</strong>, or roughly six days. About <strong>51 further waves</strong> are needed at the measured yield.</p><p>ZZ-only production may improve throughput with up to 400 workers, subject to scratch checks. Its end-to-end rate has not yet been measured. Repeated project-storage outages could delay completion.</p><p class="small">This estimates reaching the 1M production target, not unfolding or inference completion. Hourly monitoring continues. <a href="evidence/production-completion-estimate-20261116.json">Counts, measured rate and forecast assumptions</a>. Earlier dated snapshots follow.</p></section><!-- SIGNAL_COMPLETE_END --><!-- REVISED_ZZ_TARGET_BEGIN --><section id="revised-zz-target"><p class="eyebrow">Revised production requirement · 2026-11-16 20:17:14 UTC</p><h2>Initial ZZ target: one million per configuration</h2><table style="font-size:.67em"><thead><tr><th>ZZ sample</th><th>Archived reco</th><th>Remaining to 1M</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>237,435</td><td>762,565</td></tr><tr><td>Pythia muon-scale up</td><td>237,474</td><td>762,526</td></tr><tr><td>Pythia muon-scale down</td><td>237,848</td><td>762,152</td></tr><tr><td>Herwig</td><td>235,252</td><td>764,748</td></tr></tbody></table><p>The ggH target remains <strong>five million per configuration</strong>. Finish the current signal wave, then devote subsequent production to <strong>ZZ only</strong>.</p><p class="small">Counts through wave 15; active wave 16 is excluded. Selected reco in the extended mass region; correlated Pythia scale variants. The initial 1M target applies separately to all four configurations. <a href="evidence/revised-ZZ-target-20261116.json">Requirement and deployment evidence</a></p></section><section><p class="eyebrow">Continuation confirmed · 2026-11-16 20:17:14 UTC</p><h2>Continue to the target with hourly checks</h2><p>The user confirmed continuation beyond the previous 21:35 UTC cutoff. Production stops after every configuration reaches its validated, archived target; the final wave may slightly exceed it.</p><p>After ggH completion, ZZ may use <strong>400 workers total</strong> if the existing scratch checks pass. <strong>48 future hourly checks</strong> are queued independently of production jobs, and each check extends that horizon before storage checks begin.</p><p>All <strong>53 controller checks passed</strong>, and the live target mapping, ZZ-only transition and stop condition were verified. Existing physics workers continue with their frozen inputs.</p><p class="small">The 100-pseudo-experiment requirement remains. At the 1M milestone, assess sideband and signal-region effective statistics and background-removal closure before deciding whether more ZZ production is needed. Earlier dated slides retain the historical targets and deadlines.</p></section><!-- REVISED_ZZ_TARGET_END --><!-- SIGNAL_TARGET_20261116_BEGIN --><section id="signal-target"><p class="eyebrow">ggH target check · 2026-11-16 19:56:23 UTC</p><h2>Three signal configurations complete</h2><table style="font-size:.66em"><thead><tr><th>ggH sample</th><th>Fully archived reco</th><th>5M target</th></tr></thead><tbody><tr><td>Pythia nominal</td><td>5,286,420</td><td>Met</td></tr><tr><td>Pythia scale up</td><td>5,319,632</td><td>Met</td></tr><tr><td>Pythia scale down</td><td>5,252,059</td><td>Met</td></tr><tr><td>Herwig</td><td>4,856,030</td><td>Pending</td></tr></tbody></table><p>Herwig has another <strong>13,356 validated reco events</strong> from nine completed wave-16 tasks: <strong>4,869,386</strong> completed-analysis events in total, <strong>130,614 short</strong> of the target.</p><p>The remaining <strong>191 Herwig tasks are queued for Slurm priority</strong> at this snapshot. The current wave should supply enough events; its archive verification must finish before declaring ggH complete.</p><p class="small">All three latest hourly checks passed. No new storage error was reported in those checks. New-wave submissions remain authorized through 16 November 21:35:38 UTC. <a href="evidence/signal-status-20261116.json">Count and queue evidence</a> · Earlier snapshots follow.</p></section><!-- SIGNAL_TARGET_20261116_END --><!-- NOV16_STATUS_BEGIN --><section id="nov16-counts"><p class="eyebrow">Production status · 2026-11-16 16:54:36 UTC</p><h2>Production resumed; archive still slow</h2><table style="font-size:.61em"><thead><tr><th>Sample</th><th>Completed analysis</th><th>Fully archived</th></tr></thead><tbody><tr><td>ggH / Pythia nominal</td><td>4,965,354</td><td>4,645,236</td></tr><tr><td>ggH / Pythia scale up</td><td>4,996,180</td><td>4,674,263</td></tr><tr><td>ggH / Pythia scale down</td><td>4,932,836</td><td>4,614,789</td></tr><tr><td>ggH / Herwig</td><td>4,563,977</td><td>4,269,699</td></tr><tr><td>ZZ / Pythia nominal</td><td>222,643</td><td>207,592</td></tr><tr><td>ZZ / Pythia scale up</td><td>222,615</td><td>207,688</td></tr><tr><td>ZZ / Pythia scale down</td><td>222,935</td><td>207,814</td></tr><tr><td>ZZ / Herwig</td><td>220,673</td><td>205,979</td></tr></tbody></table><p class="small">Completed analysis includes wave 14; fully archived counts stop at wave 13. Selected reco events in the extended mass region; pilots excluded; Pythia scale variations correlated. <a href="production-20261116.html">Recovery, validation and current status →</a></p></section><!-- NOV16_STATUS_END --><!-- EVENING_20261115_BEGIN --><section id="evening-counts"><p class="eyebrow">Validated production · 2026-11-15 22:28:46 UTC</p><h2>Eight thousand more jobs completed</h2><table style="font-size:.60em"><thead><tr><th>Sample</th><th>Reco events</th><th>Since 12:38 UTC</th><th>Of 5M</th></tr></thead><tbody><tr><td>ggH / Pythia nominal</td><td>3,363,612</td><td>+1,603,156</td><td>67.27%</td></tr><tr><td>ggH / Pythia scale up</td><td>3,385,288</td><td>+1,613,727</td><td>67.71%</td></tr><tr><td>ggH / Pythia scale down</td><td>3,341,767</td><td>+1,592,851</td><td>66.84%</td></tr><tr><td>ggH / Herwig</td><td>3,087,717</td><td>+1,468,250</td><td>61.75%</td></tr><tr><td>ZZ / Pythia nominal</td><td>148,547</td><td>+74,267</td><td>2.97%</td></tr><tr><td>ZZ / Pythia scale up</td><td>148,615</td><td>+74,408</td><td>2.97%</td></tr><tr><td>ZZ / Pythia scale down</td><td>148,766</td><td>+74,331</td><td>2.98%</td></tr><tr><td>ZZ / Herwig</td><td>146,966</td><td>+73,173</td><td>2.94%</td></tr></tbody></table><p class="small">Through wave 9: validated and archived; extended mass region; pilots and diagnostics excluded. Pythia scale variations are correlated. Wave 10 is in progress and excluded from these counts. <a href="production-20261115-evening.html">Throughput, health and outlook →</a></p></section><!-- EVENING_20261115_END --><!-- SCALEUP_20261115_BEGIN --><section id="scaleup-20261115"><p class="eyebrow">Production scale-up · 2026-11-15 13:25:59 UTC</p><h2>200 ggH + 200 ZZ workers</h2><p>All <strong>398 pending tasks</strong> in the audit were waiting for our array cap. The first batch started <strong>16–17 seconds</strong> after becoming eligible.</p><p>The higher limits are active for this wave and future waves. At 13:21:47 UTC, <strong>193 ggH + 143 ZZ</strong> workers were running; ZZ had no tasks left queued in this wave.</p><p class="small">Scratch audit: 2,672 completed workers; 3.67 GB maximum sampled use per task; at least 402 GB free on the measured nodes; no guard, exit or cleanup failures. Worker disk guards and storage limits remain.</p><p class="small">Generation can use twice the parallelism. Validation/archive I/O still limits total turnaround. The 37 remaining hourly checks retain their schedule with a longer, 20-minute budget for slow inventories. <a href="evidence/production-scaleup-20261115.json">Decision and verification evidence →</a></p></section><!-- SCALEUP_20261115_END -->
+<section id="production-20261115"><p class="eyebrow">Production status · 2026-11-15 12:38:23 UTC</p><h2>Validated reconstructed events</h2><table style="font-size:.62em"><thead><tr><th>Sample</th><th>Reco events</th><th>Of 5M target</th></tr></thead><tbody><tr><td>ggH / Pythia nominal</td><td>1,760,456</td><td>35.21%</td></tr><tr><td>ggH / Pythia muon scale up</td><td>1,771,561</td><td>35.43%</td></tr><tr><td>ggH / Pythia muon scale down</td><td>1,748,916</td><td>34.98%</td></tr><tr><td>ggH / Herwig</td><td>1,619,467</td><td>32.39%</td></tr><tr><td>ZZ / Pythia nominal</td><td>74,280</td><td>1.49%</td></tr><tr><td>ZZ / Pythia muon scale up</td><td>74,207</td><td>1.48%</td></tr><tr><td>ZZ / Pythia muon scale down</td><td>74,435</td><td>1.49%</td></tr><tr><td>ZZ / Herwig</td><td>73,793</td><td>1.48%</td></tr></tbody></table><p class="small">Fully validated and persisted through wave 4; extended mass region; pilots and diagnostics excluded. Pythia scale variations are correlated. <a href="production-20261115.html">Overnight audit and current production →</a></p></section>
+  <section class="cover">
+    <p class="eyebrow">Research notebook / 01</p>
+    <h1>Unfolding the<br>Higgs decay.</h1>
+    <p class="lead">Seven decay coordinates. A controlled O<sub>HB</sub> injection.<br>From ordinary OmniFold to nuisance profiling.</p>
+    <div class="rule"></div>
+    <p><strong>Current phase:</strong> continuing production in automatically validated waves.</p>
+    <p class="small">Production and archival continue. Latest count snapshot: 2026-11-18 12:41:45 UTC. No unfolding result yet.<br>Use ← → to navigate · Esc for overview · <a href="?print-pdf">Print layout</a></p>
+  </section>
+<!-- DAY_SLIDE_BEGIN --><section><p class="eyebrow">Current production · 2026-11-18 12:41:45 UTC</p><h2>Herwig diagnosis; bulk production stopped</h2><p>ggH production is complete. ZZ has 411,925–416,060 validated reconstructed events per configuration, including the successful files in unfinished wave 27. Whole-wave archival is complete through wave 26.</p><p>An identical-seed retry reproduced the Herwig density-matrix assertion on a different node. An isolated diagnostic job has been submitted. The latest completed storage check passed, and hourly checks continue.</p><p class="small"><a href="production-20261118.html">Current counts and recovery status</a></p></section><!-- DAY_SLIDE_END -->
+  <section>
+    <p class="eyebrow">01 / The measurement</p><h2>A decay-only closure test</h2>
+    <div class="columns"><div>
+      <p class="equation">c<sub>HB</sub> = +0.1<br><span>Λ = 1 TeV</span></p>
+      <p>User-confirmed injection.<br>Controls: c<sub>HB</sub> = 0 and −0.1.</p>
+    </div><div>
+      <p class="equation compact">cos θ₁, cos θ₂, cos θ*,<br>Ψ, Φ, m<sub>Z1</sub>, m<sub>Z2</sub></p>
+      <p>Phi and Psi remain signed angles in radians. m₄ℓ defines selections; m₄ℓ, y₄ℓ and pT₄ℓ never enter these networks.</p>
+      <p class="small">13.6 TeV pp; repository luminosity convention 312 fb⁻¹. The detector is an ATLAS-inspired Delphes approximation.</p>
+    </div></div>
+    <p class="source"><a href="https://arxiv.org/abs/1208.4018">Angular definitions</a> · <a href="https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/main/SMEFT">SMEFT implementation</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">02 / Evidence so far</p><h2>The signal chain runs end to end</h2>
+    <table><thead><tr><th>Component</th><th>Observed state</th><th>Evidence</th></tr></thead><tbody>
+      <tr><td>Delphes 3.5.1 + project patches</td><td class="pass">Built successfully</td><td>Recorded batch validation</td></tr>
+      <tr><td>Analysis environment</td><td class="pass">Installed; imports pass</td><td>Recorded batch validation</td></tr>
+      <tr><td>NSBI / PyTorch environment</td><td class="pass">Installed; imports pass</td><td>Recorded batch validation</td></tr>
+      <tr><td>Generator stack</td><td class="pass">Built; compatible POWHEG core pinned</td><td>Recorded batch validation</td></tr>
+      <tr><td>Software validation</td><td class="pass">428 checks pass across component runs</td><td><a href="TRAINING_LEDGER.md">Validation ledger</a></td></tr>
+      <tr><td>Clean-worker ROOT/Delphes environment</td><td class="pass">Validated</td><td>Recorded batch validation</td></tr>
+      <tr><td>Four gg_H pilot configurations</td><td class="pass">Validated and persisted</td><td>Recorded batch validation</td></tr>
+      <tr><td>ZZ grid and four 10k pilots</td><td class="pass">Completed and persisted</td><td>Local run record / Local run record</td></tr>
+    </tbody></table>
+    <p class="small">Snapshot updated manually from job output. See <a href="CURRENT_STATUS.md">current status</a> for the latest recorded update.</p>
+  </section>
+  <section>
+    <p class="eyebrow">Pilot / Measured acceptance</p><h2>First compact signal samples</h2>
+    <table><thead><tr><th>1,000 generated events each</th><th>Selected reco</th><th>115–130 GeV</th><th>Fiducial</th><th>Walltime</th></tr></thead><tbody>
+      <tr><td>Pythia nominal</td><td>172</td><td>167</td><td>234</td><td>93 s</td></tr>
+      <tr><td>Pythia muon scale up</td><td>172</td><td>167</td><td>234</td><td>94 s</td></tr>
+      <tr><td>Pythia muon scale down</td><td>170</td><td>167</td><td>234</td><td>93 s</td></tr>
+      <tr><td>Herwig nominal</td><td>140</td><td>134</td><td>201</td><td>96 s</td></tr>
+    </tbody></table>
+    <p>All selected events have certified Born kinematics. Pythia scale variants retain identical hard-event identities. Compact files are approximately 0.25 MB each; peak memory is 650–790 MiB.</p>
+    <p class="small">The completed 10k pilot selects 1528/1544/1526/1477 events respectively, in 9 min 40 s–11 min 44 s. It supports sizing a first bounded production wave. <a href="PILOT_RESULTS.md">Measurements, failures and provenance →</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">Pilot / Native deformation</p><h2>The injected ratio is evaluable</h2>
+    <p class="equation compact">c<sub>HB</sub> = 0 → r = 1 exactly<br>c<sub>HB</sub> = +0.1 → selected Herwig r ∈ [0.708, 2.428]</p>
+    <p>The native −0.1/0/+0.1 scan passes finite, nonnegative-ratio checks. The existing merger reproduces the expected cross-section and luminosity normalization.</p>
+    <p>One selected tau-origin event in each nominal sample is unsupported by the direct-lepton calculation. It is explicitly counted and retained at unity for this diagnostic; the final treatment remains to be fixed.</p>
+    <p class="small">No pseudo-data draw, unfolding or coefficient fit was performed. The 1,000-event Herwig template gives selected weighted yields 411.24 → 410.56 at 312 fb⁻¹; this is a noisy template integral, not a measurement. Machine-readable check →</p>
+  </section>
+  <section>
+    <p class="eyebrow">03 / Production design</p><h2>Measure acceptance before scaling</h2>
+    <p class="flow">POWHEG <b>→</b> shower <b>→</b> Delphes <b>→</b> compact ROOT</p>
+    <table><thead><tr><th>Process</th><th>Shower / detector settings</th><th>Required selected reco events</th></tr></thead><tbody>
+      <tr><td>gg_H</td><td>Pythia nominal, scale up, scale down</td><td>≥5M per setting</td></tr>
+      <tr><td>ZZ</td><td>Pythia nominal, scale up, scale down</td><td>Initial ≥1M per setting</td></tr>
+      <tr><td>gg_H</td><td>Herwig nominal</td><td>≥5M</td></tr>
+      <tr><td>ZZ</td><td>Herwig nominal</td><td>Initial ≥1M</td></tr>
+    </tbody></table>
+    <p>First signal wave is complete: one million showered events per configuration selects 160,171 / 161,104 / 158,946 / 148,747 reconstructed events. All 400 shards are validated and persisted. The four 10k ZZ pilots also passed.</p>
+    <p class="small">Persist compact samples and models on /project. Stage active I/O on /work; remove validated intermediates. Soft storage targets: 300 GB /work and 2 TB /project.</p>
+  </section>
+  <section>
+    <p class="eyebrow">Production / Recovery</p><h2>Keep input and accepted counts explicit</h2>
+    <p>Two rare Herwig discards left 9,998 accepted events from a 10,000-event finite source. The same seed succeeds with 10,100 supplied hard events and 10,000 unique showered outputs.</p>
+    <p>New Herwig workers use a 1% reserve. They retain original source identities, keep exceptions fatal, and never reopen the source. All three initial full-chain retries have passed.</p>
+    <p>I also caused eight NFS failures by updating an executing shared script. Partial files were rejected. Runtime files are now frozen; new jobs and final recovery use an immutable snapshot.</p>
+    <p class="small">All recovery tasks passed. Recorded batch validation validated/persisted the complete wave at 22:18 UTC. See <a href="PILOT_RESULTS.md#finite-herwig-input-and-runtime-deployment-failure">failure history and evidence</a>. No physics closure is inferred from these checks.</p>
+  </section>
+  <section>
+    <p class="eyebrow">Production / Capacity and storage</p><h2>100 workers per physics process</h2>
+    <table><thead><tr><th>Resource</th><th>Measured / planned</th></tr></thead><tbody>
+      <tr><td>Persistent usage</td><td>64.1 GB /work with diagnostics; 3.70 GB /project</td></tr>
+      <tr><td>Temporary files per 10k task</td><td>≤3.66 GB sampled across all 1,600 tasks</td></tr>
+      <tr><td>Wave two saved</td><td>15.98M showered rows; 1,598/1,600 shards</td></tr>
+      <tr><td>Concurrency cap</td><td>Observed peak: 100 gg_H + 100 ZZ</td></tr>
+    </tbody></table>
+    <p>All eight local-disk pilots passed, using 3.0–3.64 GB each with complete cleanup. The larger wave saved 1,598/1,600 shards. Two calorimeter crashes stopped final completion. Per-task disk monitoring and project headroom checks stayed active.</p>
+    <p class="small">Use immutable code; persist validated compact results; remove only checksum-verified duplicate work files. <a href="PILOT_RESULTS.md#scaling-with-node-local-temporary-storage">Storage probes and campaign validation →</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">Production / 14 November checkpoint</p><h2>1,598 of 1,600 shards saved</h2>
+    <table><thead><tr><th>Selected reco, excluding pilots</th><th>Saved</th><th>Goal per configuration</th></tr></thead><tbody>
+      <tr><td>gg_H, first + second waves</td><td>440,177–483,395</td><td>≥5M</td></tr>
+      <tr><td>ZZ, second wave</td><td>14,792–14,843</td><td>≥5M</td></tr>
+    </tbody></table>
+    <p>Two signal seeds crash in Delphes' calorimeter. Its particle loop indexes a track vector; upstream has a targeted correction. The separate build and neutral-only regression passed; both failed seeds now complete. All eight controls are certified, including an exact same-node check for floating-point rounding.</p>
+    <p>The repaired wave is being validated. The next run is queued to continue through midnight UTC, with 100 workers per process and storage checks between waves.</p>
+    <p class="small">99.875% successful jobs refers to this wave, not the full sample target. ZZ selection efficiency is about 0.74%. <a href="PILOT_RESULTS.md#large-wave-completion-and-calorimeter-investigation">Failure analysis and evidence →</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">Background / Larger pilot</p><h2>The ZZ chain also completes</h2>
+    <table><thead><tr><th>10,000 showered rows each</th><th>Selected reco</th><th>115–130 GeV</th><th>Fiducial</th></tr></thead><tbody>
+      <tr><td>Pythia nominal / up / down</td><td>77 / 77 / 71</td><td>24 / 25 / 23</td><td>107 / 107 / 107</td></tr>
+      <tr><td>Herwig nominal</td><td>81</td><td>28</td><td>102</td></tr>
+    </tbody></table>
+    <p>All selected Born kinematics are valid. Negative selected weights now occur in every configuration; positive data-like sampling requires explicit validation.</p>
+    <p>Integration took 1 h 35 min; each 10k full-chain job took 10–11 minutes. The corrected summary validates and persists all four outputs.</p>
+    <p class="small">Validated counts, signed sums and hashes · The small independent samples do not establish a shower discrepancy.</p>
+  </section>
+  <section>
+    <p class="eyebrow">04 / Deformation convention</p><h2>Define the injected target exactly</h2>
+    <p class="equation compact">r(x; c) = 1 + c a(x) + c² b(x), &nbsp; c = C<sub>HB</sub> / (Λ/TeV)²</p>
+    <p>The repository uses the full LO decay amplitude with one dimension-six insertion, including its square. Dimension-eight interference and a changed Higgs width are absent.</p>
+    <div class="columns"><div><h3>Source identity</h3><p>gg_H LHE contains an undecayed Higgs. Certified pre-QED shower decay records supply Born leptons. Keep source hashes and event indices.</p></div><div><h3>Closure interpretation</h3><p>The target is generated Herwig density × r. Unity at c = 0 validates the ratio; it does not prove the shower decay equals the exact matrix-element denominator.</p></div></div>
+    <p class="small">Direct e/μ channels are supported. Count unsupported τ-derived decays and undefined angular configurations explicitly before choosing their treatment.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2012.11343">SMEFTsim</a> · <a href="https://arxiv.org/abs/1405.0301">MG5_aMC@NLO</a> · <a href="https://arxiv.org/abs/2606.11083">Born projection, §2.3</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">05 / Statistical construction</p><h2>Signed MC is not Poisson data</h2>
+    <div class="columns"><div><h3>Existing signed resampling</h3><p class="equation compact">E[N₊ − N₋] = μ₊ − μ₋<br>Var[N₊ − N₋] = μ₊ + μ₋</p><p>Its variance exceeds the physical net expectation when negative weights are present.</p></div><div><h3>Required closure check</h3><p>Measure the discrepancy in the pilot. Construct a positive reference for the signed target if needed, validate multivariate closure, then Poisson-sample the deformed intensity.</p></div></div>
+    <p>Deforming an already sampled toy also changes its variance. The c<sub>HB</sub> deformation must enter the sampling intensity for toys intended to reproduce data variance.</p>
+    <p class="small">No absolute-value replacement or dropping negative MC events. Positive-resampling methods need their own bias and correlation validation.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2412.01600">ATLAS NSBI, §6</a> · <a href="https://arxiv.org/abs/2005.09375">Positive Resampler</a> · <a href="https://arxiv.org/abs/2109.07851">Cell resampling</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">06 / Background removal</p><h2>One frozen correction pair</h2>
+    <ol><li>Fit data/(gg_H + ZZ) in 130 &lt; m₄ℓ &lt; 160 GeV; apply the correction to ZZ.</li><li>Fit fiducial signal / contamination in 115 &lt; m₄ℓ &lt; 130 GeV using corrected ZZ.</li><li>Derive both models on one nominal pseudo-data sample. Freeze them for the full pseudo-data ensemble.</li></ol>
+    <p>Validate residual gg_H contamination in the sideband and transport into the signal window. Refit OmniFold for every statistical toy; evaluating frozen OmniFold models does not reproduce unfolding statistical uncertainty.</p>
+    <p class="source"><a href="https://github.com/rafaellopesdesa/FourLeptonUnfolding/tree/main/BackgroundRemoval">Repository background-removal contract</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">07 / Implemented code</p><h2>Unregularized, stage-specific fits</h2>
+    <table><thead><tr><th>Stage</th><th>Default</th><th>Purpose</th></tr></thead><tbody>
+      <tr><td>reco_pull</td><td>4 × (4 layers, 1024 neurons); scan smaller</td><td>Data / folded current MC</td></tr>
+      <tr><td>truth_push</td><td>4 × (4 layers, 1024 neurons)</td><td>Cumulative truth reweighting</td></tr>
+      <tr><td>reco_likelihood</td><td>4 × (4 layers, 1024 neurons)</td><td>Updated / original folded MC</td></tr>
+    </tbody></table>
+    <p>New per-stage settings survive resume and cannot silently change mid-run. Nonzero weight decay is rejected. No dropout, penalty, fitted score calibration, or empirical ratio renormalization is introduced.</p>
+    <p class="small">Existing validation stopping and numerical logit bounds remain recorded controls. Raw-score reliability is a diagnostic, never a fitted correction.</p>
+  </section>
+  <section>
+    <p class="eyebrow">08 / Implemented code</p><h2>Systematic endpoint training</h2>
+    <p class="equation compact">R(x) = K · r(x), &nbsp; K = Σw<sub>varied</sub>/Σw<sub>nominal</sub></p>
+    <p>New <code>Systematics.train</code> reuses the pinned NSBI estimator. It trains Herwig/Pythia and muon-scale up/nominal or down/nominal ratios, keeping shape and yield separate.</p>
+    <ul><li>Require explicit process, shower, scale, luminosity and LHE provenance.</li><li>Reject deformed, background-subtracted and pseudo-data inputs.</li><li>Keep repetitions of a hard event in one split across endpoints.</li><li>Store ensemble, raw reliability, normalization and held-out closure diagnostics.</li></ul>
+    <p class="small">These are marginal reco-space endpoints. A fixed marginal ratio is not yet a validated conditional response model for Profile OmniFold.</p>
+  </section>
+  <section>
+    <p class="eyebrow">09 / Software evidence</p><h2>Failures are part of the record</h2>
+    <table><thead><tr><th>Attempt</th><th>Outcome</th><th>Action</th></tr></thead><tbody>
+      <tr><td>Local run record</td><td>5 endpoint checks passed; 2 BR errors</td><td>Close mmap caches before NFS cleanup</td></tr>
+      <tr><td>Local run record</td><td>5 endpoint + 86 BR passed; 1 OF failure</td><td>Update a test that tried to mutate zero by multiplying it</td></tr>
+      <tr><td>Local run record</td><td>173 tests passed</td><td>Separate-stage and resume tests included</td></tr>
+      <tr><td>Local run record / Local run record</td><td>32 native / 132 Analysis checks passed</td><td>NFS library lifecycle; LHE footer and worker CLI regressions</td></tr>
+    </tbody></table>
+    <p>The endpoint smoke fit uses four tiny networks and one optimizer step, with deliberately relaxed acceptance tolerance. It checks artifact mechanics; it establishes no modeling accuracy.</p>
+    <p class="small"><a href="TRAINING_LEDGER.md">Training ledger</a> records HPO, ensemble selection, reweighting, reliability and normalization status for each attempted fit category.</p>
+  </section>
+  <section>
+    <p class="eyebrow">10 / Planned ordinary OmniFold study</p><h2>Choose capacity before final closure</h2>
+    <div class="columns"><div><h3>Initial candidates</h3><p>reco_pull: 1–3 layers, 16–128 neurons; batches 32–256 subject to usable fit statistics. Four independent members. Scan optimizer budget and iterations.</p><p>These are proposed candidates, not results. Larger truth and likelihood fits retain the requested baseline.</p></div><div><h3>Selection and assessment</h3><p>Use development pseudo-experiments for predictive validation and stopping. Reserve independent pseudo-experiments and truth events for final closure.</p><p>Track all seven marginals, joint two-sample tests, yields, effective entries, ratio tails and coefficient bias.</p></div></div>
+    <p class="small">Hold input identities and splits fixed across comparable candidates. No hyperparameter selection using the final Herwig truth test sample.</p>
+  </section>
+  <section>
+    <p class="eyebrow">11 / Profile OmniFold gate</p><h2>The response must transport with truth</h2>
+    <p class="equation compact">q(x | z, θ) / q(x | z, 0)</p>
+    <p>The Profile OmniFold update depends on a conditional detector response. Theory variation may change both the truth density and response. A ratio integrated over the original truth mixture may fail after unfolding changes that mixture.</p>
+    <p>Test endpoint transport under controlled truth reweightings. Implement the profiling step only after ordinary closure and a response-model validation.</p>
+    <p class="small">Evaluate several nuisance initializations, objective histories, nuisance trajectories and held-out discriminator performance. The paper's V = 1 − 2|accuracy − ½| is not sufficient if the test classifier is weak; signed weights also need special treatment.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2512.07074">Profile OmniFold, §§2–4</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">12 / Likelihood and inference</p><h2>Keep yields, shapes and constraints distinct</h2>
+    <p class="equation compact">−2 log L = 2ν − 2Σ log λ(xᵢ; c, θ)<br>+ (θ<sub>theory</sub> − a<sub>theory</sub>)² + (θ<sub>exp</sub> − a<sub>exp</sub>)² + const.</p>
+    <p>This is the extended point-process form for unweighted observed events with intensity λ and integral ν. Auxiliary observations a constrain nuisance parameters θ; they are not fixed nuisance values.</p>
+    <p>Background-subtracted weighted events give a pseudo-likelihood, not automatically this ordinary Poisson likelihood. Validate inference using the complete toy procedure or an explicitly modeled signal-plus-background likelihood.</p>
+    <p class="small">c<sub>HB</sub> inference needs normalized coefficient-dependent densities, yield dependence and a demonstrated Neyman/coverage construction where asymptotic assumptions fail.</p>
+    <p class="source"><a href="https://arxiv.org/abs/2412.01548">ATLAS HIGP-2024-14</a> · <a href="https://arxiv.org/abs/2412.01600">ATLAS SOFT-2023-01</a></p>
+  </section>
+  <section>
+    <p class="eyebrow">13 / Ensemble specification</p><h2>Two ensembles, two interpretations</h2>
+    <table><thead><tr><th>Ensemble</th><th>Draw</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td>Statistical: ≥100</td><td>Independent pseudo-data realizations</td><td>Refit unfolding with frozen BR models</td></tr>
+      <tr><td>Auxiliary: 100</td><td>Uniform (a<sub>theory</sub>, a<sub>exp</sub>) ∈ [−2,2]²</td><td>User-requested sensitivity ensemble</td></tr>
+    </tbody></table>
+    <p>Store seeds, observable draws, nuisance estimates, failed fits and all unfolded replicas. Do not interpret uniform-box replica quantiles as Gaussian 68% coverage without a separate construction.</p>
+    <p class="small">NNPDF-style deliverable: event weights and provenance for every accepted replica, plus the failure record. No successful replicas selected by favorable truth agreement.</p>
+  </section>
+  <section>
+    <p class="eyebrow">14 / Reading record</p><h2>Sources tied to implementation decisions</h2>
+    <p>Repository documentation reviewed at <code>48a960a</code>: Generation, PowhegCards, BatchSubmit, Simulation, Analysis, Tools, SMEFT, BackgroundRemoval, Plotting and OmniFold, including subdirectory READMEs.</p>
+    <p>Fourteen cited papers were cached with checksums. Core unfolding and inference methods, angular conventions, generator reweighting, signed-weight treatment and detector-performance sections have been studied.</p>
+    <p>Long reference works were read selectively for this implementation. Caching a complete paper does not mean every page, appendix, or reference was read.</p>
+    <p><a href="READING_NOTES.md">Detailed source register, scope and implications →</a></p>
+    <p class="small">Unity partitions, account, limits, modules and storage guidance were checked on the live cluster. Existing allocations constrain all interactive work.</p>
+  </section>
+  <section class="cover">
+    <p class="eyebrow">Next checkpoint</p><h2>Validate local-disk production.<br>Count the larger wave.</h2>
+    <p class="lead">Persist validated shards → count actual selected events → inspect signs and Born coverage → size the remaining waves.</p>
+    <div class="rule"></div>
+    <p><a href="CURRENT_STATUS.md">Current status</a> · <a href="PILOT_RESULTS.md">Pilot results</a> · <a href="TRAINING_LEDGER.md">Training ledger</a> · <a href="READING_NOTES.md">Reading notes</a></p>
+    <p class="small">Living report branch: <code>codex_report</code><br>Code and documentation on main; campaign files and tests on codex branches.</p>
+  </section>
+</div></div>
+<script src="vendor/reveal.js"></script>
+<script src="report.js"></script>
+</body></html>
+
