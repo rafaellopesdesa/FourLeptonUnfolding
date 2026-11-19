@@ -1,6 +1,6 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-19T19:38:28+00:00
+Updated: 19 November 2026 · 20:46 UTC
 
 The accepted samples are merged, normalized and validated. The full Herwig SMEFT template at c_HB = -0.1, 0 and +0.1, Lambda = 1 TeV, has passed its checks. Production is closed.
 
@@ -28,3 +28,7 @@ Twenty development and 100 ensemble pseudo-experiments are available, including 
 ## Working nominal
 
 Member 47 supplies both the sideband fit (637 observed events) and the fixed Higgs data (726 observed events). At 312 fb⁻¹, Pythia ZZ predicts 301.36 Higgs-window events before correction and 296.86 with nominal fit 47. Herwig predicts 299.86. The 100 corrections give a median of 296.57 events and a central 68% interval of 286.10–310.85. All 100 draws enter the bands. Hyperparameter selection uses development draws reweighted with the new nominal pair. [Plots](zz-transport.html?nominal=47).
+
+## Ordinary OmniFold results
+
+The development scan selected 1 iteration and two hidden layers of 32 neurons for the reconstructed-data classifier. The frozen settings are queued for member 47 and the two conditional statistical ensembles. [Study and figures](ordinary-omnifold.html).
