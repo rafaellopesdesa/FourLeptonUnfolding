@@ -1,0 +1,131 @@
+{
+  "finished_utc": "2026-11-19T15:33:15.509080+00:00",
+  "phase": "complete",
+  "ensembles": {
+    "positive": {
+      "count": 121,
+      "nominal": {
+        "signal_lower": 6,
+        "signal_higgs": 380,
+        "signal_sideband": 0,
+        "zz_lower": 116,
+        "zz_higgs": 316,
+        "zz_sideband": 592
+      },
+      "expected": {
+        "signal_lower": 8.343884534155867,
+        "signal_higgs": 415.9606480974398,
+        "signal_sideband": 6.208704779288408,
+        "zz_lower": 111.1683249547329,
+        "zz_higgs": 299.858290287421,
+        "zz_sideband": 630.9312799193165
+      },
+      "sampled_shape_max_abs_pull": 3.274706369635626,
+      "sampled_shape_comparisons": 28,
+      "heldout_statistics": {
+        "signal_lower": {
+          "expected": 8.343884534155867,
+          "mean": 7.92,
+          "variance": 7.427878787878788,
+          "variance_over_mean": 0.8902183098858343,
+          "mean_z": -1.4674503914511454
+        },
+        "signal_higgs": {
+          "expected": 415.9606480974398,
+          "mean": 415.73,
+          "variance": 406.46171717171717,
+          "variance_over_mean": 0.9771638712239493,
+          "mean_z": -0.11308988266438422
+        },
+        "signal_sideband": {
+          "expected": 6.208704779288408,
+          "mean": 6.44,
+          "variance": 5.663030303030303,
+          "variance_over_mean": 0.9121113830249398,
+          "mean_z": 0.9282525566090902
+        },
+        "zz_lower": {
+          "expected": 111.1683249547329,
+          "mean": 114.5,
+          "variance": 109.24242424242425,
+          "variance_over_mean": 0.9826758142385175,
+          "mean_z": 3.159891021880677
+        },
+        "zz_higgs": {
+          "expected": 299.858290287421,
+          "mean": 300.62,
+          "variance": 287.2884848484848,
+          "variance_over_mean": 0.9580808473666419,
+          "mean_z": 0.4398772113287259
+        },
+        "zz_sideband": {
+          "expected": 630.9312799193165,
+          "mean": 628.83,
+          "variance": 457.0112121212121,
+          "variance_over_mean": 0.7243438812855415,
+          "mean_z": -0.8365518821872437
+        },
+        "combined": {
+          "expected": 1472.4711325723545,
+          "mean": 1474.04,
+          "variance": 1400.0185858585862,
+          "variance_over_mean": 0.9507952685040445,
+          "mean_z": 0.40884891706265564
+        }
+      }
+    },
+    "sm": {
+      "count": 1,
+      "nominal": {
+        "signal_lower": 13,
+        "signal_higgs": 426,
+        "signal_sideband": 8,
+        "zz_lower": 101,
+        "zz_higgs": 332,
+        "zz_sideband": 602
+      },
+      "expected": {
+        "signal_lower": 8.366119500564546,
+        "signal_higgs": 417.61848442295866,
+        "signal_sideband": 6.236342085951829,
+        "zz_lower": 111.1683249547329,
+        "zz_higgs": 299.858290287421,
+        "zz_sideband": 630.9312799193165
+      }
+    },
+    "negative": {
+      "count": 1,
+      "nominal": {
+        "signal_lower": 5,
+        "signal_higgs": 410,
+        "signal_sideband": 7,
+        "zz_lower": 106,
+        "zz_higgs": 290,
+        "zz_sideband": 613
+      },
+      "expected": {
+        "signal_lower": 8.436797092837367,
+        "signal_higgs": 421.9441420020962,
+        "signal_sideband": 6.305357568484118,
+        "zz_lower": 111.1683249547329,
+        "zz_higgs": 299.858290287421,
+        "zz_sideband": 630.9312799193165
+      }
+    }
+  },
+  "template_checks": 24,
+  "max_marginal_shift_sigma": 0.02586868034962984,
+  "max_multidimensional_shift_sigma": 0.026242415085969174,
+  "conditioning": "Poisson fluctuations conditional on template, with shared full-template selected rates. Finite-template variance is supplied separately.",
+  "positive_indices": {
+    "nominal": 0,
+    "development": [
+      1,
+      20
+    ],
+    "held_out": [
+      21,
+      120
+    ]
+  }
+}
