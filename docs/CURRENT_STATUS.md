@@ -1,6 +1,6 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-19T16:18:49+00:00
+Updated: 2026-11-19T19:38:28+00:00
 
 The accepted samples are merged, normalized and validated. The full Herwig SMEFT template at c_HB = -0.1, 0 and +0.1, Lambda = 1 TeV, has passed its checks. Production is closed.
 
@@ -28,3 +28,7 @@ One nominal, 20 development and 100 held-out pseudo-experiments are available at
 ## Higgs-window ZZ transport
 
 At 312 fb⁻¹ Herwig predicts 299.86 ZZ events in the 115–130 GeV window. Pythia gives 301.36 before correction and 274.80 after correction. All seven normalized Pythia distributions move farther from Herwig after this fit. [Plots and fit diagnostics](zz-transport.html).
+
+## Sideband statistical ensemble
+
+All 100 fitted corrections were evaluated on the same signed Pythia ZZ sample in the Higgs window. Median 296.57 events, central 68% interval 286.10–310.85. [Absolute and unit-area plots](zz-transport.html).
