@@ -1,0 +1,43 @@
+{
+  "updated_utc": "2026-11-19T10:42:29Z",
+  "production_state": "stopped",
+  "stopped_utc": "2026-11-18T20:06:34Z",
+  "fully_archived_through_wave": 32,
+  "active_wave": 33,
+  "target_selected_reco_per_configuration": 1000000,
+  "count_definition": "Selected reconstructed events with the existing 105–160 GeV mass selection; pilots excluded; Pythia scale variants are correlated.",
+  "samples": [
+    {
+      "name": "Pythia nominal",
+      "archived": 490087,
+      "reco": 504772,
+      "files": 199
+    },
+    {
+      "name": "Pythia muon-scale up",
+      "archived": 490242,
+      "reco": 504985,
+      "files": 199
+    },
+    {
+      "name": "Pythia muon-scale down",
+      "archived": 490699,
+      "reco": 505436,
+      "files": 199
+    },
+    {
+      "name": "Herwig nominal",
+      "archived": 486002,
+      "reco": 500780,
+      "files": 200
+    }
+  ],
+  "validated_files_current_wave": 797,
+  "expected_files_current_wave": 800,
+  "storage_check_utc": "2026-11-19T10:35:50Z",
+  "storage_okay": true,
+  "hourly_checks_scheduled": 48,
+  "failure": "The same Pythia seed aborted with heap corruption in three configurations. Herwig completed all 200 files. The root cause remains under investigation.",
+  "diagnostic": "A bounded, isolated replay is running under a debugger and memory-error diagnostics. Production physics inputs and successful outputs are unchanged.",
+  "eta": "No reliable completion estimate until the failure is resolved and recovery passes validation."
+}
