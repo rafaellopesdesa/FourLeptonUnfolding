@@ -1,6 +1,6 @@
 # FourLeptonStudy current status
 
-Updated: 2026-11-19T15:34:36+00:00
+Updated: 2026-11-19T16:18:49+00:00
 
 The accepted samples are merged, normalized and validated. The full Herwig SMEFT template at c_HB = -0.1, 0 and +0.1, Lambda = 1 TeV, has passed its checks. Production is closed.
 
@@ -24,3 +24,7 @@ Plot gallery: https://rafaellopesdesa.github.io/FourLeptonUnfolding/distribution
 ## Physical pseudo-experiments
 
 One nominal, 20 development and 100 held-out pseudo-experiments are available at +0.1, with nominal controls at 0 and −0.1. The held-out mean is 1,474.04 events for an expectation of 1,472.47 at 312 fb⁻¹. The variance is 1,400.0 events². For pseudo-data draws, a negative contribution cancels against nearby positive weights within each process, mass region, channel, fiducial category and source partition. Simulation training and validation use the original signed weights in the BCE. Five focused regression tests passed against the frozen training code. The largest tested shape changes from this procedure are 0.026 and 0.026 Run 3 statistical errors for marginal and joint projections, respectively.
+
+## Higgs-window ZZ transport
+
+At 312 fb⁻¹ Herwig predicts 299.86 ZZ events in the 115–130 GeV window. Pythia gives 301.36 before correction and 274.80 after correction. All seven normalized Pythia distributions move farther from Herwig after this fit. [Plots and fit diagnostics](zz-transport.html).
