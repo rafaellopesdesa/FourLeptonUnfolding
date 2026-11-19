@@ -1,6 +1,6 @@
 # FourLeptonStudy current status
 
-Updated: 19 November 2026 · 22:42 UTC
+Updated: 19 November 2026 · 22:50 UTC
 
 The accepted samples are merged, normalized and validated. The full Herwig SMEFT template at c_HB = -0.1, 0 and +0.1, Lambda = 1 TeV, has passed its checks. Production is closed.
 
