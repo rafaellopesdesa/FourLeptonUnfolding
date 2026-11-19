@@ -23,12 +23,8 @@ Plot gallery: https://rafaellopesdesa.github.io/FourLeptonUnfolding/distribution
 
 ## Physical pseudo-experiments
 
-One nominal, 20 development and 100 held-out pseudo-experiments are available at +0.1, with nominal controls at 0 and −0.1. The held-out mean is 1,474.04 events for an expectation of 1,472.47 at 312 fb⁻¹. The variance is 1,400.0 events². For pseudo-data draws, a negative contribution cancels against nearby positive weights within each process, mass region, channel, fiducial category and source partition. Simulation training and validation use the original signed weights in the BCE. Five focused regression tests passed against the frozen training code. The largest tested shape changes from this procedure are 0.026 and 0.026 Run 3 statistical errors for marginal and joint projections, respectively.
+Twenty development and 100 ensemble pseudo-experiments are available, including working nominal member 47, at +0.1, with nominal controls at 0 and −0.1. The held-out mean is 1,474.04 events for an expectation of 1,472.47 at 312 fb⁻¹. The variance is 1,400.0 events². For pseudo-data draws, a negative contribution cancels against nearby positive weights within each process, mass region, channel, fiducial category and source partition. Simulation training and validation use the original signed weights in the BCE. Five focused regression tests passed against the frozen training code. The largest tested shape changes from this procedure are 0.026 and 0.026 Run 3 statistical errors for marginal and joint projections, respectively.
 
-## Higgs-window ZZ transport
+## Working nominal
 
-At 312 fb⁻¹ Herwig predicts 299.86 ZZ events in the 115–130 GeV window. Pythia gives 301.36 before correction and 274.80 after correction. All seven normalized Pythia distributions move farther from Herwig after this fit. [Plots and fit diagnostics](zz-transport.html).
-
-## Sideband statistical ensemble
-
-All 100 fitted corrections were evaluated on the same signed Pythia ZZ sample in the Higgs window. Median 296.57 events, central 68% interval 286.10–310.85. [Absolute and unit-area plots](zz-transport.html).
+Member 47 supplies both the sideband fit (637 observed events) and the fixed Higgs data (726 observed events). At 312 fb⁻¹, Pythia ZZ predicts 301.36 Higgs-window events before correction and 296.86 with nominal fit 47. Herwig predicts 299.86. The 100 corrections give a median of 296.57 events and a central 68% interval of 286.10–310.85. All 100 draws enter the bands. Hyperparameter selection uses development draws reweighted with the new nominal pair. [Plots](zz-transport.html?nominal=47).
