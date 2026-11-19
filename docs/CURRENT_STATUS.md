@@ -1,6 +1,6 @@
 # FourLeptonStudy current status
 
-Updated: 19 November 2026 · 20:46 UTC
+Updated: 19 November 2026 · 21:08 UTC
 
 The accepted samples are merged, normalized and validated. The full Herwig SMEFT template at c_HB = -0.1, 0 and +0.1, Lambda = 1 TeV, has passed its checks. Production is closed.
 
@@ -31,4 +31,4 @@ Member 47 supplies both the sideband fit (637 observed events) and the fixed Hig
 
 ## Ordinary OmniFold results
 
-The development scan selected 1 iteration and two hidden layers of 32 neurons for the reconstructed-data classifier. The frozen settings are queued for member 47 and the two conditional statistical ensembles. [Study and figures](ordinary-omnifold.html).
+The development scan selected 1 iteration and two hidden layers of 32 neurons for the reconstructed-data classifier. The Pythia prior predicts 647.55 fiducial events. Member 47 unfolds to 611.69, compared with 592.87 in the deformed Herwig reference. [Study and figures](ordinary-omnifold.html).
