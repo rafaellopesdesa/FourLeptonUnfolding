@@ -1,0 +1,47 @@
+{
+  "updated_utc": "2026-11-19T11:07:12+00:00",
+  "production_state": "ended_by_user",
+  "additional_generation": false,
+  "diagnostic_state": "already_finished_before_user_stop",
+  "future_production_checks_cancelled": 48,
+  "samples": [
+    {
+      "configuration": "Pythia nominal",
+      "ggH_reconstructed": 5607187,
+      "ZZ_reconstructed": 504772
+    },
+    {
+      "configuration": "Pythia muon-scale up",
+      "ggH_reconstructed": 5642232,
+      "ZZ_reconstructed": 504985
+    },
+    {
+      "configuration": "Pythia muon-scale down",
+      "ggH_reconstructed": 5569862,
+      "ZZ_reconstructed": 505436
+    },
+    {
+      "configuration": "Herwig nominal",
+      "ggH_reconstructed": 5150310,
+      "ZZ_reconstructed": 500780
+    }
+  ],
+  "current_sample_policy": "Existing >=5M ggH and >=0.5M ZZ selected reco accepted for the research program.",
+  "count_definition": "Selected reconstructed events in 105\u2013160 GeV; pilots excluded; Pythia scale variants correlated.",
+  "retained_final_wave_files": 797,
+  "missing_final_wave_pythia_files": 3,
+  "legacy_herwig_ggH_repeated_source_occurrences": 33,
+  "preflight_passed": true,
+  "preflight_input_files": 16,
+  "preflight_rows": 160000,
+  "preflight_tests": [
+    "merged counts and normalization",
+    "retained source metadata",
+    "exact coefficient-zero identity",
+    "nonnegative finite +/-0.1 SMEFT ratios at 1 TeV",
+    "signed weight preservation",
+    "ZZ unchanged"
+  ],
+  "research_status": "Full sample consolidation running; Herwig SMEFT template and final validation queued after their inputs. No new generation or NN training.",
+  "next_gate": "Validate physical Poisson pseudo-data from the deformed signed generator measure before background removal and ordinary OmniFold closure."
+}
