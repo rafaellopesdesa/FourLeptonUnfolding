@@ -1,6 +1,6 @@
 # FourLeptonStudy current status
 
-Updated: 20 November 2026 · 10:47 UTC
+Updated: 20 November 2026 · 13:12 UTC
 
 The accepted samples are merged, normalized and validated. The full Herwig SMEFT template at c_HB = -0.1, 0 and +0.1, Lambda = 1 TeV, has passed its checks. Production is closed.
 
@@ -31,4 +31,4 @@ Member 47 supplies both the sideband fit (637 observed events) and the fixed Hig
 
 ## Ordinary OmniFold results
 
-The Run 3–sized pilot compared one and two iterations. Its yield-sensitive score favored 1 iteration with two hidden layers of 32 neurons for the reconstructed-data classifier. The Pythia prior predicts 647.55 fiducial events. Member 47 unfolds to 611.69, compared with 592.87 in the deformed Herwig reference. [Study and figures](ordinary-omnifold.html). [Network validation by iteration](distributions.html#omnifold-validation). Varying Higgs-window data in 100 unfoldings gives a median fiducial yield of 612.67 events and a 16th–84th percentile interval of 589.37–638.52. Varying sideband subtraction in 100 unfoldings gives a median fiducial yield of 612.40 events and a 16th–84th percentile interval of 603.38–621.21. All eight high-statistics network trials and nine trajectories through iteration 12 completed. The largest separation between priors in Φ is 1.81% at iteration 1 and 5.96% at iteration 12. Independent confirmation is pending. [Fiducial Φ by iteration](highstat-phi.html).
+The Run 3–sized pilot compared one and two iterations. Its yield-sensitive score favored 1 iteration with two hidden layers of 32 neurons for the reconstructed-data classifier. The Pythia prior predicts 647.55 fiducial events. Member 47 unfolds to 611.69, compared with 592.87 in the deformed Herwig reference. [Study and figures](ordinary-omnifold.html). [Network validation by iteration](distributions.html#omnifold-validation). Varying Higgs-window data in 100 unfoldings gives a median fiducial yield of 612.67 events and a 16th–84th percentile interval of 589.37–638.52. Varying sideband subtraction in 100 unfoldings gives a median fiducial yield of 612.40 events and a 16th–84th percentile interval of 603.38–621.21. All eight high-statistics network trials and nine trajectories through iteration 12 completed. The largest separation between priors in Φ is 1.81% at iteration 1 and 5.96% at iteration 12. Independent confirmation is pending. [Fiducial Φ by iteration](highstat-phi.html). [Original Pythia truth spectra and detector likelihood](nominal-ggf.html). The first update gains 1.761 expected log-likelihood units at 312 fb⁻¹, with 1.726 from the rate. Later changes vary across training seeds.
